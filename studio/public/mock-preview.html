@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Mock-mode stand-in for a Vibe app running in vibe-dev (VITE_MOCK=1 only). -->
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vikingequiz</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1c2028; }
+  header { background: #2f5bea; color: #fff; padding: 20px 24px; }
+  main { padding: 24px; max-width: 640px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 16px; }
+  button { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid #c3c9d2; background: #fff; cursor: pointer; margin: 4px 8px 4px 0; }
+  .role { display: inline-block; font-size: 12px; background: rgba(255,255,255,.2); border-radius: 999px; padding: 2px 10px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<header><strong>Vikingequiz</strong> <span class="role" id="role"></span></header>
+<main>
+  <div class="card">
+    <h2>Hvad hed vikingernes skibe?</h2>
+    <button>Langskibe</button><button>Kogger</button><button>Galejer</button>
+  </div>
+  <div class="card">
+    <p>Klassen: 7.A · 24 elever</p>
+    <button id="boom">Simulér fejl</button>
+  </div>
+</main>
+<script>
+  const viewAs = new URLSearchParams(location.search).get("viewAs") || "owner";
+  document.getElementById("role").textContent = { owner: "Ejer", editor: "Redaktør", viewer: "Elev" }[viewAs];
+  // Same shape the platform SDK posts from the preview: {type:"vibe:error", message, stack}
+  const report = (message, stack) => parent.postMessage({ type: "vibe:error", message, stack }, "*");
+  window.addEventListener("error", (e) => report(e.message, e.error && e.error.stack));
+  document.getElementById("boom").onclick = () => setTimeout(() => { throw new TypeError("Cannot read properties of undefined (reading 'score')"); });
+</script>
+</body>
+</html>

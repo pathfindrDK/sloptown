@@ -1,0 +1,7 @@
+/* @miira/vibe base styles: apply Miira tokens to the page. Tokens only, no raw colours. */
+html, body {
+  margin: 0;
+  font-family: var(--miira-font-family);
+  background: var(--miira-color-bg);
+  color: var(--miira-color-text);
+}

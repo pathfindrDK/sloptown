@@ -1,0 +1,10 @@
+# User unit of the sloptown user. See deploy/pipeline/nightly.sh.
+[Unit]
+Description=SlopTown nightly image rebuild, scan, smoke test and rollout
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/sloptown
+ExecStart=%h/sloptown/deploy/pipeline/nightly.sh
+TimeoutStartSec=3h
+Nice=10

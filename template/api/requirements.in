@@ -1,0 +1,7 @@
+# Backend dependencies baked into vibe-base. Compile with:
+#   uv pip compile --generate-hashes --python-version 3.13 --exclude-newer <14 days ago> requirements.in -o requirements.lock
+# The platform SDK (miira_vibe) is installed separately from sdk/python.
+fastapi
+uvicorn[standard]
+httpx
+pydantic

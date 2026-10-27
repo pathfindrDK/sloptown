@@ -1,0 +1,16 @@
+[Unit]
+Description=SlopTown local image registry (localhost:5000, host-only)
+
+[Container]
+ContainerName=sloptown-registry
+Image=docker.io/library/registry:2
+AutoUpdate=registry
+Network=sloptown.network
+PublishPort=127.0.0.1:5000:5000
+Volume=sloptown-registry.volume:/var/lib/registry
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

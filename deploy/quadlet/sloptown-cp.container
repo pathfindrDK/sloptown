@@ -1,0 +1,32 @@
+[Unit]
+Description=SlopTown control plane
+Requires=sloptown-db.service
+After=sloptown-db.service
+
+[Container]
+ContainerName=sloptown-cp
+Image=localhost:5000/sloptown/control-plane:latest
+AutoUpdate=registry
+Network=sloptown.network
+EnvironmentFile=/etc/sloptown/sloptown.env
+# The orchestrator drives the sloptown user's rootless podman. Whoever controls
+# sloptown-cp controls every Vibe container: keep this image small and patched.
+Volume=%t/podman/podman.sock:/run/podman/podman.sock
+# The socket belongs to the host sloptown user; map that user to the image's
+# uid 1000 so the control plane can use it without running as root.
+UserNS=keep-id:uid=1000,gid=1000
+SecurityLabelDisable=true
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=sloptown-healthcheck http://127.0.0.1:8000/health
+HealthInterval=15s
+HealthStartPeriod=20s
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

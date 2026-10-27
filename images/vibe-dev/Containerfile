@@ -1,0 +1,56 @@
+# vibe-dev: vibe-base + OpenCode + git + vibe-agentd + the templates (webapp, scratch).
+# Runs opencode :4096, Vite :5173, uvicorn :8000, agentd :4097. Build context: repo root.
+ARG BASE_IMAGE=localhost/sloptown/vibe-base:latest
+FROM ${BASE_IMAGE}
+ARG OPENCODE_VERSION=1.19.4
+ARG DEBIAN_FRONTEND=noninteractive
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends git ripgrep \
+ && rm -rf /var/lib/apt/lists/*
+RUN npm install -g --no-audit --no-fund "opencode-ai@${OPENCODE_VERSION}" && rm -rf /root/.npm
+
+# agentd lives in its own venv so the app's environment stays exactly the lock.
+COPY images/vibe-agentd/ /tmp/agentd/
+RUN uv venv /opt/agentd --python /usr/local/bin/python3 \
+ && VIRTUAL_ENV=/opt/agentd uv pip install /tmp/agentd && rm -rf /tmp/agentd /root/.cache
+
+COPY template/ /opt/template/
+# README.md and tests/ are for SlopTown maintainers, not part of a teacher's project.
+RUN rm -rf /opt/template/web/node_modules /opt/template/web/dist /opt/template/.data \
+    /opt/template/README.md /opt/template/tests
+# A "fra bunden" project starts from this instead (agentd /reset-scratch).
+COPY template-scratch/ /opt/template-scratch/
+COPY images/vibe-dev/opencode.json /etc/opencode/opencode.json
+COPY images/vibe-dev/platform-allowlist.txt /opt/vibe/platform-allowlist.txt
+COPY --chmod=0755 images/vibe-dev/entrypoint.sh /usr/local/bin/vibe-dev-entrypoint
+COPY --chmod=0755 images/vibe-dev/supervisor.py /usr/local/bin/vibe-supervisor
+COPY --chmod=0755 images/vibe-dev/vibe-build.sh /usr/local/bin/vibe-build
+
+# Read-only root: /data points into the project volume, everything else is tmpfs.
+# Vite's dep cache lives in node_modules/.vite; point it at tmpfs.
+# Vite also bundles vite.config.ts into node_modules/.vite-temp.
+RUN ln -s /tmp/vite /opt/vibe/node_modules/.vite && ln -s /tmp/vite-temp /opt/vibe/node_modules/.vite-temp
+RUN ln -s /workspace/.data /data.tmp && rm -rf /data && mv /data.tmp /data \
+ && mkdir -p /workspace && chown vibe:vibe /workspace
+ENV VIBE_MODE=dev \
+    VIBE_WORKSPACE=/workspace \
+    OPENCODE_CONFIG=/etc/opencode/opencode.json \
+    OPENCODE_DISABLE_AUTOUPDATE=1 \
+    OPENCODE_DISABLE_LSP_DOWNLOAD=1 \
+    OPENCODE_DISABLE_MODELS_FETCH=1 \
+    OPENCODE_DISABLE_DEFAULT_PLUGINS=1 \
+    OPENCODE_DISABLE_SHARE=1 \
+    OPENCODE_DISABLE_PROJECT_CONFIG=1 \
+    OPENCODE_DISABLE_CLAUDE_CODE=1 \
+    OPENCODE_DISABLE_EXTERNAL_SKILLS=1 \
+    OPENCODE_DISABLE_EMBEDDED_WEB_UI=1 \
+    XDG_DATA_HOME=/workspace/.opencode/data \
+    XDG_STATE_HOME=/workspace/.opencode/state \
+    XDG_CACHE_HOME=/tmp/cache \
+    XDG_CONFIG_HOME=/tmp/config \
+    HOME=/tmp/home
+WORKDIR /workspace
+USER vibe
+EXPOSE 4096 4097 5173 8000
+LABEL org.opencontainers.image.title="vibe-dev"
+ENTRYPOINT ["tini", "--", "/usr/local/bin/vibe-dev-entrypoint"]

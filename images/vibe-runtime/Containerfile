@@ -1,0 +1,15 @@
+# vibe-runtime: serves one published Vibe. Read-only root; only /data is writable.
+# No agent, git, node or build tools. Build context: repo root.
+ARG BASE_IMAGE=localhost/sloptown/vibe-base:latest
+FROM ${BASE_IMAGE}
+USER root
+# The base carries node for vibe-dev; a published app never needs it.
+RUN rm -rf /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx /usr/local/lib/node_modules \
+           /opt/vibe/node_modules /opt/vibe/sdk-js /usr/local/bin/uv /usr/local/bin/uvx
+ENV VIBE_MODE=runtime VIBE_APP_DIR=/srv/app PYTHONDONTWRITEBYTECODE=1
+WORKDIR /srv/app
+USER vibe
+EXPOSE 8000
+LABEL org.opencontainers.image.title="vibe-runtime"
+ENTRYPOINT ["tini", "--"]
+CMD ["uvicorn", "miira_vibe.runtime:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

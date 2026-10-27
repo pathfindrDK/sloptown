@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the SlopTown image pipeline every night
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Europe/Copenhagen
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

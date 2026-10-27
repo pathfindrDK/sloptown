@@ -1,0 +1,13 @@
+# fake-miira: dev-only Miira stand-in. Build context: fake-miira/.
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 UV_PROJECT_ENVIRONMENT=/opt/venv PATH=/opt/venv/bin:$PATH \
+    FAKE_MIIRA_DATA_FILE=/var/lib/fake-miira/store.json FAKE_MIIRA_KEY_FILE=/var/lib/fake-miira/key.pem
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY fake_miira/ ./fake_miira/
+RUN uv sync --frozen --no-dev && useradd --uid 1000 app && mkdir -p /var/lib/fake-miira && chown app /var/lib/fake-miira
+USER app
+VOLUME /var/lib/fake-miira
+EXPOSE 8100
+CMD ["uvicorn", "fake_miira.app:app", "--host", "0.0.0.0", "--port", "8100", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -1,0 +1,134 @@
+// Reducer for the editor's live state, fed by the project SSE stream.
+import type { BudgetStatus, Message, Part, ProjectEvent, Thread } from "../api/types";
+
+export type ProjectState = {
+  threads: Thread[];
+  messages: Record<string, Message[]>; // by thread id
+  runningThreadId: string | null;
+  queuedThreadId: string | null;
+  changedFiles: string[]; // changed by the last finished turn (or in progress)
+  lastCommitSha: string | null;
+  budget: BudgetStatus | null;
+  filesVersion: number; // bumped on files.changed so views refetch
+  historyVersion: number; // bumped on turn.finished
+};
+
+export const initialProjectState: ProjectState = {
+  threads: [],
+  messages: {},
+  runningThreadId: null,
+  queuedThreadId: null,
+  changedFiles: [],
+  lastCommitSha: null,
+  budget: null,
+  filesVersion: 0,
+  historyVersion: 0,
+};
+
+export type Action =
+  | ProjectEvent
+  | { event: "local.threads"; data: Thread[] }
+  | { event: "local.messages"; data: { threadId: string; messages: Message[] } }
+  | { event: "local.budget"; data: BudgetStatus };
+
+function upsertThread(threads: Thread[], t: Thread): Thread[] {
+  const i = threads.findIndex((x) => x.id === t.id);
+  if (i === -1) return [...threads, t];
+  const next = threads.slice();
+  next[i] = t;
+  return next;
+}
+
+function setThreadStatus(threads: Thread[], id: string, status: Thread["status"]): Thread[] {
+  return threads.map((t) => (t.id === id ? { ...t, status } : t));
+}
+
+function upsertMessage(list: Message[], msg: Message): Message[] {
+  const i = list.findIndex((m) => m.id === msg.id);
+  if (i === -1) return [...list, msg];
+  const next = list.slice();
+  next[i] = msg;
+  return next;
+}
+
+function upsertPart(list: Message[], threadId: string, messageId: string, index: number, part: Part): Message[] {
+  const i = list.findIndex((m) => m.id === messageId);
+  const base: Message =
+    i === -1
+      ? { id: messageId, threadId, role: "assistant", parts: [], createdAt: new Date().toISOString() }
+      : list[i];
+  const parts = base.parts.slice();
+  while (parts.length < index) parts.push({ type: "text", text: "" });
+  parts[index] = part;
+  const msg = { ...base, parts };
+  return i === -1 ? [...list, msg] : upsertMessage(list, msg);
+}
+
+const uniq = (xs: string[]) => Array.from(new Set(xs));
+
+export function projectReducer(state: ProjectState, action: Action): ProjectState {
+  switch (action.event) {
+    case "local.threads":
+      return { ...state, threads: action.data };
+    case "local.messages":
+      return { ...state, messages: { ...state.messages, [action.data.threadId]: action.data.messages } };
+    case "local.budget":
+    case "budget":
+      return { ...state, budget: action.data };
+    case "thread.updated":
+      return { ...state, threads: upsertThread(state.threads, action.data) };
+    case "turn.queued":
+      return {
+        ...state,
+        queuedThreadId: action.data.threadId,
+        threads: setThreadStatus(state.threads, action.data.threadId, "queued"),
+      };
+    case "turn.started": {
+      const { threadId } = action.data;
+      return {
+        ...state,
+        runningThreadId: threadId,
+        queuedThreadId: state.queuedThreadId === threadId ? null : state.queuedThreadId,
+        changedFiles: [],
+        threads: setThreadStatus(state.threads, threadId, "running"),
+      };
+    }
+    case "message.created": {
+      const m = action.data;
+      return {
+        ...state,
+        messages: { ...state.messages, [m.threadId]: upsertMessage(state.messages[m.threadId] ?? [], m) },
+      };
+    }
+    case "message.part": {
+      const { threadId, messageId, index, part } = action.data;
+      return {
+        ...state,
+        messages: {
+          ...state.messages,
+          [threadId]: upsertPart(state.messages[threadId] ?? [], threadId, messageId, index, part),
+        },
+      };
+    }
+    case "turn.finished": {
+      const { threadId, commitSha, changedFiles } = action.data;
+      return {
+        ...state,
+        runningThreadId: state.runningThreadId === threadId ? null : state.runningThreadId,
+        changedFiles: uniq(changedFiles),
+        lastCommitSha: commitSha ?? state.lastCommitSha,
+        threads: setThreadStatus(state.threads, threadId, "idle"),
+        historyVersion: state.historyVersion + 1,
+        filesVersion: state.filesVersion + 1,
+      };
+    }
+    case "files.changed":
+      return {
+        ...state,
+        changedFiles: state.runningThreadId ? uniq([...state.changedFiles, ...action.data.paths]) : state.changedFiles,
+        filesVersion: state.filesVersion + 1,
+      };
+    case "ping":
+      return state;
+  }
+}

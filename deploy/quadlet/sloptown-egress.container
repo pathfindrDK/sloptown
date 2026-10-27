@@ -1,0 +1,29 @@
+[Unit]
+Description=SlopTown egress and inference proxy (:8200 API, :8201 CONNECT)
+Requires=sloptown-db.service
+After=sloptown-db.service
+
+[Container]
+ContainerName=sloptown-egress
+Image=localhost:5000/sloptown/control-plane:latest
+AutoUpdate=registry
+Network=sloptown.network
+EnvironmentFile=/etc/sloptown/sloptown.env
+Environment=SLOPTOWN_EGRESS_ENV_FILE=/etc/sloptown/egress.env
+Volume=/etc/sloptown/egress.env:/etc/sloptown/egress.env:ro
+# Single process: the CONNECT proxy on :8201 runs inside the same worker.
+Exec=python -m sloptown.egress
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=sloptown-healthcheck http://127.0.0.1:8200/health
+HealthInterval=15s
+HealthStartPeriod=20s
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

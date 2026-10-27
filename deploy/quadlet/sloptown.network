@@ -1,0 +1,5 @@
+# Platform network: db, cp, egress, edge, registry, fake-miira.
+# Project networks (vibe-net-*) are created by the control plane, not here.
+[Network]
+NetworkName=sloptown
+Label=sloptown=1

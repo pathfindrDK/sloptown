@@ -1,0 +1,90 @@
+/*
+ * PLACEHOLDER — approximates Miira's design tokens until
+ * design/sync-from-miira.mjs vendors the real drive/public/tokens.css from a
+ * pinned miira3 commit and overwrites this file. Keep the variable names; the
+ * studio only ever reads --miira-* variables.
+ */
+:root {
+  --miira-font-sans: "Roobert PRO", "Roobert", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --miira-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --miira-font-size-xs: 0.75rem;
+  --miira-font-size-sm: 0.8125rem;
+  --miira-font-size-md: 0.875rem;
+  --miira-font-size-lg: 1rem;
+  --miira-font-size-xl: 1.25rem;
+  --miira-font-size-2xl: 1.625rem;
+
+  --miira-space-1: 4px;
+  --miira-space-2: 8px;
+  --miira-space-3: 12px;
+  --miira-space-4: 16px;
+  --miira-space-5: 24px;
+  --miira-space-6: 32px;
+
+  --miira-radius-sm: 6px;
+  --miira-radius-md: 10px;
+  --miira-radius-lg: 16px;
+  --miira-radius-full: 999px;
+
+  --miira-color-bg: #f6f7f9;
+  --miira-color-surface: #ffffff;
+  --miira-color-surface-2: #f0f2f5;
+  --miira-color-surface-3: #e6e9ee;
+  --miira-color-border: #dde1e7;
+  --miira-color-border-strong: #c3c9d2;
+  --miira-color-text: #1c2028;
+  --miira-color-text-muted: #5d6573;
+  --miira-color-text-subtle: #8a92a0;
+  --miira-color-text-on-accent: #ffffff;
+
+  --miira-color-accent: #2f5bea;
+  --miira-color-accent-hover: #244bd0;
+  --miira-color-accent-shade: #1b3aa6;
+  --miira-color-accent-soft: #e7edfd;
+
+  --miira-color-success: #1f8a4c;
+  --miira-color-success-soft: #e3f4ea;
+  --miira-color-warning: #b86e00;
+  --miira-color-warning-soft: #fdf1dc;
+  --miira-color-danger: #c8323b;
+  --miira-color-danger-soft: #fbe5e6;
+
+  --miira-color-diff-add: rgba(31, 138, 76, 0.14);
+  --miira-color-diff-remove: rgba(200, 50, 59, 0.14);
+  --miira-color-highlight: rgba(47, 91, 234, 0.12);
+
+  --miira-shadow-sm: 0 1px 2px rgba(20, 24, 33, 0.06);
+  --miira-shadow-md: 0 4px 16px rgba(20, 24, 33, 0.1);
+  --miira-shadow-lg: 0 16px 48px rgba(20, 24, 33, 0.18);
+  --miira-shadow-3d: 0 2px 0 var(--miira-color-border-strong);
+  --miira-shadow-3d-accent: 0 2px 0 var(--miira-color-accent-shade);
+
+  --miira-overlay: rgba(16, 20, 28, 0.45);
+  --miira-focus-ring: 0 0 0 3px rgba(47, 91, 234, 0.35);
+}
+
+[data-theme="dark"] {
+  --miira-color-bg: #12151b;
+  --miira-color-surface: #1a1e26;
+  --miira-color-surface-2: #222731;
+  --miira-color-surface-3: #2b313d;
+  --miira-color-border: #2f3542;
+  --miira-color-border-strong: #424a5a;
+  --miira-color-text: #e8ebf0;
+  --miira-color-text-muted: #a3abb8;
+  --miira-color-text-subtle: #737c8b;
+
+  --miira-color-accent: #5b7ff2;
+  --miira-color-accent-hover: #6f8ff5;
+  --miira-color-accent-shade: #3550b8;
+  --miira-color-accent-soft: #232f52;
+
+  --miira-color-success-soft: #173325;
+  --miira-color-warning-soft: #3a2c12;
+  --miira-color-danger-soft: #3d1c1f;
+
+  --miira-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --miira-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --miira-overlay: rgba(0, 0, 0, 0.6);
+}

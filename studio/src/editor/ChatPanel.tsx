@@ -1,0 +1,343 @@
+import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileText,
+  ImagePlus,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Send,
+  Square,
+  Terminal,
+  X,
+} from "lucide-react";
+import { api } from "../api/client";
+import { ApiError, type ImageAttachment, type Message, type Part, type Thread } from "../api/types";
+import type { Action, ProjectState } from "../lib/projectState";
+import { useT } from "../lib/i18n";
+import { Menu } from "../components/Menu";
+import { Modal } from "../components/Modal";
+
+type Props = {
+  projectId: string;
+  state: ProjectState;
+  dispatch: (a: Action) => void;
+  activeThreadId: string | null;
+  setActiveThreadId: (id: string) => void;
+  draft: string | null;
+  clearDraft: () => void;
+  blocked: boolean;
+  onBlocked: () => void;
+};
+
+export function ChatPanel(props: Props) {
+  const { projectId, state, dispatch, activeThreadId, setActiveThreadId } = props;
+  const t = useT();
+  const [showArchived, setShowArchived] = useState(false);
+  const [renaming, setRenaming] = useState<Thread | null>(null);
+
+  const threads = state.threads.filter((th) => showArchived || !th.archived);
+  const active = state.threads.find((th) => th.id === activeThreadId) ?? null;
+
+  useEffect(() => {
+    if (!activeThreadId || state.messages[activeThreadId]) return;
+    api.messages(activeThreadId).then((messages) => dispatch({ event: "local.messages", data: { threadId: activeThreadId, messages } }));
+  }, [activeThreadId, state.messages, dispatch]);
+
+  const newThread = async () => {
+    const th = await api.createThread(projectId);
+    dispatch({ event: "thread.updated", data: th });
+    dispatch({ event: "local.messages", data: { threadId: th.id, messages: [] } });
+    setActiveThreadId(th.id);
+  };
+
+  const setArchived = async (th: Thread, archived: boolean) => {
+    dispatch({ event: "thread.updated", data: await api.updateThread(th.id, { archived }) });
+  };
+
+  return (
+    <div className="chat">
+      <div className="chat__threads">
+        <div className="chat__threads-head">
+          <button className="btn btn--3d btn--small" onClick={newThread}>
+            <Plus size={14} /> {t("chat.newThread")}
+          </button>
+          <label className="check">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            {t("chat.showArchived")}
+          </label>
+        </div>
+        <ul className="thread-list" role="listbox" aria-label={t("side.chat")}>
+          {threads.map((th) => (
+            <li
+              key={th.id}
+              role="option"
+              aria-selected={th.id === activeThreadId}
+              className={`thread-list__item${th.id === activeThreadId ? " is-active" : ""}${th.archived ? " is-archived" : ""}`}
+              onClick={() => setActiveThreadId(th.id)}
+            >
+              <ThreadStatus status={th.status} />
+              <span className="thread-list__title">{th.title}</span>
+              <Menu
+                label={th.title}
+                trigger={<MoreHorizontal size={14} />}
+                items={[
+                  { label: t("chat.rename"), icon: <Pencil size={14} />, onSelect: () => setRenaming(th) },
+                  th.archived
+                    ? { label: t("chat.unarchive"), icon: <ArchiveRestore size={14} />, onSelect: () => setArchived(th, false) }
+                    : { label: t("chat.archive"), icon: <Archive size={14} />, onSelect: () => setArchived(th, true) },
+                ]}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+      {active ? (
+        <Conversation {...props} thread={active} messages={state.messages[active.id] ?? []} />
+      ) : (
+        <div className="empty">
+          <p>{t("chat.empty")}</p>
+          <button className="btn btn--3d btn--primary" onClick={newThread}>
+            <Plus size={16} /> {t("chat.newThread")}
+          </button>
+        </div>
+      )}
+      {renaming && (
+        <RenameModal
+          thread={renaming}
+          onClose={() => setRenaming(null)}
+          onSave={async (title) => {
+            dispatch({ event: "thread.updated", data: await api.updateThread(renaming.id, { title }) });
+            setRenaming(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ThreadStatus({ status }: { status: Thread["status"] }) {
+  if (status === "running") return <Loader2 size={14} className="spin accent" aria-label="running" />;
+  if (status === "queued") return <Clock size={14} className="muted" aria-label="queued" />;
+  return <span className="thread-list__dot" aria-hidden />;
+}
+
+function RenameModal({ thread, onClose, onSave }: { thread: Thread; onClose: () => void; onSave: (t: string) => void }) {
+  const t = useT();
+  const [title, setTitle] = useState(thread.title);
+  return (
+    <Modal
+      title={t("chat.rename")}
+      onClose={onClose}
+      actions={
+        <>
+          <button className="btn btn--3d" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
+          <button className="btn btn--3d btn--primary" onClick={() => title.trim() && onSave(title.trim())}>
+            {t("common.save")}
+          </button>
+        </>
+      }
+    >
+      <input
+        className="input"
+        value={title}
+        autoFocus
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && title.trim() && onSave(title.trim())}
+      />
+    </Modal>
+  );
+}
+
+function Conversation({
+  state,
+  thread,
+  messages,
+  draft,
+  clearDraft,
+  blocked,
+  onBlocked,
+}: Props & { thread: Thread; messages: Message[] }) {
+  const t = useT();
+  const [text, setText] = useState("");
+  const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (draft) {
+      setText(draft);
+      clearDraft();
+    }
+  }, [draft, clearDraft]);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const running = state.runningThreadId === thread.id;
+  const otherRunning = !!state.runningThreadId && !running;
+  const queuedHere = state.queuedThreadId === thread.id;
+
+  const addFiles = async (files: FileList | File[]) => {
+    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 4);
+    const read = await Promise.all(
+      imgs.map(
+        (f) =>
+          new Promise<ImageAttachment>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve({ mime: f.type, dataUrl: String(r.result) });
+            r.onerror = reject;
+            r.readAsDataURL(f);
+          }),
+      ),
+    );
+    setImages((cur) => [...cur, ...read].slice(0, 4));
+  };
+
+  const send = async () => {
+    if (!text.trim() || sending) return;
+    if (blocked) return onBlocked();
+    setSending(true);
+    setError(null);
+    try {
+      await api.send(thread.id, text.trim(), images.length ? images : undefined);
+      setText("");
+      setImages([]);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "budget_blocked") onBlocked();
+      else if (e instanceof ApiError && e.code === "queue_full") setError(t("chat.queueFull"));
+      else setError(e instanceof Error ? e.message : t("common.error"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="conversation">
+      <div className="conversation__messages" ref={scroller}>
+        {messages.length === 0 && <p className="empty">{t("chat.empty")}</p>}
+        {messages.map((m) => (
+          <MessageView key={m.id} message={m} />
+        ))}
+        {running && (
+          <div className="conversation__status">
+            <Loader2 size={14} className="spin" /> {t("chat.running")}
+          </div>
+        )}
+        {queuedHere && (
+          <div className="conversation__status">
+            <Clock size={14} /> {t("chat.queued")}
+          </div>
+        )}
+      </div>
+      <div
+        className="composer"
+        onDragOver={(e: DragEvent) => e.preventDefault()}
+        onDrop={(e: DragEvent) => {
+          e.preventDefault();
+          void addFiles(e.dataTransfer.files);
+        }}
+      >
+        {otherRunning && !queuedHere && <div className="composer__note">{t("chat.otherRunning")}</div>}
+        {error && <div className="composer__error">{error}</div>}
+        {images.length > 0 && (
+          <div className="composer__images">
+            {images.map((img, i) => (
+              <div className="composer__thumb" key={i}>
+                <img src={img.dataUrl} alt="" />
+                <button className="icon-btn" aria-label={t("common.close")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <textarea
+          className="composer__input"
+          value={text}
+          rows={3}
+          placeholder={t("chat.placeholder")}
+          onChange={(e) => setText(e.target.value)}
+          onPaste={(e: ClipboardEvent) => {
+            if (e.clipboardData.files.length) {
+              e.preventDefault();
+              void addFiles(e.clipboardData.files);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <div className="composer__actions">
+          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+          <button className="icon-btn" onClick={() => fileInput.current?.click()} title={t("chat.attach")} aria-label={t("chat.attach")}>
+            <ImagePlus size={16} />
+          </button>
+          <div className="topbar__spacer" />
+          {running ? (
+            <button className="btn btn--3d btn--danger" onClick={() => api.stop(thread.id)}>
+              <Square size={14} /> {t("chat.stop")}
+            </button>
+          ) : (
+            <button className="btn btn--3d btn--primary" onClick={send} disabled={!text.trim() || sending}>
+              <Send size={14} /> {t("chat.send")}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageView({ message }: { message: Message }) {
+  return (
+    <div className={`msg msg--${message.role}`}>
+      {message.role === "user" && message.authorName && <div className="msg__author">{message.authorName}</div>}
+      {message.parts.map((p, i) => (
+        <PartView key={i} part={p} />
+      ))}
+    </div>
+  );
+}
+
+function PartView({ part }: { part: Part }) {
+  const [open, setOpen] = useState(false);
+  switch (part.type) {
+    case "text":
+      return part.text ? <div className="msg__text">{part.text}</div> : null;
+    case "image":
+      return <img className="msg__image" src={part.url} alt="" />;
+    case "tool": {
+      const Icon = /bash|run|shell|command/i.test(part.tool) ? Terminal : FileText;
+      return (
+        <div className={`tool tool--${part.status}`}>
+          <button className="tool__head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {part.status === "running" ? <Loader2 size={14} className="spin" /> : <Icon size={14} />}
+            <span className="tool__title">{part.title || part.tool}</span>
+          </button>
+          {open && (
+            <pre className="tool__body">
+              {part.input !== undefined && `${JSON.stringify(part.input, null, 2)}\n`}
+              {part.output}
+            </pre>
+          )}
+        </div>
+      );
+    }
+  }
+}

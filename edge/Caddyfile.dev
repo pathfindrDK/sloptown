@@ -1,0 +1,20 @@
+# Dev edge: plain http on :8080 for *.sloptown.localhost (browsers resolve
+# *.localhost to loopback). Started by deploy/dev-up.sh.
+{
+	auto_https off
+	order rate_limit before basic_auth
+}
+
+import /etc/caddy/common.caddy
+
+http://{$STUDIO_HOST}:8080 {
+	import studio
+}
+
+http://miira.sloptown.localhost:8080 {
+	reverse_proxy {$FAKE_MIIRA_UPSTREAM}
+}
+
+http://*.{$APPS_DOMAIN}:8080 {
+	import apps
+}

@@ -1,0 +1,6 @@
+# Older versions of platform-owned files that may still be published.
+# Format: "<sha256>  <path>" (output of `sha256sum <path>` run in template/).
+# When you change a platform file (AGENTS.md, web/package.json,
+# web/package-lock.json, web/vite.config.ts, api/requirements.lock), append the
+# hash of the PREVIOUS version here, so versions committed before the image
+# update can still be published. Copied to /opt/vibe/platform-allowlist.txt.

@@ -1,0 +1,129 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Copenhagen",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "minimumReleaseAge": "14 days",
+  "prConcurrentLimit": 6,
+  "labels": [
+    "dependencies"
+  ],
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": null,
+    "schedule": [
+      "at any time"
+    ],
+    "labels": [
+      "security"
+    ]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on the first day of the month"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Vibe app dependencies are baked into vibe-base: one PR, and each bump must also be checked against template/AGENTS.md",
+      "matchFileNames": [
+        "template/**"
+      ],
+      "groupName": "vibe template dependencies"
+    },
+    {
+      "description": "Studio frontend",
+      "matchFileNames": [
+        "studio/**"
+      ],
+      "groupName": "studio dependencies"
+    },
+    {
+      "description": "Python services (control plane, fake-miira, SDK, agentd)",
+      "matchFileNames": [
+        "control-plane/**",
+        "fake-miira/**",
+        "sdk/python/**",
+        "images/vibe-agentd/**"
+      ],
+      "groupName": "python service dependencies"
+    },
+    {
+      "description": "Major bumps of the app stack need a new vibe-base line and an SDK codemod (see sdk/AGENTS.md)",
+      "matchFileNames": [
+        "template/**",
+        "sdk/**"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Base images and pinned tools in images/versions.env",
+      "matchFileNames": [
+        "images/versions.env",
+        "**/*Containerfile",
+        "deploy/quadlet/**"
+      ],
+      "groupName": "container base images"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Container images pinned in images/versions.env (NAME=registry/image:tag)",
+      "managerFilePatterns": [
+        "/^images/versions\\.env$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)[A-Z_]+_IMAGE=(?<depName>[^:\\s]+):(?<currentValue>[^\\s@]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "OpenCode version in images/versions.env and the vibe-dev Containerfile default",
+      "managerFilePatterns": [
+        "/^images/versions\\.env$/",
+        "/^images/vibe-dev/Containerfile$/"
+      ],
+      "matchStrings": [
+        "OPENCODE_VERSION=(?<currentValue>[0-9][^\\s]*)"
+      ],
+      "depNameTemplate": "opencode-ai",
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "caddy-ratelimit plugin version",
+      "managerFilePatterns": [
+        "/^images/versions\\.env$/",
+        "/^edge/Containerfile$/"
+      ],
+      "matchStrings": [
+        "RATELIMIT_VERSION=(?<currentValue>v[^\\s]+)"
+      ],
+      "depNameTemplate": "github.com/mholt/caddy-ratelimit",
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "description": "Caddy version built by xcaddy",
+      "managerFilePatterns": [
+        "/^images/versions\\.env$/",
+        "/^edge/Containerfile$/"
+      ],
+      "matchStrings": [
+        "CADDY_VERSION=(?<currentValue>v[^\\s]+)"
+      ],
+      "depNameTemplate": "github.com/caddyserver/caddy/v2",
+      "datasourceTemplate": "go"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "share": "disabled",
+  "enabled_providers": [
+    "sloptown"
+  ],
+  "model": "sloptown/{env:VIBE_AGENT_MODEL}",
+  "small_model": "sloptown/{env:VIBE_AGENT_SMALL_MODEL}",
+  "provider": {
+    "sloptown": {
+      "npm": "@ai-sdk/openai",
+      "name": "SlopTown",
+      "options": {
+        "baseURL": "{env:OPENAI_BASE_URL}",
+        "apiKey": "{env:OPENAI_API_KEY}"
+      },
+      "models": {
+        "{env:VIBE_AGENT_MODEL}": {
+          "name": "Vibe agent",
+          "tool_call": true,
+          "limit": {
+            "context": 200000,
+            "output": 32000
+          }
+        },
+        "{env:VIBE_AGENT_SMALL_MODEL}": {
+          "name": "Vibe agent (small)",
+          "tool_call": true,
+          "limit": {
+            "context": 200000,
+            "output": 16000
+          }
+        }
+      }
+    }
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "deny"
+  }
+}

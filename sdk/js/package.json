@@ -1,0 +1,30 @@
+{
+  "name": "@miira/vibe",
+  "version": "1.0.0",
+  "description": "SlopTown platform SDK for Vibe app frontends: identity, members, AI, Miira theme.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./theme.css": "./dist/theme.css",
+    "./fonts/*": "./dist/fonts/*"
+  },
+  "files": ["dist"],
+  "sideEffects": ["./dist/theme.css"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-theme.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "typescript": "^5.6.3"
+  }
+}

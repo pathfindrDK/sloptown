@@ -1,0 +1,60 @@
+# vibe-base: Python 3.13 + Node 22 + every framework dependency the template uses.
+# Build context: repo root. Almost all security patches land in this image.
+ARG PYTHON_IMAGE=docker.io/library/python:3.13-slim-bookworm
+ARG NODE_IMAGE=docker.io/library/node:22-bookworm-slim
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.9.30
+
+FROM ${NODE_IMAGE} AS node
+FROM ${UV_IMAGE} AS uv
+
+# Pack the JS SDK (@miira/vibe) so it can be unpacked into the global node_modules.
+FROM ${NODE_IMAGE} AS sdk-js
+# copy-theme.mjs reads ../../design/dist, so keep the repo-relative layout.
+WORKDIR /build/sdk/js
+COPY design/dist/ /build/design/dist/
+COPY sdk/js/ ./
+RUN rm -rf node_modules dist \
+ && if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi \
+ && npm run build --if-present \
+ && mkdir /out && npm pack --pack-destination /out \
+ && mv /out/*.tgz /out/miira-vibe.tgz
+
+FROM ${PYTHON_IMAGE}
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+COPY --from=uv /uv /uvx /usr/local/bin/
+
+ENV UV_PYTHON_DOWNLOADS=never UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    VIRTUAL_ENV=/opt/vibe/venv \
+    PATH=/opt/vibe/venv/bin:$PATH \
+    NODE_PATH=/opt/vibe/node_modules \
+    NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false NPM_CONFIG_AUDIT=false
+
+# Python: the template's locked backend deps, then the platform SDK.
+COPY template/api/requirements.lock /opt/vibe/requirements.lock
+RUN uv venv /opt/vibe/venv --python /usr/local/bin/python3 \
+ && uv pip sync /opt/vibe/requirements.lock
+COPY sdk/python/ /tmp/sdk-python/
+RUN uv pip install /tmp/sdk-python && uv pip check && rm -rf /tmp/sdk-python /root/.cache
+
+# Node: the template's locked frontend deps, then the SDK unpacked on top.
+# The SDK is staged at /opt/vibe/sdk-js first so a "file:" reference in the
+# template's package.json resolves during npm ci.
+COPY --from=sdk-js /out/miira-vibe.tgz /tmp/miira-vibe.tgz
+RUN mkdir -p /opt/vibe/sdk-js && tar -xzf /tmp/miira-vibe.tgz -C /opt/vibe/sdk-js --strip-components=1
+COPY template/web/package.json template/web/package-lock.json /opt/vibe/
+RUN cd /opt/vibe && npm ci --no-audit --no-fund \
+ && if [ ! -e node_modules/@miira/vibe ]; then mkdir -p node_modules/@miira && cp -a /opt/vibe/sdk-js node_modules/@miira/vibe; fi \
+ && rm -rf /tmp/miira-vibe.tgz /root/.npm
+
+RUN useradd --uid 1000 --create-home --shell /bin/bash vibe \
+ && mkdir -p /data && chown vibe:vibe /data
+LABEL org.opencontainers.image.title="vibe-base"
+USER vibe

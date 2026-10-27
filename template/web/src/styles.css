@@ -1,0 +1,89 @@
+/* App styles. Use --miira-* tokens only (see AGENTS.md). */
+.side {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--miira-space-6) var(--miira-space-4);
+}
+.hoved {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-3);
+}
+.hoved h1 {
+  margin: 0;
+}
+.maerke {
+  font-size: 0.8rem;
+  padding: 2px var(--miira-space-2);
+  border-radius: var(--miira-radius-lg);
+  border: 1px solid var(--miira-color-border);
+  color: var(--miira-color-text-muted);
+}
+.daempet {
+  color: var(--miira-color-text-muted);
+}
+.kort {
+  background: var(--miira-color-surface);
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-md);
+  box-shadow: var(--miira-shadow-sm);
+  padding: var(--miira-space-4);
+  margin-top: var(--miira-space-4);
+}
+.kort h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-2);
+  margin: 0 0 var(--miira-space-3);
+  font-size: 1.1rem;
+}
+.raekke {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-2);
+}
+.raekke input {
+  flex: 1;
+  font: inherit;
+  padding: var(--miira-space-2) var(--miira-space-3);
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-sm);
+  background: var(--miira-color-bg);
+  color: var(--miira-color-text);
+}
+.knap {
+  font: inherit;
+  padding: var(--miira-space-2) var(--miira-space-4);
+  border: 0;
+  border-radius: var(--miira-radius-sm);
+  background: var(--miira-color-accent);
+  color: var(--miira-color-accent-contrast);
+  cursor: pointer;
+}
+.knap:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.liste {
+  list-style: none;
+  padding: 0;
+  margin: var(--miira-space-3) 0 0;
+  display: grid;
+  gap: var(--miira-space-2);
+}
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: hsl(var(--hue) 70% 85%);
+  color: hsl(var(--hue) 50% 25%);
+  font-weight: 600;
+}
+.fejl {
+  color: var(--miira-color-danger);
+}
+.svar {
+  white-space: pre-wrap;
+}

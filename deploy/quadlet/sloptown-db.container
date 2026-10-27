@@ -1,0 +1,21 @@
+[Unit]
+Description=SlopTown Postgres
+
+[Container]
+ContainerName=sloptown-db
+Image=docker.io/library/postgres:17
+AutoUpdate=registry
+Network=sloptown.network
+Volume=sloptown-db.volume:/var/lib/postgresql/data
+EnvironmentFile=/etc/sloptown/sloptown.env
+HealthCmd=pg_isready -U sloptown -d sloptown
+HealthInterval=10s
+HealthStartPeriod=20s
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

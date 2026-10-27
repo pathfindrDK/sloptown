@@ -1,0 +1,102 @@
+# Shared snippets for Caddyfile (prod) and Caddyfile.dev.
+# Env: STUDIO_ORIGIN, MIIRA_ORIGINS (space separated), CP_UPSTREAM (host:port),
+#      ADMIN_ALLOWED_IPS (space separated CIDRs).
+
+(security_headers) {
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+# Studio host: SPA + control plane API.
+(studio) {
+	import security_headers
+	header >Content-Security-Policy "frame-ancestors 'self' {$MIIRA_ORIGINS}"
+	route {
+		rate_limit {
+			zone studio_ip {
+				key {remote_host}
+				events 600
+				window 1m
+			}
+		}
+
+		# The admin API is called by Miira's backend only.
+		@adminDenied {
+			path /admin/v1 /admin/v1/*
+			not remote_ip {$ADMIN_ALLOWED_IPS}
+		}
+		respond @adminDenied "forbidden" 403
+
+		@cp path /api/* /auth/* /hooks/* /admin/v1/*
+		reverse_proxy @cp {$CP_UPSTREAM} {
+			# SSE streams (/api/projects/*/events) must not be buffered.
+			flush_interval -1
+		}
+
+		root * /srv/studio
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# App and preview hosts: <slug>.APPS and preview-<slug>.APPS.
+(apps) {
+	import security_headers
+	header >Content-Security-Policy "frame-ancestors {$STUDIO_ORIGIN} {$MIIRA_ORIGINS}"
+	route {
+		rate_limit {
+			zone app_ip {
+				key {remote_host}
+				events 1200
+				window 1m
+			}
+		}
+
+		# Identity headers only ever come from forward_auth below.
+		request_header -X-Vibe-*
+		request_header -X-Sloptown-*
+
+		@preview header_regexp Host ^preview-
+		@app not header_regexp Host ^preview-
+		request_header @preview X-Vibe-View-As {http.request.cookie.vibe_view_as}
+
+		# One-time code -> host-only session cookie, set by the control plane.
+		@session path /_vibe/session
+		reverse_proxy @session {$CP_UPSTREAM} {
+			rewrite /edge/session?{query}
+		}
+
+		forward_auth @preview {$CP_UPSTREAM} {
+			uri /edge/auth/preview
+			# The auth check is plain HTTP even when the client upgrades to a WebSocket
+			# (Vite HMR); otherwise the control plane treats it as a handshake and 403s.
+			header_up -Connection
+			header_up -Upgrade
+			header_up -Sec-WebSocket-*
+			copy_headers X-Vibe-Edge-Secret X-Vibe-User X-Vibe-Name X-Vibe-Role X-Vibe-Classes X-Vibe-Upstream
+		}
+		forward_auth @app {$CP_UPSTREAM} {
+			uri /edge/auth/app
+			# The auth check is plain HTTP even when the client upgrades to a WebSocket
+			# (Vite HMR); otherwise the control plane treats it as a handshake and 403s.
+			header_up -Connection
+			header_up -Upgrade
+			header_up -Sec-WebSocket-*
+			copy_headers X-Vibe-Edge-Secret X-Vibe-User X-Vibe-Name X-Vibe-Role X-Vibe-Classes X-Vibe-Upstream
+		}
+
+		# The control plane names the container (vibe-run-<pid>:8000 or vibe-dev-<pid>:5173).
+		reverse_proxy {http.request.header.X-Vibe-Upstream} {
+			header_up -X-Vibe-Upstream
+			header_up -X-Vibe-View-As
+			# The public test gate's cookie is for the edge only; app code never sees it.
+			header_up Cookie "sloptown_gate=[^;]*;?\s*" ""
+			flush_interval -1
+		}
+	}
+}

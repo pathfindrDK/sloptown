@@ -1,0 +1,4 @@
+# Caddy certificates and ACME state.
+[Volume]
+VolumeName=sloptown-caddy
+Label=sloptown=1

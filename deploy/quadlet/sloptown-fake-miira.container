@@ -1,0 +1,16 @@
+# DEV ONLY. Do not install on a production host (bootstrap.sh skips it unless --dev).
+[Unit]
+Description=SlopTown fake Miira (dev)
+
+[Container]
+ContainerName=sloptown-fake-miira
+Image=localhost:5000/sloptown/fake-miira:latest
+AutoUpdate=registry
+Network=sloptown.network
+EnvironmentFile=/etc/sloptown/sloptown.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

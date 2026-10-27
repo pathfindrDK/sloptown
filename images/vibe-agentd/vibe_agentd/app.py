@@ -1,0 +1,393 @@
+"""vibe-agentd: file, git and event helper inside vibe-dev.
+
+Only the control plane calls it (bearer VIBE_PROJECT_TOKEN). See the
+"vibe-agentd" section in docs/internal-api.md.
+"""
+
+import asyncio
+import fnmatch
+import hashlib
+import hmac
+import json
+import os
+import shutil
+import subprocess
+import time
+from pathlib import Path, PurePosixPath
+
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
+
+WORKSPACE = Path(os.environ.get("VIBE_WORKSPACE", "/workspace"))
+TOKEN = os.environ.get("VIBE_PROJECT_TOKEN", "")
+POLL_SECONDS = float(os.environ.get("VIBE_AGENTD_POLL", "1.0"))
+# Platform copies of the locked files, and sha256 hashes of older platform
+# versions that may still be published (see images/AGENTS.md).
+PLATFORM_DIR = Path(os.environ.get("VIBE_PLATFORM_DIR", "/opt/template"))
+PLATFORM_ALLOWLIST = Path(os.environ.get("VIBE_PLATFORM_ALLOWLIST", "/opt/vibe/platform-allowlist.txt"))
+PLATFORM_FILES = ["AGENTS.md", "web/package.json", "web/package-lock.json", "web/vite.config.ts",
+                  "api/requirements.lock"]
+# A "fra bunden" project: no web app, only AGENTS.md is the platform's. The kind
+# lives in an untracked marker the entrypoint and the supervisor read too.
+SCRATCH_DIR = Path(os.environ.get("VIBE_SCRATCH_DIR", "/opt/template-scratch"))
+KIND_FILE = ".vibe-kind"
+RESET_SETTLE_SECONDS = float(os.environ.get("VIBE_RESET_SETTLE", "2.0"))  # > two supervisor ticks
+EXCLUDE = "# managed by vibe-dev\n.data/\n.opencode/\n.vibe-kind\nnode_modules\nweb/dist/\n__pycache__/\n"
+
+HIDDEN = [".git", ".git/**", "node_modules", "node_modules/**", "*/node_modules", "*/node_modules/**",
+          ".opencode", ".opencode/**", ".data", ".data/**", "web/dist", "web/dist/**", KIND_FILE,
+          "**/__pycache__", "**/__pycache__/**"]
+LOCKED = ["AGENTS.md", "web/package.json", "web/package-lock.json", "web/vite.config.ts",
+          "api/requirements.lock", ".opencode/**", ".data/**"]
+
+LANGUAGES = {
+    ".ts": "typescript", ".tsx": "tsx", ".js": "javascript", ".jsx": "jsx", ".mjs": "javascript",
+    ".py": "python", ".json": "json", ".css": "css", ".html": "html", ".md": "markdown",
+    ".toml": "toml", ".yaml": "yaml", ".yml": "yaml", ".sql": "sql", ".svg": "xml", ".txt": "text",
+}
+
+GIT_ENV = {
+    "GIT_AUTHOR_NAME": "Vibe", "GIT_AUTHOR_EMAIL": "vibe@sloptown.invalid",
+    "GIT_COMMITTER_NAME": "SlopTown", "GIT_COMMITTER_EMAIL": "vibe@sloptown.invalid",
+    "GIT_TERMINAL_PROMPT": "0",
+}
+
+app = FastAPI(title="vibe-agentd")
+
+
+def _match(path: str, patterns: list[str]) -> bool:
+    # fnmatch's "*" also matches "/", so "x/**" covers the whole subtree.
+    return any(fnmatch.fnmatchcase(path, p) for p in patterns)
+
+
+def is_hidden(path: str) -> bool:
+    return _match(path, HIDDEN) or any(
+        _match("/".join(path.split("/")[: i + 1]), HIDDEN) for i in range(path.count("/"))
+    )
+
+
+def is_locked(path: str) -> bool:
+    return _match(path, LOCKED)
+
+
+def auth(authorization: str = Header(default="")) -> None:
+    if not TOKEN:
+        return  # unconfigured (tests, local poking); the container always sets it
+    if not hmac.compare_digest(authorization, f"Bearer {TOKEN}"):
+        raise HTTPException(401, "unauthorized")
+
+
+def git(*args: str, input: bytes | None = None, check: bool = True) -> bytes:
+    proc = subprocess.run(
+        ["git", "-c", "core.quotepath=off", *args], cwd=WORKSPACE, input=input,
+        capture_output=True, env={**os.environ, **GIT_ENV},
+    )
+    if check and proc.returncode != 0:
+        raise HTTPException(500, f"git {args[0]} failed: {proc.stderr.decode(errors='replace').strip()}")
+    return proc.stdout
+
+
+def safe_path(path: str) -> str:
+    p = PurePosixPath(path)
+    if p.is_absolute() or ".." in p.parts or not p.parts:
+        raise HTTPException(400, "bad path")
+    norm = str(p)
+    if is_hidden(norm):
+        raise HTTPException(404, "not found")
+    return norm
+
+
+def resolve_sha(sha: str) -> str:
+    out = git("rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).decode().strip()
+    if not out:
+        raise HTTPException(404, "unknown sha")
+    return out
+
+
+def has_head() -> bool:
+    return bool(git("rev-parse", "--verify", "--quiet", "HEAD", check=False).strip())
+
+
+def changed_paths() -> set[str]:
+    """Uncommitted changes plus whatever the last commit touched, if it was an AI turn.
+
+    The template seed commit and platform updates carry no Vibe-Thread trailer;
+    they would otherwise mark every file in a fresh project as changed.
+    """
+    out = set()
+    for line in git("status", "--porcelain=v1", "-z", "--untracked-files=all").decode().split("\0"):
+        if len(line) > 3:
+            out.add(line[3:])
+    if has_head() and "Vibe-Thread:" in git("log", "-1", "--format=%(trailers:only)", "HEAD").decode():
+        out |= set(filter(None, git("show", "--name-only", "--format=", "-z", "HEAD").decode().split("\0")))
+    return out
+
+
+def walk() -> list[tuple[str, int, float]]:
+    files = []
+    for root, dirs, names in os.walk(WORKSPACE):
+        rel_root = os.path.relpath(root, WORKSPACE)
+        rel_root = "" if rel_root == "." else rel_root + "/"
+        dirs[:] = [d for d in dirs if not is_hidden(rel_root + d)]
+        for n in names:
+            rel = rel_root + n
+            if is_hidden(rel):
+                continue
+            try:
+                st = os.lstat(os.path.join(root, n))
+            except FileNotFoundError:
+                continue
+            files.append((rel, st.st_size, st.st_mtime))
+    return sorted(files)
+
+
+def parse_trailers(body: str) -> dict[str, str]:
+    out = {}
+    for line in body.splitlines():
+        if ":" in line:
+            k, _, v = line.partition(":")
+            if k.startswith("Vibe-"):
+                out[k.strip()] = v.strip()
+    return out
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"ok": True, "head": git("rev-parse", "HEAD", check=False).decode().strip() or None}
+
+
+@app.get("/files", dependencies=[Depends(auth)])
+def list_files() -> dict:
+    changed = changed_paths()
+    return {"files": [
+        {"path": p, "size": s, "locked": is_locked(p), "changed": p in changed} for p, s, _ in walk()
+    ]}
+
+
+@app.get("/files/{path:path}", dependencies=[Depends(auth)])
+def read_file(path: str, sha: str | None = None) -> dict:
+    path = safe_path(path)
+    if sha:
+        proc = subprocess.run(["git", "show", f"{resolve_sha(sha)}:{path}"], cwd=WORKSPACE, capture_output=True)
+        if proc.returncode != 0:
+            raise HTTPException(404, "not found")
+        data = proc.stdout
+    else:
+        f = WORKSPACE / path
+        if not f.is_file():
+            raise HTTPException(404, "not found")
+        data = f.read_bytes()
+    if b"\0" in data[:8000]:
+        content, language = None, "binary"
+    else:
+        content, language = data.decode("utf-8", errors="replace"), LANGUAGES.get(Path(path).suffix, "text")
+    return {"path": path, "content": content, "locked": is_locked(path), "language": language}
+
+
+SEP = "\x1e"
+
+
+def commit_info(sha: str) -> dict:
+    raw = git("show", "-s", f"--format=%H{SEP}%s{SEP}%an{SEP}%aI{SEP}%B", sha).decode()
+    full, subject, author, date, body = raw.split(SEP, 4)
+    trailers = parse_trailers(body)
+    files = list(filter(None, git("show", "--name-only", "--format=", "-z", full).decode().split("\0")))
+    return {
+        "sha": full, "message": subject, "authorName": trailers.get("Vibe-Author", author),
+        "threadId": trailers.get("Vibe-Thread"), "threadTitle": None, "createdAt": date,
+        "files": [f for f in files if not is_hidden(f)],
+    }
+
+
+@app.get("/history", dependencies=[Depends(auth)])
+def history(limit: int = 200) -> dict:
+    if not has_head():
+        return {"commits": []}
+    shas = git("rev-list", f"--max-count={limit}", "HEAD").decode().split()
+    return {"commits": [commit_info(s) for s in shas]}
+
+
+STATUS = {"A": "added", "M": "modified", "D": "deleted", "R": "renamed", "C": "copied", "T": "modified"}
+
+
+@app.get("/diff/{sha}", dependencies=[Depends(auth)])
+def diff(sha: str) -> dict:
+    sha = resolve_sha(sha)
+    parent = git("rev-parse", "--verify", "--quiet", f"{sha}^", check=False).decode().strip()
+    base = parent or git("hash-object", "-t", "tree", "/dev/null").decode().strip()
+    files = []
+    parts = git("diff", "--name-status", "-z", base, sha).decode().split("\0")
+    i = 0
+    while i < len(parts) and parts[i]:
+        code = parts[i][0]
+        if code in "RC":
+            path = parts[i + 2]
+            i += 3
+        else:
+            path = parts[i + 1]
+            i += 2
+        if is_hidden(path):
+            continue
+        patch = git("diff", base, sha, "--", path).decode(errors="replace")
+        files.append({"path": path, "status": STATUS.get(code, "modified"), "patch": patch})
+    return {"sha": sha, "files": files}
+
+
+class CommitIn(BaseModel):
+    message: str
+    trailers: dict[str, str] = {}
+
+
+def _commit(message: str, trailers: dict[str, str]) -> dict | None:
+    git("add", "-A")
+    if has_head() and not git("diff", "--cached", "--name-only").strip():
+        return None
+    msg = message.strip() or "Ændringer"
+    if trailers:
+        msg += "\n\n" + "\n".join(f"{k}: {v}" for k, v in trailers.items())
+    git("commit", "-q", "--allow-empty-message", "-F", "-", input=msg.encode())
+    return commit_info("HEAD")
+
+
+@app.post("/commit", dependencies=[Depends(auth)])
+def commit(body: CommitIn) -> dict:
+    c = _commit(body.message, body.trailers)
+    return c if c else {"sha": None, "files": []}
+
+
+class RestoreIn(BaseModel):
+    sha: str
+    message: str = ""
+    trailers: dict[str, str] = {}
+
+
+@app.post("/restore", dependencies=[Depends(auth)])
+def restore(body: RestoreIn) -> dict:
+    sha = resolve_sha(body.sha)
+    # Commit stray edits first so restore never destroys work silently.
+    _commit("Ugemte ændringer før gendannelse", body.trailers)
+    git("read-tree", "-u", "--reset", sha)
+    msg = body.message or f"Gendan version {sha[:7]}"
+    c = _commit(msg, {**body.trailers, "Vibe-Restored-From": sha})
+    return c or commit_info("HEAD")
+
+
+class ExportIn(BaseModel):
+    sha: str
+
+
+def _allowlist() -> set[str]:
+    """Lines "<sha256>  <path>" of accepted older platform-file versions."""
+    try:
+        lines = PLATFORM_ALLOWLIST.read_text().splitlines()
+    except FileNotFoundError:
+        return set()
+    return {" ".join(line.split()[:2]) for line in lines if line.strip() and not line.startswith("#")}
+
+
+def kind() -> str:
+    try:
+        return "scratch" if (WORKSPACE / KIND_FILE).read_text().strip() == "scratch" else "webapp"
+    except OSError:
+        return "webapp"
+
+
+def locked_violations(sha: str) -> list[str]:
+    """Platform-owned files whose content at `sha` is neither the platform copy nor allowlisted."""
+    allowed = _allowlist()
+    bad = []
+    scratch = kind() == "scratch"
+    for path in ["AGENTS.md"] if scratch else PLATFORM_FILES:
+        platform = (SCRATCH_DIR if scratch else PLATFORM_DIR) / path
+        expected = platform.read_bytes() if platform.is_file() else None
+        proc = subprocess.run(["git", "show", f"{sha}:{path}"], cwd=WORKSPACE, capture_output=True)
+        actual = proc.stdout if proc.returncode == 0 else None
+        if actual == expected:
+            continue
+        if actual is not None and f"{hashlib.sha256(actual).hexdigest()} {path}" in allowed:
+            continue
+        bad.append(path)
+    return bad
+
+
+@app.post("/export", dependencies=[Depends(auth)], response_model=None)
+def export(body: ExportIn) -> StreamingResponse | JSONResponse:
+    sha = resolve_sha(body.sha)
+    if bad := locked_violations(sha):
+        return JSONResponse({"paths": bad}, status_code=422)
+    proc = subprocess.Popen(["git", "archive", "--format=tar", sha], cwd=WORKSPACE, stdout=subprocess.PIPE)
+
+    def gen():
+        assert proc.stdout
+        while chunk := proc.stdout.read(65536):
+            yield chunk
+        proc.wait()
+
+    return StreamingResponse(gen(), media_type="application/x-tar", headers={"X-Vibe-Sha": sha})
+
+
+@app.get("/kind", dependencies=[Depends(auth)])
+def get_kind() -> dict:
+    return {"kind": kind()}
+
+
+@app.post("/reset-scratch", dependencies=[Depends(auth)])
+def reset_scratch() -> dict:
+    """Turn a freshly claimed webapp workspace into an empty "fra bunden" project.
+
+    Only while nobody but the platform has committed (every commit carries
+    `Vibe-Author: SlopTown`), so it can never throw a teacher's work away. The
+    history starts over, because a scratch project has nothing to do with the
+    template it was pre-warmed with. Idempotent.
+    """
+    if kind() == "scratch":
+        return {"kind": "scratch", **commit_info("HEAD")}
+    if has_head():
+        for sha in git("rev-list", "HEAD").decode().split():
+            if "Vibe-Author: SlopTown" not in git("log", "-1", "--format=%(trailers:only)", sha).decode():
+                raise HTTPException(409, "project already has work")
+    if git("status", "--porcelain").strip():
+        raise HTTPException(409, "project already has work")
+    # Marker first: the supervisor polls it and stops Vite and the API, which must
+    # not be running in web/ and api/ while those are deleted under them.
+    (WORKSPACE / KIND_FILE).write_text("scratch\n")
+    time.sleep(RESET_SETTLE_SECONDS)
+    for entry in WORKSPACE.iterdir():
+        if entry.name in (".opencode", KIND_FILE):
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+    shutil.copytree(SCRATCH_DIR, WORKSPACE, dirs_exist_ok=True)
+    (WORKSPACE / ".data").mkdir(exist_ok=True)
+    git("init", "-q", "-b", "main")
+    git("config", "core.fileMode", "false")
+    (WORKSPACE / ".git" / "info").mkdir(parents=True, exist_ok=True)
+    (WORKSPACE / ".git" / "info" / "exclude").write_text(EXCLUDE)
+    os.chmod(WORKSPACE / "AGENTS.md", 0o444)
+    git("add", "-A")
+    git("commit", "-q", "-F", "-", input=b"Start fra bunden\n\nVibe-Author: SlopTown")
+    return {"kind": "scratch", **commit_info("HEAD")}
+
+
+@app.get("/events", dependencies=[Depends(auth)])
+async def events() -> StreamingResponse:
+    async def gen():
+        prev = {p: (s, m) for p, s, m in await asyncio.to_thread(walk)}
+        yield "event: ping\ndata: {}\n\n"
+        ticks = 0
+        while True:
+            await asyncio.sleep(POLL_SECONDS)
+            cur = {p: (s, m) for p, s, m in await asyncio.to_thread(walk)}
+            paths = sorted({p for p in cur.keys() | prev.keys() if cur.get(p) != prev.get(p)})
+            prev = cur
+            if paths:
+                yield f"event: files.changed\ndata: {json.dumps({'paths': paths})}\n\n"
+            ticks += 1
+            if ticks * POLL_SECONDS >= 15:
+                ticks = 0
+                yield "event: ping\ndata: {}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})

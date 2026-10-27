@@ -1,0 +1,16 @@
+# Loads only SlopTown's own nftables table (inet sloptown_vibe). Installed by
+# deploy/bootstrap.sh into /etc/systemd/system. Lives on the root fs, so it
+# runs at boot even while the vault is locked.
+[Unit]
+Description=SlopTown project-network firewall rules
+After=network-pre.target
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/sloptown/sloptown.nft
+ExecStop=/usr/sbin/nft delete table inet sloptown_vibe
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+# Build context for every Containerfile is the repo root.
+.git
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.venv
+studio/dist
+studio/dist-mock
+sdk/js/dist
+template/web/dist
+template/.data

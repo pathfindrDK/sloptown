@@ -1,0 +1,12 @@
+# Public test gate: every request needs the gate cookie (one login covers all
+# subdomains). Miira's server-to-server calls are let through: they cannot log in
+# to a gate, and they authenticate themselves (the access-changed webhook with an
+# HMAC signature, the admin API with a Miira-signed JWT plus ADMIN_ALLOWED_IPS).
+(gate) {
+	@gated not path /hooks/* /admin/v1 /admin/v1/*
+	route @gated {
+		forward_auth {$GATE_UPSTREAM} {
+			uri /_gate/check
+		}
+	}
+}

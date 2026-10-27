@@ -1,0 +1,113 @@
+// Types mirror docs/internal-api.md. Change that file first.
+
+export type Role = "owner" | "editor" | "viewer";
+
+export type Me = {
+  user: { sub: string; name: string; email: string; role: string; orgId: string; isSystemAdmin: boolean };
+  termsAcceptedAt: string | null;
+};
+
+export type Terms = { version: string; html: string };
+
+/** "webapp": the template app with preview and publish. "scratch" ("fra bunden"):
+ *  an empty project for code that is never served on the web, e.g. Arduino. */
+export type ProjectKind = "webapp" | "scratch";
+
+export type Project = {
+  id: string;
+  title: string;
+  kind: ProjectKind;
+  slug: string;
+  ownerSub: string;
+  myRole: Role;
+  status: "starting" | "ready" | "stopped" | "error";
+  previewUrl: string | null;
+  appUrl: string | null;
+  publishedSha: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BudgetState = "ok" | "warning" | "nerfed" | "blocked";
+export type BucketStatus = {
+  usedTokens: number;
+  nerfLimitTokens: number | null;
+  hardLimitTokens: number | null;
+  state: BudgetState;
+  resetsAt: string;
+};
+export type BudgetStatus = { enabled: boolean; build: BucketStatus; app: BucketStatus };
+
+export type Thread = {
+  id: string;
+  projectId: string;
+  title: string;
+  ownerSub: string;
+  createdAt: string;
+  archived: boolean;
+  status: "idle" | "running" | "queued";
+};
+
+export type Part =
+  | { type: "text"; text: string }
+  | { type: "tool"; tool: string; title: string; status: "running" | "done" | "error"; input?: unknown; output?: string }
+  | { type: "image"; mime: string; url: string };
+
+export type Message = {
+  id: string;
+  threadId: string;
+  role: "user" | "assistant";
+  authorName?: string;
+  parts: Part[];
+  createdAt: string;
+};
+
+export type FileEntry = { path: string; size: number; locked: boolean; changed: boolean };
+export type FileContent = { path: string; content: string; locked: boolean; language: string };
+
+export type Commit = {
+  sha: string;
+  message: string;
+  authorName: string;
+  threadId: string | null;
+  threadTitle: string | null;
+  createdAt: string;
+  files: string[];
+};
+export type History = { commits: Commit[]; publishedSha: string | null };
+export type Diff = { sha: string; files: { path: string; status: string; patch: string }[] };
+
+export type LaunchResult = { token: string; user: Me["user"]; fileId: string; fileRole: Role };
+
+export type ImageAttachment = { mime: string; dataUrl: string };
+
+export type ProjectEvent =
+  | { event: "turn.started"; data: { threadId: string; turnId: string } }
+  | { event: "message.part"; data: { threadId: string; messageId: string; index: number; part: Part } }
+  | { event: "message.created"; data: Message }
+  | {
+      event: "turn.finished";
+      data: {
+        threadId: string;
+        turnId: string;
+        commitSha: string | null;
+        changedFiles: string[];
+        status: "done" | "stopped" | "error";
+      };
+    }
+  | { event: "turn.queued"; data: { threadId: string; turnId: string } }
+  | { event: "files.changed"; data: { paths: string[] } }
+  | { event: "budget"; data: BudgetStatus }
+  | { event: "thread.updated"; data: Thread }
+  | { event: "ping"; data: Record<string, never> };
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public body: Record<string, unknown> = {},
+  ) {
+    super(message);
+  }
+}

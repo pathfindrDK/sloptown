@@ -1,0 +1,45 @@
+#!/usr/sbin/nft -f
+# SlopTown project-network isolation (rootful podman / netavark).
+#
+# Project networks are created --internal (no default route, no NAT) with an
+# interface name starting "vb" (the control plane sets network_interface to
+# "vb<8 hex>"). Measured on this host (podman 5.7, netavark 1.16): an internal
+# network still lets containers reach every host service on the bridge
+# gateway IP (sshd :5700, smtp :25, ...), so the input chain below is needed.
+# The only legitimate host service on that IP is aardvark-dns (:53).
+#
+# Rootless podman (the production layout, user `sloptown`) keeps project
+# bridges inside the rootless network namespace: there is no host interface to
+# match and an internal network has no path out, so these rules are a no-op
+# there; deploy them anyway as defence in depth for rootful/dev hosts.
+#
+# Inside a project bridge, traffic is L2 and not filtered here (br_netfilter is
+# not loaded): project containers -> sloptown-egress :8200/:8201, and
+# sloptown-edge / sloptown-cp -> project containers :4096 :4097 :5173 :8000 (the
+# control plane connects by IP). The platform containers are attached to every
+# project network; they do not forward between networks. Those services
+# authenticate every call (project token, internal secret) because a project
+# container can reach them on the shared bridge.
+#
+# Load:   nft -f /etc/nftables.d/sloptown.nft     (deploy/bootstrap.sh installs it)
+# Check:  nft -c -f edge/nftables/sloptown.nft
+
+table inet sloptown_vibe
+delete table inet sloptown_vibe
+
+table inet sloptown_vibe {
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		iifname "vb*" udp dport 53 accept comment "aardvark-dns"
+		iifname "vb*" tcp dport 53 accept comment "aardvark-dns"
+		iifname "vb*" ct state established,related accept
+		iifname "vb*" counter drop comment "no host services for project containers"
+	}
+
+	chain forward {
+		type filter hook forward priority filter - 10; policy accept;
+		# Nothing leaves a project bridge through the host, and nothing new enters it.
+		iifname "vb*" oifname != "vb*" counter drop
+		oifname "vb*" iifname != "vb*" ct state != established,related counter drop
+	}
+}

@@ -1,0 +1,30 @@
+[Unit]
+Description=SlopTown edge (Caddy)
+Wants=sloptown-cp.service
+After=sloptown-cp.service
+
+[Container]
+ContainerName=sloptown-edge
+Image=localhost:5000/sloptown/edge:latest
+AutoUpdate=registry
+Network=sloptown.network
+EnvironmentFile=/etc/sloptown/sloptown.env
+# Rootless binding of 80/443 needs net.ipv4.ip_unprivileged_port_start=80
+# (set by deploy/bootstrap.sh).
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=443:443/udp
+Volume=sloptown-caddy.volume:/data
+Exec=caddy run --adapter caddyfile --config /etc/caddy/Caddyfile
+NoNewPrivileges=true
+HealthCmd=wget -q -O /dev/null http://127.0.0.1:2019/config/
+HealthInterval=15s
+HealthStartPeriod=10s
+Notify=healthy
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
