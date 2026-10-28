@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Eye, FileCode, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { api } from "../api/client";
-import { ApiError, type BucketStatus, type Commit, type History, type Project } from "../api/types";
+import { ApiError, type BucketStatus, type Commit, type Project } from "../api/types";
 import { initialProjectState, projectReducer } from "../lib/projectState";
 import { useT } from "../lib/i18n";
 import { useShell } from "../lib/shell";
@@ -12,6 +12,8 @@ import { Preview } from "./Preview";
 import { ChatPanel } from "./ChatPanel";
 import { FilesPanel } from "./FilesPanel";
 import { HistoryPanel } from "./HistoryPanel";
+import { useLoad } from "../lib/useLoad";
+import { Loading } from "../components/Loading";
 
 // CodeMirror is most of the bundle; load it when the first file tab opens.
 const CodeView = lazy(() => import("./CodeView").then((m) => ({ default: m.CodeView })));
@@ -36,7 +38,6 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const shell = useShell();
   const [project, setProject] = useState(initial);
   const [state, dispatch] = useReducer(projectReducer, initialProjectState);
-  const [history, setHistory] = useState<History | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState(0);
   // A "fra bunden" project has no preview; it opens on its README instead.
   const webapp = initial.kind !== "scratch";
@@ -60,8 +61,9 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     const ac = new AbortController();
     api.listThreads(project.id, true).then((threads) => {
       dispatch({ event: "local.threads", data: threads });
-      const first = threads.find((th) => !th.archived);
-      if (first) setActiveThreadId((cur) => cur ?? first.id);
+      // Open on a fresh conversation, unless a turn is already under way.
+      const busy = threads.find((th) => th.status !== "idle");
+      if (busy) setActiveThreadId((cur) => cur ?? busy.id);
     });
     api.budget(project.id).then((b) => dispatch({ event: "local.budget", data: b }));
     api.events(project.id, dispatch, ac.signal);
@@ -75,13 +77,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     return () => clearInterval(id);
   }, [project.id, project.status]);
 
-  useEffect(() => {
-    let live = true;
-    api.history(project.id).then((h) => live && setHistory(h));
-    return () => {
-      live = false;
-    };
-  }, [project.id, state.historyVersion, historyRefresh]);
+  const historyLoad = useLoad(() => api.history(project.id), [project.id, project.status, state.historyVersion, historyRefresh]);
+  const history = historyLoad.data;
 
   // Friendly modal the first time the build budget becomes nerfed or blocked.
   useEffect(() => {
@@ -222,7 +219,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
             {!active && <div className="empty">{t("editor.noTabs")}</div>}
             {active?.kind === "file" && (
               <div className="editor__pane">
-                <Suspense fallback={<div className="empty"><span className="spinner" /></div>}>
+                <Suspense fallback={<Loading />}>
                 <CodeView
                   key={tabKey(active)}
                   projectId={project.id}
@@ -268,6 +265,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                 <FilesPanel
                   projectId={project.id}
                   version={state.filesVersion}
+                  ready={project.status === "ready"}
                   changedFiles={state.changedFiles}
                   activePath={active?.kind === "file" ? active.path : null}
                   onOpen={(path) => openTab({ kind: "file", path })}
@@ -277,6 +275,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                 <HistoryPanel
                   projectId={project.id}
                   history={history ? { ...history, publishedSha: project.publishedSha ?? history.publishedSha } : null}
+                  failed={historyLoad.failed}
+                  onRetry={historyLoad.retry}
                   canEdit={canEdit}
                   onChanged={() => setHistoryRefresh((n) => n + 1)}
                   onPreview={onPreviewCommit}

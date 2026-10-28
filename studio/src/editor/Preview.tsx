@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, Monitor, RotateCw, Smartphone, Tablet, Wrench } from "lucide-react";
 import { api } from "../api/client";
 import type { Project, Role } from "../api/types";
 import { useT } from "../lib/i18n";
+import { Loading } from "../components/Loading";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 const widths: Record<Viewport, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
+// Apps on an editor with an older SDK never send vibe:ready; drop the overlay this long after load.
+const READY_FALLBACK_MS = 4000;
 
 export type PreviewError = { message: string; stack?: string; at: number };
 
@@ -27,6 +30,10 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
   const [frameKey, setFrameKey] = useState(0);
   const [errors, setErrors] = useState<PreviewError[]>([]);
   const [failed, setFailed] = useState(false);
+  // The iframe is up before Vite has compiled and rendered the app: cover it until
+  // the SDK says vibe:ready (or the first error, or the fallback after load).
+  const [appLoading, setAppLoading] = useState(true);
+  const fallback = useRef<ReturnType<typeof setTimeout>>();
 
   // One-time session URL sets the preview cookie (and view-as) on the preview host.
   useEffect(() => {
@@ -52,12 +59,25 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
   useEffect(() => {
     const onMessage = (ev: MessageEvent) => {
       if (ev.origin !== previewOrigin) return;
+      if ((ev.data as { type?: unknown } | null)?.type === "vibe:ready") return setAppLoading(false);
       const err = parsePreviewError(ev.data);
+      if (err) setAppLoading(false);
       if (err) setErrors((es) => (es.some((e) => e.message === err.message) ? es : [...es.slice(-9), err]));
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [previewOrigin]);
+
+  // A new frame (session URL, reload, viewport role switch) starts covered again.
+  useEffect(() => {
+    setAppLoading(true);
+    return () => clearTimeout(fallback.current);
+  }, [src, frameKey]);
+
+  const onFrameLoad = () => {
+    clearTimeout(fallback.current);
+    fallback.current = setTimeout(() => setAppLoading(false), READY_FALLBACK_MS);
+  };
 
   // The session URL is single use; once the cookie is set, reloads go to the plain preview URL.
   const reload = useCallback(() => {
@@ -129,18 +149,20 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
         {failed ? (
           <div className="empty">{t("common.error")}</div>
         ) : project.status !== "ready" || !src ? (
-          <div className="empty">
-            <span className="spinner" /> {t("preview.starting")}
-          </div>
+          <Loading label={t("preview.starting")} />
         ) : (
-          <iframe
-            key={`${frameKey}-${src}`}
-            className="preview__frame"
-            style={{ width: widths[viewport] }}
-            src={src}
-            title={t("preview.tab")}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
-          />
+          <div className="preview__frame-wrap" style={{ width: widths[viewport] }}>
+            {appLoading && <Loading overlay label={t("preview.loading")} />}
+            <iframe
+              key={`${frameKey}-${src}`}
+              className="preview__frame"
+              style={{ width: "100%" }}
+              src={src}
+              title={t("preview.tab")}
+              onLoad={onFrameLoad}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+            />
+          </div>
         )}
       </div>
     </div>

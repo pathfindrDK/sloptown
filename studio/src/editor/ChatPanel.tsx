@@ -3,15 +3,14 @@ import {
   Archive,
   ArchiveRestore,
   ChevronDown,
+  ArrowUp,
   ChevronRight,
   Clock,
   FileText,
-  ImagePlus,
   Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
-  Send,
   Square,
   Terminal,
   X,
@@ -28,7 +27,8 @@ type Props = {
   state: ProjectState;
   dispatch: (a: Action) => void;
   activeThreadId: string | null;
-  setActiveThreadId: (id: string) => void;
+  /** null = a fresh conversation; its thread is created on the first send. */
+  setActiveThreadId: (id: string | null) => void;
   draft: string | null;
   clearDraft: () => void;
   blocked: boolean;
@@ -49,11 +49,16 @@ export function ChatPanel(props: Props) {
     api.messages(activeThreadId).then((messages) => dispatch({ event: "local.messages", data: { threadId: activeThreadId, messages } }));
   }, [activeThreadId, state.messages, dispatch]);
 
-  const newThread = async () => {
-    const th = await api.createThread(projectId);
+  // Threads are created lazily on the first send, so "Ny tråd" just clears the view.
+  const newThread = () => setActiveThreadId(null);
+
+  const createThread = async (firstMessage: string) => {
+    const title = firstMessage.replace(/\s+/g, " ").slice(0, 60);
+    const th = await api.createThread(projectId, title);
     dispatch({ event: "thread.updated", data: th });
     dispatch({ event: "local.messages", data: { threadId: th.id, messages: [] } });
     setActiveThreadId(th.id);
+    return th;
   };
 
   const setArchived = async (th: Thread, archived: boolean) => {
@@ -97,16 +102,12 @@ export function ChatPanel(props: Props) {
           ))}
         </ul>
       </div>
-      {active ? (
-        <Conversation {...props} thread={active} messages={state.messages[active.id] ?? []} />
-      ) : (
-        <div className="empty">
-          <p>{t("chat.empty")}</p>
-          <button className="btn btn--3d btn--primary" onClick={newThread}>
-            <Plus size={16} /> {t("chat.newThread")}
-          </button>
-        </div>
-      )}
+      <Conversation
+        {...props}
+        thread={active}
+        messages={active ? (state.messages[active.id] ?? []) : []}
+        createThread={createThread}
+      />
       {renaming && (
         <RenameModal
           thread={renaming}
@@ -164,7 +165,8 @@ function Conversation({
   clearDraft,
   blocked,
   onBlocked,
-}: Props & { thread: Thread; messages: Message[] }) {
+  createThread,
+}: Props & { thread: Thread | null; messages: Message[]; createThread: (firstMessage: string) => Promise<Thread> }) {
   const t = useT();
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -172,6 +174,7 @@ function Conversation({
   const [sending, setSending] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (draft) {
@@ -185,9 +188,17 @@ function Conversation({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  const running = state.runningThreadId === thread.id;
+  // Grow the textarea with its content, up to the CSS max-height.
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text]);
+
+  const running = !!thread && state.runningThreadId === thread.id;
   const otherRunning = !!state.runningThreadId && !running;
-  const queuedHere = state.queuedThreadId === thread.id;
+  const queuedHere = !!thread && state.queuedThreadId === thread.id;
 
   const addFiles = async (files: FileList | File[]) => {
     const imgs = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 4);
@@ -211,7 +222,8 @@ function Conversation({
     setSending(true);
     setError(null);
     try {
-      await api.send(thread.id, text.trim(), images.length ? images : undefined);
+      const th = thread ?? (await createThread(text.trim()));
+      await api.send(th.id, text.trim(), images.length ? images : undefined);
       setText("");
       setImages([]);
     } catch (e) {
@@ -250,54 +262,87 @@ function Conversation({
         }}
       >
         {otherRunning && !queuedHere && <div className="composer__note">{t("chat.otherRunning")}</div>}
-        {error && <div className="composer__error">{error}</div>}
-        {images.length > 0 && (
-          <div className="composer__images">
-            {images.map((img, i) => (
-              <div className="composer__thumb" key={i}>
-                <img src={img.dataUrl} alt="" />
-                <button className="icon-btn" aria-label={t("common.close")} onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}>
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <textarea
-          className="composer__input"
-          value={text}
-          rows={3}
-          placeholder={t("chat.placeholder")}
-          onChange={(e) => setText(e.target.value)}
-          onPaste={(e: ClipboardEvent) => {
-            if (e.clipboardData.files.length) {
-              e.preventDefault();
-              void addFiles(e.clipboardData.files);
-            }
+        <form
+          className="composer__shell"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-        />
-        <div className="composer__actions">
-          <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
-          <button className="icon-btn" onClick={() => fileInput.current?.click()} title={t("chat.attach")} aria-label={t("chat.attach")}>
-            <ImagePlus size={16} />
-          </button>
-          <div className="topbar__spacer" />
-          {running ? (
-            <button className="btn btn--3d btn--danger" onClick={() => api.stop(thread.id)}>
-              <Square size={14} /> {t("chat.stop")}
-            </button>
-          ) : (
-            <button className="btn btn--3d btn--primary" onClick={send} disabled={!text.trim() || sending}>
-              <Send size={14} /> {t("chat.send")}
-            </button>
+        >
+          {images.length > 0 && (
+            <div className="composer__images">
+              {images.map((img, i) => (
+                <div className="composer__thumb" key={i}>
+                  <img src={img.dataUrl} alt="" />
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={t("common.close")}
+                    onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
-        </div>
+          <textarea
+            ref={input}
+            className="composer__input"
+            value={text}
+            rows={1}
+            autoFocus
+            placeholder={t("chat.placeholder")}
+            onChange={(e) => setText(e.target.value)}
+            onPaste={(e: ClipboardEvent) => {
+              if (e.clipboardData.files.length) {
+                e.preventDefault();
+                void addFiles(e.clipboardData.files);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+          />
+          <div className="composer__row">
+            <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+            <button
+              type="button"
+              className="composer__icon-btn"
+              onClick={() => fileInput.current?.click()}
+              title={t("chat.attach")}
+              aria-label={t("chat.attach")}
+            >
+              <Plus size={20} />
+            </button>
+            {running && thread ? (
+              <button
+                type="button"
+                className="composer__send composer__send--stop"
+                onClick={() => api.stop(thread.id)}
+                title={t("chat.stop")}
+                aria-label={t("chat.stop")}
+              >
+                <Square size={14} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="composer__send"
+                disabled={!text.trim() || sending}
+                title={t("chat.send")}
+                aria-label={t("chat.send")}
+              >
+                <ArrowUp size={18} />
+              </button>
+            )}
+          </div>
+        </form>
+        {error && <div className="composer__error">{error}</div>}
+        <div className="composer__hint">{t("chat.hint")}</div>
       </div>
     </div>
   );

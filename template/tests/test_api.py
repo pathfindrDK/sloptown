@@ -42,14 +42,6 @@ def test_hej_uses_dev_identity(client):
     assert body["besked"].startswith("Hej ")
 
 
-def test_hilsner_roundtrip(client):
-    assert client.get("/hilsner").json() == []
-    ny = client.post("/hilsner", json={"tekst": "Godmorgen 7.A"}).json()
-    assert ny["tekst"] == "Godmorgen 7.A" and ny["forfatter"]
-    assert [h["id"] for h in client.get("/hilsner").json()] == [ny["id"]]
-    assert client.post("/hilsner", json={"tekst": ""}).status_code == 422
-
-
 def test_klassen_requires_editor(client, monkeypatch):
     klasser = client.get("/klassen").json()["klasser"]
     assert "7.A" in klasser

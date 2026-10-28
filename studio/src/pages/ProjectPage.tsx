@@ -10,6 +10,7 @@ import { useShell } from "../lib/shell";
 import { Editor } from "../editor/Editor";
 import { TermsModal } from "../components/TermsModal";
 import { StartChooser } from "./StartChooser";
+import { Loading } from "../components/Loading";
 
 type Mode = "edit" | "view";
 
@@ -76,7 +77,7 @@ export function ProjectPage({ pid, mode, basePath }: { pid: string; mode: Mode; 
   if (!project) {
     return (
       <div className="page page--center">
-        <span className="spinner" />
+        <Loading />
       </div>
     );
   }
@@ -89,6 +90,7 @@ function Viewer({ project, onBack }: { project: Project; onBack: () => void }) {
   const t = useT();
   const shell = useShell();
   const [src, setSrc] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -125,11 +127,18 @@ function Viewer({ project, onBack }: { project: Project; onBack: () => void }) {
       ) : failed ? (
         <div className="empty">{t("common.error")}</div>
       ) : src ? (
-        <iframe className="viewer__frame" src={src} title={project.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads" />
-      ) : (
-        <div className="empty">
-          <span className="spinner" />
+        <div className="viewer__stage">
+          {!loaded && <Loading overlay label={t("preview.loading")} />}
+          <iframe
+            className="viewer__frame"
+            src={src}
+            title={project.title}
+            onLoad={() => setLoaded(true)}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+          />
         </div>
+      ) : (
+        <Loading />
       )}
     </div>
   );

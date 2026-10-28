@@ -84,6 +84,10 @@ the viewer says there is nothing to open. "Hent filer" (`api.download`, a fetche
   `historyVersion`.
 - `changedFiles` = files touched by the running/last turn; used for the tree
   markers and the CodeMirror line highlight (vs. the previous commit).
+- The editor opens the chat on a fresh conversation (`activeThreadId = null`),
+  or on the running/queued thread if a turn is under way. The thread is created
+  on the first send, titled from that message; "Ny tråd" only clears the view,
+  so no empty threads are left behind.
 - One AI turn per project: the reducer tracks `runningThreadId` and one
   `queuedThreadId`; the API answers `409 queue_full` / `429 budget_blocked`.
 
@@ -99,6 +103,8 @@ the viewer says there is nothing to open. "Hent filer" (`api.download`, a fetche
 - The launch token is exchanged once at `POST /api/auth/launch`; the bearer is
   kept in memory only (`setBearer`), never in storage.
 - Components never call `postMessage` directly; they use `useShell()`.
+- The preview shows a loading overlay until `{type:"vibe:ready"}` (or an error,
+  or 4 s after `load`), so a compiling Vite dev server never shows a white page.
 - Preview errors arrive as `{type:"vibe:error", message, stack}` from the
   preview origin only (posted by `@miira/vibe`'s `VibeProvider`).
 

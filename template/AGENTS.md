@@ -12,7 +12,7 @@ This file is owned by the platform. You cannot change it.
 | Path | What |
 |---|---|
 | `web/` | React 18 + Vite + TypeScript frontend. Entry `web/src/main.tsx`, UI in `web/src/App.tsx`. |
-| `api/main.py` | FastAPI backend. The browser reaches it at `/api/...` (`/api/hilsner` → `@app.get("/hilsner")`). |
+| `api/main.py` | FastAPI backend. The browser reaches it at `/api/...` (`/api/hej` → `@app.get("/hej")`). |
 | `/data/app.sqlite` | The app's SQLite database. Use `db.session()` from the SDK. |
 
 The live preview reloads by itself when you save files. The backend restarts

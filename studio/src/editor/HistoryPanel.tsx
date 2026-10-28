@@ -4,10 +4,14 @@ import { api } from "../api/client";
 import type { Commit, Diff, History } from "../api/types";
 import { useLocale, useT } from "../lib/i18n";
 import { ConfirmModal, Modal } from "../components/Modal";
+import { Loading } from "../components/Loading";
+import { LoadFailed } from "../components/LoadFailed";
 
 type Props = {
   projectId: string;
   history: History | null;
+  failed: boolean;
+  onRetry: () => void;
   canEdit: boolean;
   onChanged: () => void;
   onPreview: (c: Commit, parentSha: string | null) => void;
@@ -15,14 +19,14 @@ type Props = {
   onPublish?: (sha: string) => Promise<void>;
 };
 
-export function HistoryPanel({ projectId, history, canEdit, onChanged, onPreview, onPublish }: Props) {
+export function HistoryPanel({ projectId, history, failed, onRetry, canEdit, onChanged, onPreview, onPublish }: Props) {
   const t = useT();
   const locale = useLocale();
   const [restoring, setRestoring] = useState<Commit | null>(null);
   const [diff, setDiff] = useState<Diff | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!history) return <div className="empty">{t("common.loading")}</div>;
+  if (!history) return failed ? <LoadFailed onRetry={onRetry} /> : <Loading label={t("common.loading")} />;
   if (!history.commits.length) return <div className="empty">{t("history.empty")}</div>;
 
   const fmt = new Intl.DateTimeFormat(locale === "da" ? "da-DK" : "en-GB", { dateStyle: "medium", timeStyle: "short" });

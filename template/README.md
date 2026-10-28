@@ -15,9 +15,9 @@ in sync with the SDK's public API (`sdk/AGENTS.md`).
 | `AGENTS.md` | platform (locked) | agent rules + SDK reference |
 | `web/package.json`, `web/package-lock.json` | platform (locked) | frontend deps; `npm ci`'d into vibe-base at `/opt/vibe/node_modules`. `@miira/vibe` is **not** listed: vibe-base copies the SDK into `node_modules/@miira/vibe` |
 | `web/vite.config.ts` | platform (locked) | port 5173, `/api` → `127.0.0.1:8000` with the `/api` prefix stripped (same as vibe-runtime), `allowedHosts` from `VIBE_APPS_DOMAIN`, HMR port from `VIBE_HMR_CLIENT_PORT` |
-| `web/tsconfig.json`, `web/index.html`, `web/src/**` | app (agent edits) | example UI: greeting, guestbook, AI box, member list |
+| `web/tsconfig.json`, `web/index.html`, `web/src/**` | app (agent edits) | an empty page (`App.tsx` renders a bare `<main>`): the preview starts blank |
 | `api/requirements.in` → `api/requirements.lock` | platform (locked) | hashed, compiled for Python 3.13 / linux x86_64; `uv pip sync`'d into vibe-base |
-| `api/main.py` | app (agent edits) | example routes `/hej`, `/klassen`, `/hilsner`, `/spoerg` |
+| `api/main.py` | app (agent edits) | example routes `/hej`, `/klassen`, `/spoerg` (no UI uses them; `tests/e2e` does) |
 | `tests/` | platform | maintainer tests for the template backend (shipped in the image but unused there) |
 
 Locked = listed in `PLATFORM_FILES` in `images/vibe-dev/entrypoint.sh` and the

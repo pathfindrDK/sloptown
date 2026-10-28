@@ -6,6 +6,7 @@ import { getConfig } from "../lib/config";
 import { EmbedBridge } from "../lib/embedBridge";
 import { LocaleProvider, detectLocale, useT, type Locale } from "../lib/i18n";
 import { ShellProvider, applyTheme, embeddedShell } from "../lib/shell";
+import { Loading } from "../components/Loading";
 
 const MOCK = import.meta.env.VITE_MOCK === "1";
 
@@ -54,9 +55,7 @@ function Waiting({ denied }: { denied: boolean }) {
       {denied ? (
         <p>{t("embed.denied")}</p>
       ) : (
-        <p className="muted">
-          <span className="spinner" /> {t("embed.waiting")}
-        </p>
+        <Loading label={t("embed.waiting")} />
       )}
     </div>
   );

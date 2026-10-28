@@ -9,7 +9,7 @@ import {
   type Role,
   type User,
 } from "./client.js";
-import { installErrorBridge } from "./errors.js";
+import { announceReady, installErrorBridge } from "./errors.js";
 
 type VibeContextValue = {
   client: VibeClient;
@@ -32,7 +32,12 @@ export function VibeProvider({ children, apiBase = "/api" }: { children: ReactNo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => installErrorBridge(), []);
+  useEffect(() => {
+    const off = installErrorBridge();
+    // Effects run after the first commit, so the app's first screen is on the page.
+    announceReady();
+    return off;
+  }, []);
 
   useEffect(() => {
     let alive = true;

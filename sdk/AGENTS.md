@@ -35,7 +35,7 @@ browser ──/api/_vibe/*──▶ app backend (miira_vibe.setup) ──Bearer 
 | `python/tests/` | pytest, respx-mocked platform |
 | `js/src/client.ts` | `VibeClient` (fetch + SSE parsing), `BudgetExceededError`, types |
 | `js/src/react.tsx` | `VibeProvider`, `useCurrentUser`, `useRole`, `RequireRole`, `useMembers`, `useAi`, `miiraTheme` |
-| `js/src/errors.ts` | preview error bridge: posts `{type:"vibe:error", message, stack}` to the studio |
+| `js/src/errors.ts` | preview error bridge: posts `{type:"vibe:error", message, stack}` to the studio, and `announceReady()` posts `{type:"vibe:ready"}` after `VibeProvider`'s first render |
 | `js/src/base.css` + `js/scripts/copy-theme.mjs` | builds `dist/theme.css` = `design/dist/tokens.css` (+ fonts) + base styles |
 | `js/test/` | `node --test` against the built `dist/` |
 
@@ -79,7 +79,7 @@ template is the SDK's main consumer.
 - A breaking change is a new major: it ships as a new base image line
   (`vibe-base:2`), with a codemod run on publish, while the old line keeps
   getting patches.
-- Wire contracts (`/api/_vibe/*`, `X-Vibe-*`, `/platform/*`, `vibe:error`) are in
+- Wire contracts (`/api/_vibe/*`, `X-Vibe-*`, `/platform/*`, `vibe:error`, `vibe:ready`) are in
   `docs/internal-api.md`; change that file first.
 
 ## Invariants

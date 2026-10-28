@@ -350,7 +350,10 @@ Not to be confused with `/_vibe/session` at the root of app/preview hosts (edge)
 
 On preview hosts (`preview-*`, framed), `@miira/vibe`'s `VibeProvider` posts
 `{ type: "vibe:error", message, stack? }` to `window.parent` (target origin from
-`document.referrer`) on `error`, `unhandledrejection` and `console.error`.
+`document.referrer`) on `error`, `unhandledrejection` and `console.error`, and
+`{ type: "vibe:ready" }` once, after its first render. The studio covers the
+preview with a loading overlay until `vibe:ready`, the first `vibe:error`, or 4 s
+after the iframe's `load` (apps whose editor still runs an older SDK).
 
 ### Internal webhook relay
 

@@ -209,6 +209,71 @@ textarea {
   }
 }
 
+/* ---------- Loading (Miira design guide: loading tiles) ---------- */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--miira-space-2);
+  height: 100%;
+  padding: var(--miira-space-6) var(--miira-space-4);
+  color: var(--miira-color-text-muted);
+  font-size: var(--miira-font-size-sm);
+}
+.loading--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  height: auto;
+  background: var(--miira-color-surface);
+}
+.loading-tiles {
+  --loading-tile-lift: 3px;
+  --loading-tile-size: 8px;
+  display: inline-grid;
+  grid-template-columns: repeat(3, var(--loading-tile-size));
+  gap: 2px;
+  height: var(--loading-tile-size);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.loading-tiles--sm {
+  --loading-tile-lift: 2px;
+  --loading-tile-size: 7px;
+}
+.loading-tiles__tile {
+  position: relative;
+  display: block;
+  width: var(--loading-tile-size);
+  height: var(--loading-tile-size);
+}
+.loading-tiles__face {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: var(--miira-color-accent);
+  animation: loading-tile-wave 2.1s ease-in-out infinite;
+  animation-delay: calc(var(--tile-col) * 120ms);
+}
+@keyframes loading-tile-wave {
+  0%,
+  22%,
+  100% {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  12% {
+    transform: translateY(calc(-1 * var(--loading-tile-lift)));
+    box-shadow: 0 var(--loading-tile-lift) 0 0 var(--miira-color-accent-shade);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-tiles__face {
+    animation: none;
+  }
+}
+
 .empty {
   display: flex;
   flex-direction: column;
@@ -648,6 +713,14 @@ textarea {
   background: var(--miira-color-surface-3);
   overflow: auto;
 }
+.preview__frame-wrap {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+}
+.preview__frame-wrap > .loading--overlay {
+  border-radius: var(--miira-radius-md);
+}
 .preview__frame {
   height: 100%;
   max-width: 100%;
@@ -877,35 +950,112 @@ textarea {
   white-space: pre-wrap;
 }
 
+/* Composer: same shape as Miira's AI chat (drive `.chat-composer`): a rounded
+   shell holding the textarea and a button row, [+] left, round send right. */
 .composer {
   flex: none;
   padding: var(--miira-space-2) var(--miira-space-3) var(--miira-space-3);
-  border-top: 1px solid var(--miira-color-border);
+}
+.composer__shell {
+  display: flex;
+  flex-direction: column;
+  background: var(--miira-color-surface);
+  border: 1px solid var(--miira-color-border-strong);
+  border-radius: 28px;
+  padding: var(--miira-space-3) 14px 10px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.composer__shell:focus-within {
+  border-color: var(--miira-color-accent);
+}
+/* The shell shows focus; the bare textarea inside it doesn't need its own ring. */
+.composer__input:focus-visible {
+  box-shadow: none;
 }
 .composer__input {
   width: 100%;
-  resize: vertical;
-  min-height: 64px;
-  padding: var(--miira-space-2) var(--miira-space-3);
-  border: 1px solid var(--miira-color-border-strong);
-  border-radius: var(--miira-radius-md);
-  background: var(--miira-color-surface);
-  line-height: 1.4;
+  min-height: 28px;
+  max-height: 220px;
+  resize: none;
+  padding: var(--miira-space-1) 6px 2px;
+  font: inherit;
+  line-height: 1.5;
+  color: var(--miira-color-text);
+  background: transparent;
+  border: 0;
+  outline: none;
 }
-.composer__actions {
+.composer__input::placeholder {
+  color: var(--miira-color-text-subtle);
+}
+.composer__row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--miira-space-2);
   margin-top: var(--miira-space-2);
 }
-.composer__note,
-.composer__error {
+.composer__icon-btn,
+.composer__send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translateY(0);
+  transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.12s;
+}
+.composer__icon-btn {
+  border: 1px solid var(--miira-color-border-strong);
+  background: transparent;
+  color: var(--miira-color-text-muted);
+  box-shadow: var(--miira-shadow-3d);
+}
+.composer__send {
+  border: 2px solid var(--miira-color-accent-shade);
+  background: var(--miira-color-accent);
+  color: var(--miira-color-text-on-accent);
+  box-shadow: var(--miira-shadow-3d-accent);
+}
+.composer__icon-btn:hover:not(:disabled),
+.composer__send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.composer__icon-btn:active:not(:disabled),
+.composer__send:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.composer__send:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.composer__send--stop {
+  border-color: var(--miira-color-danger);
+  background: var(--miira-color-danger);
+  box-shadow: none;
+}
+.composer__note {
   margin-bottom: var(--miira-space-2);
   font-size: var(--miira-font-size-sm);
   color: var(--miira-color-text-muted);
 }
 .composer__error {
-  color: var(--miira-color-danger);
+  margin-top: var(--miira-space-2);
+  padding: var(--miira-space-2) var(--miira-space-3);
+  border-radius: var(--miira-radius-md);
+  background: var(--miira-color-danger-soft);
+  font-size: var(--miira-font-size-sm);
+  color: var(--miira-color-text);
+}
+.composer__hint {
+  margin-top: var(--miira-space-2);
+  text-align: center;
+  font-size: var(--miira-font-size-xs);
+  color: var(--miira-color-text-subtle);
 }
 .composer__images {
   display: flex;
@@ -1063,6 +1213,11 @@ textarea {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+.viewer__stage {
+  position: relative;
+  flex: 1;
+  display: flex;
 }
 .viewer__frame {
   flex: 1;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { BudgetExceededError, VibeClient, hasRole, installErrorBridge } from "../dist/index.js";
+import { BudgetExceededError, VibeClient, announceReady, hasRole, installErrorBridge } from "../dist/index.js";
 
 function mockFetch(handler) {
   const calls = [];
@@ -76,4 +76,14 @@ test("error bridge posts vibe:error from preview hosts only", () => {
   const pub = fakeWindow("quiz.apps.example");
   installErrorBridge(pub.win);
   assert.equal(pub.listeners.error, undefined);
+});
+
+test("announceReady posts vibe:ready from preview hosts only", () => {
+  const { win, posted } = fakeWindow("preview-quiz.apps.example");
+  announceReady(win);
+  assert.deepEqual(posted, [[{ type: "vibe:ready" }, "https://studio.example"]]);
+
+  const pub = fakeWindow("quiz.apps.example");
+  announceReady(pub.win);
+  assert.equal(pub.posted.length, 0);
 });

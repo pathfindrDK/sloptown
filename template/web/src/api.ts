@@ -1,8 +1,7 @@
 // Calls to this app's own backend (api/main.py), served under /api.
+// Add one function per route, e.g. `noter: () => request<Note[]>("/noter")`.
 
-export type Hilsen = { id: number; tekst: string; forfatter: string; oprettet: string };
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
@@ -14,7 +13,4 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const api = {
-  hilsner: () => request<Hilsen[]>("/hilsner"),
-  nyHilsen: (tekst: string) => request<Hilsen>("/hilsner", { method: "POST", body: JSON.stringify({ tekst }) }),
-};
+export const api = {};

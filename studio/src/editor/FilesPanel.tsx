@@ -1,34 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, File, Folder, Lock } from "lucide-react";
 import { api } from "../api/client";
 import type { FileEntry } from "../api/types";
 import { buildTree, type TreeNode } from "../lib/fileTree";
 import { useT } from "../lib/i18n";
+import { useLoad } from "../lib/useLoad";
+import { Loading } from "../components/Loading";
+import { LoadFailed } from "../components/LoadFailed";
 
 type Props = {
   projectId: string;
   version: number; // bumped by files.changed
+  ready: boolean; // project container status; refetch when it becomes ready
   changedFiles: string[];
   activePath: string | null;
   onOpen: (path: string) => void;
 };
 
-export function FilesPanel({ projectId, version, changedFiles, activePath, onOpen }: Props) {
+export function FilesPanel({ projectId, version, ready, changedFiles, activePath, onOpen }: Props) {
   const t = useT();
-  const [files, setFiles] = useState<FileEntry[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    let live = true;
-    api.files(projectId).then((r) => live && setFiles(r.files));
-    return () => {
-      live = false;
-    };
-  }, [projectId, version]);
+  const { data, failed, retry } = useLoad(() => api.files(projectId), [projectId, version, ready]);
+  const files: FileEntry[] | null = data?.files ?? null;
 
   const tree = useMemo(() => buildTree(files ?? [], new Set(changedFiles)), [files, changedFiles]);
 
-  if (!files) return <div className="empty">{t("common.loading")}</div>;
+  if (!files) return failed ? <LoadFailed onRetry={retry} /> : <Loading label={t("common.loading")} />;
   if (!tree.length) return <div className="empty">{t("files.empty")}</div>;
 
   const toggle = (path: string) =>
