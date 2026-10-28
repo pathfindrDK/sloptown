@@ -35,5 +35,12 @@ def runtime_token(project_id: str, seed: str) -> str:
     return _derive(f"run:{project_id}:{seed}")
 
 
+def edge_secret_for(seed: str) -> str:
+    """The X-Vibe-Edge-Secret of one Vibe's containers. Per Vibe, so a secret read out of
+    one container (it is in its environment) proves nothing to another."""
+    key = get_settings().edge_secret.encode()
+    return hmac.new(key, f"edge:{seed}".encode(), hashlib.sha256).hexdigest()
+
+
 def consteq(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode(), b.encode())

@@ -76,7 +76,7 @@ and mounts the app's `api/main.py` under `/api`.
 | `VIBE_PROJECT_ID` | `<pid>` (empty in a `vibe-dev` that started in the warm pool; egress derives the project from the token) |
 | `VIBE_PLATFORM_URL` | `http://sloptown-egress:8200` |
 | `VIBE_PROJECT_TOKEN` | per-project bearer token (dev and runtime get different tokens) |
-| `VIBE_EDGE_SECRET` | shared secret the edge sets in `X-Vibe-Edge-Secret`; SDK rejects identity headers without it |
+| `VIBE_EDGE_SECRET` | this Vibe's own secret (HMAC of the platform edge secret and its token seed), which the edge sets in `X-Vibe-Edge-Secret`; SDK rejects identity headers without it |
 | `VIBE_MODE` | `dev` or `runtime` |
 | `OPENAI_BASE_URL` | `http://sloptown-egress:8200/v1` |
 | `OPENAI_API_KEY` | same value as `VIBE_PROJECT_TOKEN` (never the real key) |

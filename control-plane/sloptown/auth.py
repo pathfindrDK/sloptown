@@ -58,11 +58,16 @@ def secure_cookies() -> bool:
     return origin.startswith("https://") or ".localhost" in origin or "//localhost" in origin
 
 
-def set_cookie(
-    response: Response, name: str, value: str, *, max_age: int, partitioned: bool, path: str = "/"
-) -> None:
+def cookie_name(base: str) -> str:
+    """`__Host-` on HTTPS: apps on sibling subdomains can set cookies for the parent
+    domain, and a planted session cookie would log a teacher into someone else's
+    session (studio) or app. A `__Host-` cookie can only come from the host itself."""
+    return f"__Host-{base}" if secure_cookies() else base
+
+
+def set_cookie(response: Response, name: str, value: str, *, max_age: int, partitioned: bool) -> None:
     """Set a host-only HttpOnly cookie; partitioned (CHIPS) cookies are SameSite=None."""
-    parts = [f"{name}={value}", f"Path={path}", f"Max-Age={max_age}", "HttpOnly"]
+    parts = [f"{cookie_name(name)}={value}", "Path=/", f"Max-Age={max_age}", "HttpOnly"]
     if partitioned:
         parts += ["Secure", "SameSite=None", "Partitioned"]
     else:
@@ -73,7 +78,8 @@ def set_cookie(
 
 
 def clear_cookie(response: Response, name: str) -> None:
-    response.headers.append("set-cookie", f"{name}=; Path=/; Max-Age=0; HttpOnly")
+    secure = "; Secure" if secure_cookies() else ""
+    response.headers.append("set-cookie", f"{cookie_name(name)}=; Path=/; Max-Age=0; HttpOnly{secure}")
 
 
 async def upsert_user(db: AsyncSession, claims: dict[str, Any]) -> User:
@@ -117,7 +123,7 @@ def _session_token(request: Request) -> str | None:
     authz = request.headers.get("authorization", "")
     if authz.lower().startswith("bearer "):
         return authz[7:].strip()
-    return request.cookies.get(SESSION_COOKIE)
+    return request.cookies.get(cookie_name(SESSION_COOKIE))
 
 
 async def optional_principal(
@@ -192,14 +198,14 @@ async def login(next: str | None = None) -> Response:
         s.session_secret,
         algorithm="HS256",
     )
-    set_cookie(response, OIDC_COOKIE, flow, max_age=600, partitioned=False, path="/auth")
+    set_cookie(response, OIDC_COOKIE, flow, max_age=600, partitioned=False)
     return response
 
 
 @router.get("/auth/callback")
 async def callback(request: Request, db: Db, code: str = "", state: str = "") -> Response:
     s = get_settings()
-    raw = request.cookies.get(OIDC_COOKIE)
+    raw = request.cookies.get(cookie_name(OIDC_COOKIE))
     try:
         flow = jwt.decode(raw or "", s.session_secret, algorithms=["HS256"])
     except jwt.PyJWTError:

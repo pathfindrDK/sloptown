@@ -100,7 +100,7 @@ async def test_cookie_writes_must_come_from_the_studio_origin(env):
     from sloptown.config import get_settings
 
     h = await env.user("s-csrf")
-    cookie = {"Cookie": f"st_session={h['Authorization'].split(' ', 1)[1]}"}
+    cookie = {"Cookie": f"__Host-st_session={h['Authorization'].split(' ', 1)[1]}"}
     studio = get_settings().studio_origin
     evil = "http://evil-1a2b3c.apps.sloptown.localhost:8080"
 
@@ -115,3 +115,13 @@ async def test_cookie_writes_must_come_from_the_studio_origin(env):
     r = await env.client.post("/api/terms/accept", json={"version": "x"}, headers={**h, "Origin": evil})
     assert r.status_code != 403
 
+
+
+async def test_session_cookies_cannot_be_planted_by_a_sibling_subdomain(env):
+    """__Host- cookies only come from the host itself: an app on a sibling subdomain can't
+    set a parent-domain cookie that logs the teacher into someone else's session."""
+    owner = await env.user("s-host")
+    planted = {"Cookie": f"st_session={owner['Authorization'].split(' ', 1)[1]}"}
+    assert (await env.client.get("/api/me", headers=planted)).status_code == 401
+    real = {"Cookie": f"__Host-st_session={owner['Authorization'].split(' ', 1)[1]}"}
+    assert (await env.client.get("/api/me", headers=real)).status_code == 200

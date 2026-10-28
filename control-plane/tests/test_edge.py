@@ -102,7 +102,7 @@ async def test_preview_requires_editor_and_supports_view_as(env):
     r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=cookie))
     assert r.status_code == 200 and r.headers["x-vibe-role"] == "owner"
     assert r.headers["x-vibe-upstream"] == "fake-vibe-dev-e1:5173"
-    r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=cookie + "; vibe_view_as=viewer"))
+    r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=cookie + "; __Host-vibe_view_as=viewer"))
     assert r.headers["x-vibe-role"] == "viewer" and r.headers["x-vibe-user"] == "dev-viewer"
 
 
@@ -144,15 +144,15 @@ async def test_preview_session_binds_view_as(env):
     url = (await env.client.post("/api/projects/e5/preview-session", json={"viewAs": "viewer"}, headers=owner)).json()["url"]
     r = await env.client.get(f"/edge/session?{urlparse(url).query}", headers={"X-Forwarded-Host": phost})
     cookies = r.headers.get_list("set-cookie")
-    assert any(c.startswith("vibe_view_as=viewer;") and "Partitioned" in c for c in cookies)
-    session = next(c for c in cookies if c.startswith("vibe_preview=")).split(";")[0]
+    assert any(c.startswith("__Host-vibe_view_as=viewer;") and "Partitioned" in c for c in cookies)
+    session = next(c for c in cookies if c.startswith("__Host-vibe_preview=")).split(";")[0]
     env.client.cookies.clear()
-    r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=session + "; vibe_view_as=viewer"))
+    r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=session + "; __Host-vibe_view_as=viewer"))
     assert r.headers["x-vibe-role"] == "viewer"
 
     url = (await env.client.post("/api/projects/e5/preview-session", headers=owner)).json()["url"]
     r = await env.client.get(f"/edge/session?{urlparse(url).query}", headers={"X-Forwarded-Host": phost})
-    assert any(c.startswith("vibe_view_as=;") and "Max-Age=0" in c for c in r.headers.get_list("set-cookie"))
+    assert any(c.startswith("__Host-vibe_view_as=;") and "Max-Age=0" in c for c in r.headers.get_list("set-cookie"))
     env.client.cookies.clear()
     assert (await env.client.post("/api/projects/e5/preview-session", json={"viewAs": "admin"}, headers=owner)).status_code == 422
 

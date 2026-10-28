@@ -25,7 +25,7 @@ from sqlalchemy import delete, select
 from .access import ROLE_RANK, role_for, role_for_sub
 from .activity import touch
 from .audit import audit
-from .auth import Db, optional_principal, set_cookie
+from .auth import Db, cookie_name, optional_principal, set_cookie
 from .config import get_settings
 from .containers import RUNTIME_PORT, VITE_PORT
 from .errors import ApiError
@@ -33,7 +33,7 @@ from .members import MembersUnavailable, get_members, member_by_sub
 from .models import EdgeCode, HostSession, Project
 from .orchestrator import OrchestratorError, get_orchestrator, runtime_container_name
 from .projects import host_url, mint_edge_code
-from .tokens import hash_token, random_token
+from .tokens import edge_secret_for, hash_token, random_token
 
 router = APIRouter()
 
@@ -87,7 +87,7 @@ async def _project_for_host(db: Db, request: Request, want: str) -> Project:
 
 
 async def _host_session_sub(db: Db, request: Request, project: Project, kind: str) -> str | None:
-    token = request.cookies.get(COOKIE[kind])
+    token = request.cookies.get(cookie_name(COOKIE[kind]))
     if not token:
         return None
     hs = await db.get(HostSession, hash_token(token))
@@ -102,9 +102,9 @@ def _login_redirect(project: Project, kind: str, request: Request) -> Response:
     return RedirectResponse(f"{s.studio_origin.rstrip('/')}/auth/app-login?{q}", status_code=302)
 
 
-def _identity_headers(member_id: str, name: str, role: str, classes: list[str], upstream: str) -> dict[str, str]:
+def _identity_headers(project: Project, member_id: str, name: str, role: str, classes: list[str], upstream: str) -> dict[str, str]:
     return {
-        "X-Vibe-Edge-Secret": get_settings().edge_secret,
+        "X-Vibe-Edge-Secret": edge_secret_for(project.token_seed or ""),
         "X-Vibe-User": member_id,
         "X-Vibe-Name": quote(name or ""),
         "X-Vibe-Role": role,
@@ -132,7 +132,7 @@ async def _forward_auth(request: Request, db: Db, kind: str) -> Response:
     if kind == "app" and project.public and role is None:
         return Response(
             status_code=200,
-            headers={"X-Vibe-Edge-Secret": get_settings().edge_secret, "X-Vibe-Upstream": await _app_upstream(project)},
+            headers={"X-Vibe-Edge-Secret": edge_secret_for(project.token_seed or ""), "X-Vibe-Upstream": await _app_upstream(project)},
         )
     if sub is None:
         return _login_redirect(project, kind, request)
@@ -149,13 +149,13 @@ async def _forward_auth(request: Request, db: Db, kind: str) -> Response:
     classes = list(member.get("classes") or []) if member else []
 
     if kind == "preview" and get_settings().dev_mode:
-        view_as = request.headers.get("x-vibe-view-as") or request.cookies.get("vibe_view_as")
+        view_as = request.headers.get("x-vibe-view-as") or request.cookies.get(cookie_name("vibe_view_as"))
         if view_as in VIEW_AS_NAMES and view_as != role:
             member_id, name, role, classes = f"dev-{view_as}", VIEW_AS_NAMES[view_as], view_as, ["Testklasse"]
 
     if kind == "app":
         upstream = await _app_upstream(project)
-        return Response(status_code=200, headers=_identity_headers(member_id, name, role, classes, upstream))
+        return Response(status_code=200, headers=_identity_headers(project, member_id, name, role, classes, upstream))
     assert project.container_name and project.network_name
     orch = get_orchestrator()
     try:
@@ -165,7 +165,7 @@ async def _forward_auth(request: Request, db: Db, kind: str) -> Response:
         upstream = f"{host}:{VITE_PORT}"
     except OrchestratorError:
         raise ApiError(503, "not_running", "Vibe starter op. Prøv igen om lidt.")
-    return Response(status_code=200, headers=_identity_headers(member_id, name, role, classes, upstream))
+    return Response(status_code=200, headers=_identity_headers(project, member_id, name, role, classes, upstream))
 
 
 @router.get("/edge/auth/app")
