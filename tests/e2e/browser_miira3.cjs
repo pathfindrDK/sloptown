@@ -116,11 +116,18 @@ async function createMenuHasVibe(page) {
     await page.screenshot({ path: `${OUT}/miira3-editor.png` });
     step("editor and the app preview render inside Miira");
 
-    await frame.getByRole("button", { name: /^Del/ }).first().click();
+    // One top bar, Miira's: the studio's actions arrive over drive:toolbar.
+    const bar = page.locator(".vibe-bar");
+    await bar.getByRole("button", { name: /Udgiv/ }).waitFor({ timeout: 30000 });
+    for (const name of [/Support/, /^Del/, /Hent filer/]) await bar.getByRole("button", { name }).waitFor({ timeout: 5000 });
+    if (await frame.locator("header.topbar").count()) throw new Error("the studio still draws its own top bar");
+    step("one top bar in Miira: Hent filer, Support, Del, Udgiv; none in the studio");
+
+    await bar.getByRole("button", { name: /^Del/ }).click();
     const dialog = page.getByRole("dialog");
     await dialog.first().waitFor({ timeout: 15000 });
     await page.screenshot({ path: `${OUT}/miira3-share.png` });
-    step("studio Del -> Miira's share dialog over the iframe");
+    step("Del in Miira's bar -> Miira's share dialog");
     await page.keyboard.press("Escape");
 
     // A second Vibe, "fra bunden": no preview and no publish, files to download.
@@ -128,12 +135,19 @@ async function createMenuHasVibe(page) {
     await page.waitForURL(/#\/file\/[0-9a-f-]{36}/, { timeout: 30000 });
     const scratchFrame = page.frameLocator('iframe[title^="Vibe"]');
     await scratchFrame.getByRole("button", { name: /Fra bunden/ }).click({ timeout: 60000 });
-    await scratchFrame.getByRole("button", { name: /Hent filer/ }).waitFor({ timeout: 60000 });
+    const scratchBar = page.locator(".vibe-bar");
+    const hentFiler = scratchBar.getByRole("button", { name: /Hent filer/ });
+    await hentFiler.waitFor({ timeout: 60000 });
     await scratchFrame.getByText("Mit projekt").first().waitFor({ timeout: 60000 });
-    if (await scratchFrame.getByRole("button", { name: /Udgiv/ }).count()) throw new Error("scratch project offers Udgiv");
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll(".vibe-bar button")].find((x) => /Hent filer/.test(x.textContent || ""));
+      return b && !b.disabled;
+    }, null, { timeout: 60000 });
+    if (await scratchBar.getByRole("button", { name: /Udgiv/ }).count()) throw new Error("scratch project offers Udgiv");
     if (await scratchFrame.getByText("Forhåndsvisning", { exact: true }).count()) throw new Error("scratch project shows a preview");
+    // The press is Miira's; the download runs in the studio frame (drive:action).
     const download = page.waitForEvent("download", { timeout: 30000 });
-    await scratchFrame.getByRole("button", { name: /Hent filer/ }).click();
+    await hentFiler.click();
     if (!(await download).suggestedFilename().endsWith(".zip")) throw new Error("download is not a .zip");
     await page.screenshot({ path: `${OUT}/miira3-scratch.png` });
     step("\"Fra bunden\": README open, no preview or Udgiv, Hent filer downloads a .zip");

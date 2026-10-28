@@ -43,7 +43,7 @@ export function HistoryPanel({ projectId, history, failed, onRetry, canEdit, onC
                 <HistoryIcon size={14} className="muted" />
                 <span className="history__msg">{c.message.split("\n")[0]}</span>
                 {published && (
-                  <span className="chip chip--success">
+                  <span className="role-badge role-badge--ok">
                     <Rocket size={12} /> {t("history.published")}
                   </span>
                 )}

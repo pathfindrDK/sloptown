@@ -34,6 +34,59 @@ describe("origin allowlist", () => {
 });
 
 describe("parseInbound", () => {
+  it("accepts the icon only as an image data URL", () => {
+    const src = "data:image/png;base64,iVBORw0KGgo=";
+    expect(parseInbound({ type: "drive:icon-state", fileId: "f", src, custom: true })).toEqual({
+      type: "drive:icon-state",
+      fileId: "f",
+      icon: { src, custom: true },
+    });
+    expect(parseInbound({ type: "drive:icon-state", fileId: "f", src: "https://evil.test/x.png" })).toBeNull();
+    expect(parseInbound({ type: "drive:icon-state", fileId: "f", src: "data:text/html;base64,PGI+" })).toBeNull();
+    expect(parseInbound({ type: "drive:icon-state", fileId: "f", src: "data:image/png;base64," + "A".repeat(700_000) })).toBeNull();
+  });
+  it("carries Miira's theme name and a school's tokens, dropping anything unsafe", () => {
+    const msg = parseInbound({
+      type: "drive:theme",
+      theme: "light",
+      miiraTheme: "org",
+      tokens: {
+        "--miira-accent": "#1d6b4f",
+        "--miira-bg-primary": "rgb(250 250 248)",
+        "--miira-font": "x; } body { display: none",
+        "--miira-logo": "url(https://evil.test/x.png)",
+        color: "red",
+      },
+    });
+    expect(msg).toEqual({
+      type: "drive:theme",
+      theme: { name: "org", tokens: { "--miira-accent": "#1d6b4f", "--miira-bg-primary": "rgb(250 250 248)" } },
+    });
+  });
+  it("still understands the light/dark-only theme of older Miira builds", () => {
+    expect(parseInbound({ type: "drive:theme", theme: "dark" })).toEqual({
+      type: "drive:theme",
+      theme: { name: "dark", tokens: {} },
+    });
+    expect(parseInbound({ type: "drive:theme", theme: "light", miiraTheme: "sparkly" })).toEqual({
+      type: "drive:theme",
+      theme: { name: "miira", tokens: {} },
+    });
+  });
+  it("validates drive:action from Miira's top bar", () => {
+    expect(parseInbound({ type: "drive:action", fileId: "f", action: "publish" })).toEqual({
+      type: "drive:action",
+      fileId: "f",
+      action: "publish",
+    });
+    expect(parseInbound({ type: "drive:action", fileId: "f", action: "download" })).toEqual({
+      type: "drive:action",
+      fileId: "f",
+      action: "download",
+    });
+    expect(parseInbound({ type: "drive:action", fileId: "f", action: "delete" })).toBeNull();
+    expect(parseInbound({ type: "drive:action", action: "publish" })).toBeNull();
+  });
   it("validates drive:title from Miira's top bar, trimmed to the project title limit", () => {
     expect(parseInbound({ type: "drive:title", fileId: "f", title: "  Gloser 1. A " })).toEqual({
       type: "drive:title",
@@ -52,7 +105,7 @@ describe("parseInbound", () => {
       type: "drive:init",
       fileId: "f",
       launchToken: "t",
-      theme: "dark",
+      theme: { name: "dark", tokens: {} },
       locale: "da",
     });
     expect(parseInbound({ type: "drive:unknown" })).toBeNull();

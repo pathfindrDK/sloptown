@@ -1,0 +1,454 @@
+/* Vendored from miira3@645ac156dbe9:drive/public/tokens.css by design/sync-from-miira.mjs. Do not edit. */
+/* ============================================================
+ * AUTO-GENERATED — DO NOT EDIT BY HAND.
+ * Shared Miira design tokens, generated from the styleguide:
+ *   drive/public/styleguide.html  (between the @miira-tokens markers)
+ * Regenerate with: npm run sync:tokens  (from drive/; runs on dev & build).
+ * Web-served mirror — link target for the styleguide page.
+ * ============================================================ */
+
+@font-face {
+  font-family: 'Roobert PRO';
+  font-style: normal; font-weight: 300; font-display: swap;
+  src: url('/fonts/RoobertPRO-Light.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roobert PRO';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/RoobertPRO-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roobert PRO';
+  font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/fonts/RoobertPRO-Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roobert PRO';
+  font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/fonts/RoobertPRO-SemiBold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Roobert PRO';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/RoobertPRO-Bold.woff2') format('woff2');
+}
+
+/* OpenDyslexic — accessibility override (SIL OFL). Synced into every
+   app via `node scripts/sync-opendyslexic.mjs`. Activated by
+   `document.documentElement.dataset.dyslexiaFont = 'true'`. */
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/opendyslexic/OpenDyslexic-Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: italic; font-weight: 400; font-display: swap;
+  src: url('/fonts/opendyslexic/OpenDyslexic-Italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/opendyslexic/OpenDyslexic-Bold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: italic; font-weight: 700; font-display: swap;
+  src: url('/fonts/opendyslexic/OpenDyslexic-BoldItalic.woff2') format('woff2');
+}
+
+:root {
+  /* Brand (same in every theme) */
+  --miira-brown:   #5c4500;
+  --miira-yellow:  #ffbf00;
+  --miira-orange:  #ff8049;
+  --miira-green:   #00bd62;
+  --miira-blue:    #3368d1;
+  --miira-red:     #e74c3c;
+
+  /* Sticky notes (Tavle) — the six colours a card can be, plus the
+     ink that stays readable on all of them. Theme-independent on
+     purpose: a note's colour is authored content that a classmate
+     picked, so it must not change meaning when somebody switches to
+     the dark theme. They are muted enough to carry body text and
+     distinct enough to sort a board by eye. */
+  --miira-sticky-yellow: #ffe9a8;
+  --miira-sticky-orange: #ffd2bb;
+  --miira-sticky-green:  #c4ecd2;
+  --miira-sticky-blue:   #c7dcf7;
+  --miira-sticky-purple: #ddd2f2;
+  --miira-sticky-grey:   #e6e2d9;
+  --miira-sticky-ink:    #302400;
+  --miira-sticky-border: rgba(48, 36, 0, 0.14);
+
+  /* Radius */
+  --miira-radius-sm: 5px;
+  --miira-radius-md: 10px;
+  --miira-radius-lg: 20px;
+
+  /* Layout */
+  --miira-subheader-height: 49px;
+
+  /* Shadows */
+  --miira-shadow-rgb:    92, 69, 0;
+  --miira-shadow:        0 2px 8px rgba(var(--miira-shadow-rgb), 0.08);
+  --miira-shadow-strong: 0 4px 12px rgba(var(--miira-shadow-rgb), 0.14);
+  --miira-shadow-elev:   0 8px 24px rgba(var(--miira-shadow-rgb), 0.18);
+  --miira-shadow-modal:  0 20px 60px rgba(var(--miira-shadow-rgb), 0.28);
+
+  /* Typography */
+  --miira-font:
+    'Roobert PRO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  /* Accessibility: when the user enables "dyslexia font" in account
+     preferences, swap the brand font for OpenDyslexic everywhere. */
+  --miira-font-dyslexia:
+    'OpenDyslexic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  --miira-font-size-h1: 2.5rem;
+  --miira-font-size-h2: 2rem;
+  --miira-font-size-h3: 1.5rem;
+  --miira-font-size-h4: 1.125rem;
+  --miira-font-size-h5: 0.9375rem;
+  --miira-font-size-body: 1rem;
+  --miira-font-size-sm:   0.875rem;
+  --miira-font-size-xs:   0.75rem;
+
+  /* Icon buttons */
+  --miira-icon-btn-size:       32px;
+  --miira-icon-btn-round-size: 44px;
+}
+
+/* ------- Themes ------- */
+
+/* Miira (light, golden warm) — default */
+:root,
+[data-theme='miira'] {
+  --miira-bg-primary:     #fffdf8;
+  --miira-bg-secondary:   #fffcf5;
+  --miira-bg-surface:     #fff9ee;
+  --miira-bg-input:       #fffdf8;
+  --miira-bg-hover:       #f0e4cb;
+  --miira-text-primary:   #302400;
+  --miira-text-secondary: #8b7a63;
+  --miira-text-muted:     #b2a47b;
+  --miira-border-color:   #d7c7a9;
+  --miira-border-hover:   #c9ba94;
+  /* The edge and 2px shelf under a card. Identical to the hairline
+     colour in every built-in theme — it is a token of its own so a
+     school whose lines are darker than Miira's can lift the cards
+     off them (Administration → Organisationens udseende). */
+  --miira-card-edge:      #d7c7a9;
+  --miira-card-edge-hover: #c9ba94;
+  --miira-3d-shadow:      #d7c7a9;
+  /* Darker shade of the accent for 3D button lips/borders. In warm
+     themes this equals the 3D shelf colour so existing buttons are
+     unaffected; the neutral business theme overrides it to blue. */
+  --miira-accent-shade:   var(--miira-3d-shadow);
+  --miira-accent:         var(--miira-yellow);
+  --miira-accent-text:    var(--miira-brown);
+  /* Keyboard focus ring. A global `:focus-visible` rule paints this in
+     every app so tabbing never falls back to the browser's blue. */
+  --miira-focus-ring:     color-mix(in srgb, var(--miira-yellow) 65%, transparent);
+  --miira-shadow-rgb:     92, 69, 0;
+  --miira-avatar-default-bg:     #ffffff;
+  --miira-avatar-default-border: #e6d7b5;
+  /* Paper — the sheet a document/fagtekst/spreadsheet is rendered on,
+     both full size in an editor and miniaturised in a card thumb. Kept
+     apart from --miira-bg-* because a page is white in both light
+     themes while the surrounding chrome is warm. */
+  --miira-paper-bg:       #ffffff;
+  --miira-paper-text:     #1c140d;
+  --miira-paper-border:   #e6dcc7;
+  --miira-segmented-menu-bg:           var(--miira-bg-surface);
+  --miira-segmented-menu-indicator:    #f5e7c6;
+  --miira-segmented-menu-text:         var(--miira-text-secondary);
+  --miira-segmented-control-bg:        var(--miira-bg-surface);
+  --miira-segmented-control-indicator: #f5e7c6;
+  --miira-segmented-control-text:      var(--miira-text-secondary);
+  color-scheme: light;
+}
+
+/* Neutral (light, greyscale) */
+[data-theme='neutral'] {
+  --miira-bg-primary:     #ffffff;
+  --miira-bg-secondary:   #fafafb;
+  --miira-bg-surface:     #f1f1f4;
+  --miira-bg-input:       #ffffff;
+  --miira-bg-hover:       #e8e8ed;
+  --miira-text-primary:   #1c1c1f;
+  --miira-text-secondary: #5b5b63;
+  --miira-text-muted:     #8b8b95;
+  --miira-border-color:   #dadae0;
+  --miira-border-hover:   #c4c4cc;
+  /* The edge and 2px shelf under a card. Identical to the hairline
+     colour in every built-in theme — it is a token of its own so a
+     school whose lines are darker than Miira's can lift the cards
+     off them (Administration → Organisationens udseende). */
+  --miira-card-edge:      #dadae0;
+  --miira-card-edge-hover: #c4c4cc;
+  --miira-3d-shadow:      #dadae0;
+  /* Business theme: blue accent on greyscale, no warm Miira tokens. */
+  --miira-accent-shade:   #1e3f80;
+  --miira-accent:         var(--miira-blue);
+  --miira-accent-text:    #ffffff;
+  --miira-focus-ring:     color-mix(in srgb, var(--miira-blue) 60%, transparent);
+  --miira-shadow-rgb:     0, 0, 0;
+  --miira-avatar-default-bg:     #ffffff;
+  --miira-avatar-default-border: #dadae0;
+  --miira-paper-bg:       #ffffff;
+  --miira-paper-text:     #1c1c1f;
+  --miira-paper-border:   #e1e1e6;
+  --miira-segmented-menu-bg:           var(--miira-bg-surface);
+  --miira-segmented-menu-indicator:    #ffffff;
+  --miira-segmented-menu-text:         var(--miira-text-secondary);
+  --miira-segmented-control-bg:        var(--miira-bg-surface);
+  --miira-segmented-control-indicator: #ffffff;
+  --miira-segmented-control-text:      var(--miira-text-secondary);
+  color-scheme: light;
+}
+
+/* Mørkt (dark) */
+[data-theme='dark'] {
+  --miira-bg-primary:     #1e180a;
+  --miira-bg-secondary:   #241d0e;
+  --miira-bg-surface:     #2f2515;
+  --miira-bg-input:       #43341d;
+  --miira-bg-hover:       #3f3120;
+  --miira-text-primary:   #f4e7d5;
+  --miira-text-secondary: #c7b188;
+  --miira-text-muted:     #a68f66;
+  --miira-border-color:   #3f3120;
+  --miira-border-hover:   #594726;
+  /* The edge and 2px shelf under a card. Identical to the hairline
+     colour in every built-in theme — it is a token of its own so a
+     school whose lines are darker than Miira's can lift the cards
+     off them (Administration → Organisationens udseende). */
+  --miira-card-edge:      #3f3120;
+  --miira-card-edge-hover: #594726;
+  --miira-3d-shadow:      #3f3120;
+  --miira-accent-shade:   var(--miira-3d-shadow);
+  --miira-accent:         var(--miira-yellow);
+  --miira-accent-text:    var(--miira-brown);
+  --miira-focus-ring:     color-mix(in srgb, var(--miira-yellow) 70%, transparent);
+  --miira-shadow-rgb:     0, 0, 0;
+  --miira-avatar-default-bg:     #f4e7d5;
+  --miira-avatar-default-border: #c7b188;
+  --miira-paper-bg:       #2d2210;
+  --miira-paper-text:     #f4e7d5;
+  --miira-paper-border:   #4a3a23;
+  --miira-segmented-menu-bg:           var(--miira-bg-surface);
+  --miira-segmented-menu-indicator:    #4a3a22;
+  --miira-segmented-menu-text:         var(--miira-text-secondary);
+  --miira-segmented-control-bg:        var(--miira-bg-surface);
+  --miira-segmented-control-indicator: #4a3a22;
+  --miira-segmented-control-text:      var(--miira-text-secondary);
+  color-scheme: dark;
+}
+
+/* Kontrast (light, maximum contrast) — for readers with reduced
+   eyesight. Black ink and black borders on white, and no pair of
+   colours in the block below 11:1 — well past the 7:1 AAA bar,
+   because AAA is a floor for people with ordinary sight.
+
+   Two rules it is built on, both learned the hard way:
+
+   - There is no muted ink. The other themes fade secondary text into
+     the page to build hierarchy; here that is the first thing to
+     become unreadable, so hierarchy is carried by weight and size
+     and every label stays black.
+   - The accent is dark with white on it, not light with dark on it.
+     Miira's yellow carries black at 12.7:1, which passes and still
+     reads badly: a bright fill between white surfaces glares, and
+     thin dark glyphs on it are the hardest thing on the page. A deep
+     navy at 16.7:1 puts the label the other way round, and every
+     filled control in the app is `--miira-accent` +
+     `--miira-accent-text`, so the pair carries all of them. */
+[data-theme='kontrast'] {
+  /* One surface, not a ramp. The other themes separate a card from
+     the page with a tint a shade or two apart; here the black border
+     does that job, and every tint spent on separation is contrast
+     taken off the text sitting on it. So page, card, panel and input
+     are all white — and so is everything else, because this theme is
+     two colours and no more. There is no light grey row, no grey
+     track, no near-black label: a tone between the two is a tone
+     somebody cannot see, which is the whole reason the theme exists. */
+  --miira-bg-primary:     #ffffff;
+  --miira-bg-secondary:   #ffffff;
+  --miira-bg-surface:     #ffffff;
+  --miira-bg-input:       #ffffff;
+  --miira-text-primary:   #000000;
+  --miira-text-secondary: #000000;
+  --miira-text-muted:     #000000;
+
+  /* Hover cannot be a fill here — ~210 rules write
+     `background: var(--miira-bg-hover)` and leave the ink alone, so
+     black would put black text on black and white would say nothing.
+     It is drawn instead, but **not** by this token: every one of
+     those rules carries a companion
+     `box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent)`,
+     which is transparent in every other theme and a black ring here.
+
+     A `background` gradient was the first attempt and it is the
+     instructive failure: four `linear-gradient` bars do draw a frame,
+     but a background is clipped by `border-radius` and the bars are
+     rectangular, so everything above `--miira-radius-sm` lost its
+     corners — a pill-shaped row hovered as four detached dashes. An
+     inset `box-shadow` is the only ring that follows the radius, and
+     it costs no layout, which a `border` would. So the token itself
+     goes back to being a plain colour: white, the same as the surface
+     under it, leaving the ring to say everything. */
+  --miira-bg-hover:       #ffffff;
+  --miira-border-color:   #000000;
+  --miira-border-hover:   #000000;
+  /* The edge and 2px shelf under a card. Identical to the hairline
+     colour in every built-in theme — it is a token of its own so a
+     school whose lines are darker than Miira's can lift the cards
+     off them (Administration → Organisationens udseende). */
+  --miira-card-edge:      #000000;
+  --miira-card-edge-hover: #000000;
+  /* The accent is black with a white label. Every filled control in
+     the app is `--miira-accent` + `--miira-accent-text`, so that one
+     pair turns all of them over at once — and the 3D shelf goes with
+     it, because a shelf needs a third tone and there isn't one. A
+     `.btn--3d` is a solid black block here that still lifts on
+     hover; the depth was never the message. */
+  --miira-3d-shadow:      #000000;
+  --miira-accent-shade:   #000000;
+  --miira-accent:         #000000;
+  --miira-accent-text:    #ffffff;
+  /* Solid, not the usual colour-mix: a translucent ring keeps almost
+     none of its contrast over whatever it sits on, which is the one
+     thing this theme exists to prevent. `outline-offset` puts the
+     ring on the surface rather than on the control, and every
+     surface here is white or near-white, so black is right for all
+     of them — including around the navy buttons. */
+  --miira-focus-ring:     #000000;
+  --miira-shadow-rgb:     0, 0, 0;
+  --miira-avatar-default-bg:     #ffffff;
+  --miira-avatar-default-border: #000000;
+  --miira-paper-bg:       #ffffff;
+  --miira-paper-text:     #000000;
+  --miira-paper-border:   #000000;
+  /* The pill that marks the chosen option cannot be filled black —
+     the *selected* label reads `--miira-text-primary` and would
+     disappear under it. So the pill stays white like the track, and
+     its boundary comes from the same inset ring hover uses: every
+     `.segmented__indicator` rule declares
+     `box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent)`
+     in place of the `none` it had.
+
+     A 4px bottom bar was tried first and is why the ring won: with no
+     outline of its own the pill was a black edge with nothing attached
+     to it, sitting under a hard black shelf, and it read as a rendering
+     fault rather than a selection. */
+  --miira-segmented-menu-bg:           #ffffff;
+  --miira-segmented-menu-indicator:    #ffffff;
+  --miira-segmented-menu-text:         #000000;
+  --miira-segmented-control-bg:        #ffffff;
+  --miira-segmented-control-indicator: #ffffff;
+  --miira-segmented-control-text:      #000000;
+
+  /* Depth without a grey blur. Every surface here already has a
+     black border, so the soft shadows the other themes use would be
+     the only grey left on the page — replaced by a hard black
+     offset, which says the same thing in two colours. */
+  --miira-shadow:        0 2px 0 0 #000000;
+  --miira-shadow-strong: 0 3px 0 0 #000000;
+  --miira-shadow-elev:   0 4px 0 0 #000000;
+  --miira-shadow-modal:  0 0 0 3px #000000;
+
+  /* The four below are declared by this theme and no other, and are
+     read as `var(--token, <what happens today>)` — so a theme that
+     does not set them is not opting out of anything, it simply never
+     hears about them. That is deliberate: each answers a question
+     only this theme asks, and a `none` in four other blocks (plus a
+     rule in `deriveTokens` for the schools) would be four more
+     places to keep in step for no behaviour.
+
+     The first three are one idea in three properties: **a faint tint
+     has no monochrome value.** Roughly 570 rules build a plate, an
+     edge or a label out of `color-mix(… var(--miira-X) N%,
+     transparent)` — a pale danger banner, a selected row, a chip on
+     a card. With a black source those all land on the mid-greys this
+     theme has none of anywhere else, and nudging the percentages
+     cannot help: the tint *is* a mid-tone. So the plate goes white,
+     the edge goes fully black, and the label goes fully black — a
+     coloured banner becomes a white one inside a black frame, which
+     is what it was always saying.
+
+     Note the asymmetry, because it is the whole trick: `wash` erases
+     and `wash-edge` asserts. A white border would delete the banner's
+     outline along with its colour; a black plate would delete the
+     text on it. */
+  --miira-wash:      #ffffff;
+  --miira-wash-edge: #000000;
+  --miira-wash-ink:  #000000;
+
+  /* What the illustrated file-type sprites are run through. They
+     are drawn pages in brand colours; desaturating alone turns those
+     fills into the mid-greys this theme has none of anywhere else.
+     `contrast(20)` is a threshold in everything but name — each
+     pixel lands on black or on white — so what is left is the
+     linework, which is what the drawing was. Some interior detail
+     goes with the greys (a quiz loses two of its four chips), and
+     that is the trade: a pencil, a bar chart, a target and a play
+     triangle are all still themselves. */
+  --miira-artwork-filter: grayscale(1) contrast(20);
+
+  /* The one theme that re-cuts the brand palette, and it cuts it down
+     to nothing. Everywhere else these are fixed, and that is right:
+     red means the same thing in every theme. But the palette is tuned
+     to be *legible*, not to be maximal, and each colour is used two
+     ways that both failed here — as a fill under white text
+     (`.btn--danger` sat at 3.8:1) and as a status dot or bar on a
+     white page, where the bright green reached 2.5:1 and simply was
+     not there for the reader this theme is for.
+
+     So they are black. The cost is real and worth stating: danger,
+     success and warning can no longer be told apart by colour, and
+     every one of them leans on the label or the icon beside it. That
+     is the trade this theme makes everywhere — a tone somebody
+     cannot see is not information.
+
+     Two that are not black, for opposite reasons:
+
+     - **Yellow is white.** It is never the fill under white text —
+       it is the fill under `--miira-brown`, 105 times over — so
+       black would be black on black. White plus the black border
+       those controls already carry is the monochrome version of a
+       highlighted chip. The important ones don't reach it anyway:
+       every accent-recolouring branch now lists `kontrast`, so a
+       primary button, a send button and an active toggle take
+       `--miira-accent` instead.
+     - **Brown is black**, and stays the ink rather than becoming a
+       surface: besides sitting on yellow it is the `.btn--3d` shelf
+       and a dozen status labels on a white page, which white would
+       erase.
+
+     The sticky-note colours below are untouched. A note's colour is
+     something a classmate picked, and authored content does not
+     change meaning because the reader switched theme. Their ink
+     (`--miira-sticky-ink`) is near-black already. */
+  --miira-brown:  #000000;
+  --miira-yellow: #ffffff;
+  --miira-red:    #000000;
+  --miira-green:  #000000;
+  --miira-blue:   #000000;
+  --miira-orange: #000000;
+
+  color-scheme: light;
+}
+
+/* Dyslexia font accessibility override — set
+   document.documentElement.dataset.dyslexiaFont = 'true' from account
+   preferences. Swaps --miira-font and forces every element (including
+   authored document/slide text with explicit font-family) onto
+   OpenDyslexic. SVG icons are unaffected. */
+[data-dyslexia-font='true'] {
+  --miira-font: var(--miira-font-dyslexia);
+}
+[data-dyslexia-font='true'] body,
+[data-dyslexia-font='true'] body * {
+  font-family: var(--miira-font) !important;
+}

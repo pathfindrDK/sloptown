@@ -15,7 +15,7 @@ async function boot() {
     await loadConfig();
   }
   // Standalone follows the OS; embedded gets its theme from drive:init.
-  applyTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  applyTheme({ name: window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "miira", tokens: {} });
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <App />

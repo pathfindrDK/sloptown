@@ -11,8 +11,6 @@ type Props = {
   headSha: string | null;
   canEdit: boolean;
   publishing: boolean;
-  /** Embedded with chrome=none: Miira draws back button and file name, we show only actions. */
-  compact?: boolean;
   onBack: () => void;
   onRename: (title: string) => void;
   onShare: () => void;
@@ -20,7 +18,7 @@ type Props = {
   onDownload: () => void;
 };
 
-export function TopBar({ project, budget, headSha, canEdit, publishing, compact, onBack, onRename, onShare, onPublish, onDownload }: Props) {
+export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, onRename, onShare, onPublish, onDownload }: Props) {
   const t = useT();
   const [title, setTitle] = useState(project.title);
   useEffect(() => setTitle(project.title), [project.title]);
@@ -34,9 +32,7 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, compact,
   const upToDate = !!headSha && headSha === project.publishedSha;
 
   return (
-    <header className={`topbar${compact ? " topbar--compact" : ""}`}>
-      {!compact && (
-        <>
+    <header className="topbar">
       <button className="icon-btn" onClick={onBack} aria-label={t("top.back")} title={t("top.back")}>
         <ArrowLeft size={18} />
       </button>
@@ -59,8 +55,6 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, compact,
           }
         }}
       />
-        </>
-      )}
       <div className="topbar__spacer" />
       {budget && <BudgetMeter bucket={budget.build} enabled={budget.enabled} />}
       {project.appUrl && project.publishedSha && (

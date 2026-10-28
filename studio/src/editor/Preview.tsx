@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { Project, Role } from "../api/types";
 import { useT } from "../lib/i18n";
 import { Loading } from "../components/Loading";
+import { useSegmentedIndicator } from "../lib/useSegmentedIndicator";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 const widths: Record<Viewport, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
@@ -20,9 +21,37 @@ export function parsePreviewError(data: unknown): PreviewError | null {
   return { message: m.message.slice(0, 2000), stack: typeof m.stack === "string" ? m.stack.slice(0, 4000) : undefined, at: Date.now() };
 }
 
-type Props = { project: Project; reloadSignal: number; onFixError: (prompt: string) => void };
+type Props = {
+  project: Project;
+  reloadSignal: number;
+  /** Nothing built yet (only the template commit): invite the teacher to the chat. */
+  empty: boolean;
+  onFixError: (prompt: string) => void;
+};
 
-export function Preview({ project, reloadSignal, onFixError }: Props) {
+/** A pen-drawn arrow towards the chat: a wavering stroke and an uneven, open head. */
+function HandDrawnArrow() {
+  return (
+    <svg className="preview__welcome-arrow" width="104" height="52" viewBox="0 0 120 60" fill="none" aria-hidden>
+      <path
+        d="M6 40c9-6 17-9 26-7 9 2 15 8 25 7 11-1 18-10 29-12 8-1 15 0 22 2"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M95 17c5 3 10 7 15 12-6 3-11 8-15 13"
+        stroke="currentColor"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function Preview({ project, reloadSignal, empty, onFixError }: Props) {
   const t = useT();
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [viewAs, setViewAs] = useState<Role>("owner");
@@ -34,6 +63,8 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
   // the SDK says vibe:ready (or the first error, or the fallback after load).
   const [appLoading, setAppLoading] = useState(true);
   const fallback = useRef<ReturnType<typeof setTimeout>>();
+  const segRef = useRef<HTMLDivElement>(null);
+  useSegmentedIndicator(segRef, viewport);
 
   // One-time session URL sets the preview cookie (and view-as) on the preview host.
   useEffect(() => {
@@ -99,7 +130,8 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
   return (
     <div className="preview">
       <div className="preview__toolbar">
-        <div className="segmented" role="group">
+        <div className="segmented" role="group" aria-label={t("preview.device")} ref={segRef}>
+          <span className="segmented__indicator" aria-hidden />
           {(
             [
               ["desktop", Monitor],
@@ -109,7 +141,8 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
           ).map(([v, Icon]) => (
             <button
               key={v}
-              className={`segmented__btn${viewport === v ? " is-active" : ""}`}
+              type="button"
+              className={viewport === v ? "active" : undefined}
               onClick={() => setViewport(v)}
               aria-pressed={viewport === v}
               title={t(`preview.${v}`)}
@@ -152,7 +185,17 @@ export function Preview({ project, reloadSignal, onFixError }: Props) {
           <Loading label={t("preview.starting")} />
         ) : (
           <div className="preview__frame-wrap" style={{ width: widths[viewport] }}>
-            {appLoading && <Loading overlay label={t("preview.loading")} />}
+            {empty ? (
+              <div className="preview__welcome">
+                <div>
+                  <h2>{t("preview.welcome.title")}</h2>
+                  <p>{t("preview.welcome.body")}</p>
+                </div>
+                <HandDrawnArrow />
+              </div>
+            ) : (
+              appLoading && <Loading overlay label={t("preview.loading")} />
+            )}
             <iframe
               key={`${frameKey}-${src}`}
               className="preview__frame"

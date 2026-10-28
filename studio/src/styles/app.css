@@ -55,7 +55,7 @@ textarea {
 
 :focus-visible {
   outline: none;
-  box-shadow: var(--miira-focus-ring);
+  box-shadow: 0 0 0 3px var(--miira-focus-ring);
 }
 
 .muted {
@@ -490,9 +490,6 @@ textarea {
   background: var(--miira-color-surface);
   border-bottom: 1px solid var(--miira-color-border);
 }
-.topbar--compact {
-  height: 48px;
-}
 .topbar__icon {
   display: inline-flex;
   padding: 6px;
@@ -593,6 +590,10 @@ textarea {
   display: flex;
   flex-direction: column;
 }
+/* display: flex above beats the UA [hidden] rule; the preview stays mounted (no reload) but must not paint under, or over, the code tab. */
+.editor__pane[hidden] {
+  display: none;
+}
 
 .tabs {
   display: flex;
@@ -648,25 +649,65 @@ textarea {
   background: var(--miira-color-surface-3);
 }
 
+/* Miira's segmented control, verbatim from the styleguide (design guide: Toggles):
+   a track that hugs its options and one indicator pill that slides between them
+   (lib/useSegmentedIndicator.ts places it). Buttons carry aria-pressed + .active. */
 .segmented {
+  position: relative;
   display: inline-flex;
-  padding: 2px;
+  background: var(--miira-segmented-control-bg);
+  border: 1px solid var(--miira-border-color);
   border-radius: var(--miira-radius-md);
-  background: var(--miira-color-surface-2);
+  padding: 2px;
+  gap: 2px;
 }
-.segmented__btn {
+.segmented__indicator {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 7px;
+  background: var(--miira-segmented-control-indicator);
+  box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transform: translateX(0);
+  transition:
+    transform 0.28s cubic-bezier(0.45, 0, 0.55, 1),
+    width 0.28s cubic-bezier(0.45, 0, 0.55, 1),
+    opacity 0.15s ease;
+}
+.segmented button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
-  padding: 4px 8px;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
   border: none;
-  border-radius: var(--miira-radius-sm);
-  background: none;
-  color: var(--miira-color-text-muted);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: var(--miira-font-size-xs);
+  font-weight: 500;
+  color: var(--miira-segmented-control-text);
+  border-radius: 7px;
   cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+  box-shadow: none;
 }
-.segmented__btn.is-active {
-  background: var(--miira-color-surface);
-  color: var(--miira-color-text);
-  box-shadow: var(--miira-shadow-sm);
+.segmented button:hover:not(.active) {
+  background: var(--miira-bg-hover);
+  box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+  color: var(--miira-text-primary);
+}
+.segmented button.active {
+  color: var(--miira-text-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmented__indicator { transition: none; }
 }
 
 .preview {
@@ -720,6 +761,42 @@ textarea {
 }
 .preview__frame-wrap > .loading--overlay {
   border-radius: var(--miira-radius-md);
+}
+/* A Vibe with nothing built yet: an invitation pointing at the chat on the right. */
+.preview__welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--miira-space-5);
+  padding: var(--miira-space-6);
+  text-align: left;
+  background: var(--miira-color-surface);
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-md);
+}
+.preview__welcome h2 {
+  margin: 0 0 var(--miira-space-2);
+  font-size: var(--miira-font-size-xl);
+  color: var(--miira-color-text);
+}
+.preview__welcome p {
+  margin: 0;
+  color: var(--miira-color-text-muted);
+}
+.preview__welcome-arrow {
+  flex: none;
+  color: var(--miira-accent-shade);
+  animation: preview-welcome-nudge 1.6s ease-in-out infinite;
+}
+@keyframes preview-welcome-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview__welcome-arrow { animation: none; }
 }
 .preview__frame {
   height: 100%;
@@ -775,26 +852,19 @@ textarea {
 .sidepane__resizer:hover {
   background: var(--miira-color-accent-soft);
 }
-.sidepane__tabs {
+/* The pane's sections as Miira's segmented control, centred like the editors'
+   side pane (.sidepane__seg-wrap); a narrow pane scrolls the pill, never wraps it. */
+.sidepane__seg-wrap {
   display: flex;
-  gap: var(--miira-space-1);
-  height: 40px;
+  justify-content: center;
   flex: none;
-  padding: 0 var(--miira-space-2);
+  padding: var(--miira-space-3);
   border-bottom: 1px solid var(--miira-color-border);
 }
-.sidepane__tab {
-  padding: 0 var(--miira-space-3);
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: var(--miira-color-text-muted);
-  font-weight: 500;
-  cursor: pointer;
-}
-.sidepane__tab.is-active {
-  color: var(--miira-color-text);
-  border-bottom-color: var(--miira-color-accent);
+.sidepane__seg-wrap .segmented {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .sidepane__content {
   flex: 1;
@@ -1133,24 +1203,170 @@ textarea {
 }
 
 /* History */
+/* Versions are Miira's shelf cards (design guide: Chat history card / Cards):
+   rest lip, lift on hover, press back. The published one stays raised on a green lip. */
 .history {
   list-style: none;
   margin: 0;
-  padding: var(--miira-space-2);
+  padding: var(--miira-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-3);
 }
 .history__item {
   padding: var(--miira-space-3);
+  background: var(--miira-bg-primary);
+  border: 1px solid var(--miira-border-color);
   border-radius: var(--miira-radius-md);
-  border: 1px solid transparent;
+  box-shadow: 0 2px 0 0 var(--miira-border-color);
+  transform: translateY(0);
+  transition:
+    transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 0.15s;
 }
-.history__item + .history__item {
-  border-top-color: var(--miira-color-border);
-  border-radius: 0;
+.history__item:hover {
+  border-color: var(--miira-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 0 var(--miira-border-hover);
+}
+.history__item:active:not(:has(button:active)) {
+  transform: translateY(0);
+  box-shadow: 0 1px 0 0 var(--miira-border-color);
 }
 .history__item.is-published {
-  border: 1px solid var(--miira-color-success);
+  border-color: var(--miira-green);
+  transform: translateY(-3px);
+  box-shadow: 0 5px 0 0 var(--miira-green);
+}
+@media (prefers-reduced-motion: reduce) {
+  .history__item,
+  .history__item:hover,
+  .history__item.is-published {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Indstillinger: sections, and the access choice as shelf cards like the history. */
+.settings {
+  padding: var(--miira-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-5);
+}
+.settings__section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--miira-space-2);
+}
+.settings__section h3 {
+  margin: 0;
+  font-size: var(--miira-font-size-md);
+}
+.settings__section p {
+  margin: 0;
+  font-size: var(--miira-font-size-sm);
+}
+.settings__icon {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-4);
+  width: 100%;
+}
+.settings__icon-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 88px;
+  height: 88px;
+  background: var(--miira-bg-surface);
+  border: 1px solid var(--miira-border-color);
+  border-radius: var(--miira-radius-lg);
+  box-shadow: 0 2px 0 0 var(--miira-border-color);
+}
+.settings__icon-frame img {
   border-radius: var(--miira-radius-md);
-  background: var(--miira-color-success-soft);
+}
+.settings__icon-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--miira-space-2);
+}
+.settings__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-2);
+  width: 100%;
+}
+.settings__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--miira-space-3);
+  width: 100%;
+  padding: var(--miira-space-3);
+  text-align: left;
+  font: inherit;
+  color: var(--miira-color-text);
+  background: var(--miira-bg-primary);
+  border: 1px solid var(--miira-border-color);
+  border-radius: var(--miira-radius-md);
+  box-shadow: 0 2px 0 0 var(--miira-border-color);
+  cursor: pointer;
+  transition:
+    transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 0.15s;
+}
+.settings__choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings__choice .muted {
+  font-size: var(--miira-font-size-sm);
+}
+.settings__choice:hover:not(:disabled) {
+  border-color: var(--miira-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 0 var(--miira-border-hover);
+}
+.settings__choice.is-active {
+  border-color: var(--miira-accent-shade);
+  box-shadow: 0 3px 0 0 var(--miira-accent-shade);
+}
+.settings__choice:disabled {
+  cursor: default;
+}
+.settings__choice:disabled:not(.is-active) {
+  opacity: 0.6;
+}
+.settings__description {
+  resize: vertical;
+  font: inherit;
+}
+.settings__error {
+  color: var(--miira-color-danger);
+}
+
+/* Miira's pill badge (design guide: Badges). */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--miira-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+.role-badge--ok {
+  background: color-mix(in srgb, var(--miira-green) 18%, transparent);
+  color: var(--miira-green);
 }
 .history__head {
   display: flex;

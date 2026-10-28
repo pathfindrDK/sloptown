@@ -3,6 +3,7 @@ import { Eye, FileCode, PanelRightClose, PanelRightOpen, X } from "lucide-react"
 import { api } from "../api/client";
 import { ApiError, type BucketStatus, type Commit, type Project } from "../api/types";
 import { initialProjectState, projectReducer } from "../lib/projectState";
+import { meterFor } from "../lib/budget";
 import { useT } from "../lib/i18n";
 import { useShell } from "../lib/shell";
 import { TopBar } from "../components/TopBar";
@@ -12,7 +13,9 @@ import { Preview } from "./Preview";
 import { ChatPanel } from "./ChatPanel";
 import { FilesPanel } from "./FilesPanel";
 import { HistoryPanel } from "./HistoryPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { useLoad } from "../lib/useLoad";
+import { useSegmentedIndicator } from "../lib/useSegmentedIndicator";
 import { Loading } from "../components/Loading";
 
 // CodeMirror is most of the bundle; load it when the first file tab opens.
@@ -21,7 +24,7 @@ const CodeView = lazy(() => import("./CodeView").then((m) => ({ default: m.CodeV
 type Tab = { kind: "preview" } | { kind: "file"; path: string; sha?: string; compareSha?: string | null; highlight?: boolean };
 const tabKey = (t: Tab) => (t.kind === "preview" ? "preview" : `${t.path}@${t.sha ?? "work"}`);
 
-type SideTab = "chat" | "files" | "history";
+type SideTab = "chat" | "files" | "history" | "settings";
 
 const SIDEBAR_KEY = "sloptown.sidebarWidth";
 function loadWidth(): number {
@@ -53,6 +56,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const [publishError, setPublishError] = useState<ApiError | null>(null);
   const [publishing, setPublishing] = useState(false);
   const shownBudgetState = useRef<string>("ok");
+  const segRef = useRef<HTMLDivElement>(null);
+  useSegmentedIndicator(segRef, `${sideTab}:${sideOpen}`);
 
   const canEdit = project.myRole === "owner" || project.myRole === "editor";
 
@@ -168,24 +173,57 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     window.addEventListener("pointerup", up);
   };
 
+  const download = () => api.download(project.id, `${project.title || "vibe"}.zip`);
+
+  // chrome=none: Miira's top bar shows publish/download/budget/open app; keep it current.
+  const upToDate = !!headSha && headSha === project.publishedSha;
+  const bucket = state.budget?.enabled ? state.budget.build : null;
+  const meter = meterFor(bucket);
+  const toolbarKey = JSON.stringify({
+    canEdit,
+    publish: canEdit && webapp ? { published: upToDate, busy: publishing, disabled: !headSha || upToDate || publishing } : null,
+    appUrl: project.appUrl && project.publishedSha ? project.appUrl : null,
+    download: canEdit && !!headSha,
+    budget: bucket && {
+      state: bucket.state,
+      fraction: meter.fraction,
+      nerfMark: meter.nerfMark,
+      usedTokens: bucket.usedTokens,
+      limitTokens: bucket.hardLimitTokens ?? bucket.nerfLimitTokens,
+    },
+  });
+  useEffect(() => shell.toolbar(project.id, JSON.parse(toolbarKey)), [shell, project.id, toolbarKey]);
+  useEffect(() => () => shell.toolbar(project.id, null), [shell, project.id]);
+
+  const onAction = useRef<(action: "publish" | "download") => void>(() => {});
+  onAction.current = (action) => {
+    if (action === "download" && canEdit && headSha) download();
+    if (action === "publish" && canEdit && webapp && headSha && !upToDate && !publishing) publish(headSha);
+  };
+  useEffect(
+    () => shell.onAction((fileId, action) => fileId === project.id && onAction.current(action)),
+    [shell, project.id],
+  );
+
   const active: Tab | undefined = tabs.find((x) => tabKey(x) === activeTab) ?? tabs[0];
   const blocked = !!state.budget?.enabled && state.budget.build.state === "blocked";
 
   return (
     <div className={`editor${shell.chromeHidden ? " editor--embedded" : ""}`}>
-      <TopBar
-        project={project}
-        budget={state.budget}
-        headSha={headSha}
-        canEdit={canEdit}
-        publishing={publishing}
-        compact={shell.chromeHidden}
-        onBack={onBack}
-        onRename={rename}
-        onShare={() => shell.share(project.id)}
-        onPublish={() => headSha && publish(headSha)}
-        onDownload={() => api.download(project.id, `${project.title || "vibe"}.zip`)}
-      />
+      {!shell.chromeHidden && (
+        <TopBar
+          project={project}
+          budget={state.budget}
+          headSha={headSha}
+          canEdit={canEdit}
+          publishing={publishing}
+          onBack={onBack}
+          onRename={rename}
+          onShare={() => shell.share(project.id)}
+          onPublish={() => headSha && publish(headSha)}
+          onDownload={download}
+        />
+      )}
       <div className="editor__body">
         <main className="editor__main">
           <div className="tabs" role="tablist">
@@ -223,6 +261,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                 <Preview
                   project={project}
                   reloadSignal={state.historyVersion}
+                  empty={!!history && history.commits.length <= 1}
                   onFixError={askAiToFix}
                 />
               </div>
@@ -248,12 +287,21 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
         {sideOpen && (
           <aside className="sidepane" style={{ width: sideWidth }}>
             <div className="sidepane__resizer" onPointerDown={startResize} role="separator" aria-orientation="vertical" />
-            <div className="sidepane__tabs" role="tablist">
-              {(["chat", "files", "history"] as const).map((k) => (
-                <button key={k} role="tab" aria-selected={sideTab === k} className={`sidepane__tab${sideTab === k ? " is-active" : ""}`} onClick={() => setSideTab(k)}>
-                  {t(`side.${k}`)}
-                </button>
-              ))}
+            <div className="sidepane__seg-wrap">
+              <div className="segmented" role="group" aria-label={t("side.sections")} ref={segRef}>
+                <span className="segmented__indicator" aria-hidden />
+                {(canEdit ? (["chat", "files", "history", "settings"] as const) : (["chat", "files", "history"] as const)).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={sideTab === k}
+                    className={sideTab === k ? "active" : undefined}
+                    onClick={() => setSideTab(k)}
+                  >
+                    {t(`side.${k}`)}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="sidepane__content">
               {sideTab === "chat" &&
@@ -294,6 +342,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                   onPublish={webapp ? publish : undefined}
                 />
               )}
+              {sideTab === "settings" && canEdit && <SettingsPanel project={project} onChange={setProject} />}
             </div>
           </aside>
         )}

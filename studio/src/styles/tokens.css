@@ -1,15 +1,20 @@
 /*
- * PLACEHOLDER — approximates Miira's design tokens until
- * design/sync-from-miira.mjs vendors the real drive/public/tokens.css from a
- * pinned miira3 commit and overwrites this file. Keep the variable names; the
- * studio only ever reads --miira-* variables.
+ * The studio's design tokens, read from Miira's own (vendor/tokens.css, synced
+ * by design/sync-from-miira.mjs from a pinned miira3 commit; never edit it).
+ *
+ * The studio keeps its own --miira-color-* names, but every colour is an alias
+ * of a Miira token. Miira's theme blocks ([data-theme="miira|neutral|dark|kontrast"])
+ * and a school's own palette (inline --miira-* properties, see lib/shell.tsx
+ * applyTheme) therefore restyle the studio with no theme block of its own here.
+ * Aliases and theme sit on the same element (<html>), so they resolve per theme.
  */
+@import "./vendor/tokens.css";
+
 :root {
-  --miira-font-sans: "Roobert PRO", "Roobert", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --miira-font-sans: var(--miira-font);
   --miira-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --miira-font-size-xs: 0.75rem;
-  --miira-font-size-sm: 0.8125rem;
+  /* Sizes Miira has no token for; sm and xs come from Miira. */
   --miira-font-size-md: 0.875rem;
   --miira-font-size-lg: 1rem;
   --miira-font-size-xl: 1.25rem;
@@ -21,70 +26,39 @@
   --miira-space-4: 16px;
   --miira-space-5: 24px;
   --miira-space-6: 32px;
-
-  --miira-radius-sm: 6px;
-  --miira-radius-md: 10px;
-  --miira-radius-lg: 16px;
   --miira-radius-full: 999px;
 
-  --miira-color-bg: #f6f7f9;
-  --miira-color-surface: #ffffff;
-  --miira-color-surface-2: #f0f2f5;
-  --miira-color-surface-3: #e6e9ee;
-  --miira-color-border: #dde1e7;
-  --miira-color-border-strong: #c3c9d2;
-  --miira-color-text: #1c2028;
-  --miira-color-text-muted: #5d6573;
-  --miira-color-text-subtle: #8a92a0;
-  --miira-color-text-on-accent: #ffffff;
+  --miira-color-bg: var(--miira-bg-surface);
+  --miira-color-surface: var(--miira-bg-primary);
+  --miira-color-surface-2: var(--miira-bg-secondary);
+  --miira-color-surface-3: var(--miira-bg-hover);
+  --miira-color-border: var(--miira-border-color);
+  --miira-color-border-strong: var(--miira-border-hover);
+  --miira-color-text: var(--miira-text-primary);
+  --miira-color-text-muted: var(--miira-text-secondary);
+  --miira-color-text-subtle: var(--miira-text-muted);
+  --miira-color-text-on-accent: var(--miira-accent-text);
 
-  --miira-color-accent: #2f5bea;
-  --miira-color-accent-hover: #244bd0;
-  --miira-color-accent-shade: #1b3aa6;
-  --miira-color-accent-soft: #e7edfd;
+  --miira-color-accent: var(--miira-accent);
+  --miira-color-accent-hover: color-mix(in srgb, var(--miira-accent) 88%, var(--miira-text-primary));
+  --miira-color-accent-shade: var(--miira-accent-shade);
+  --miira-color-accent-soft: color-mix(in srgb, var(--miira-accent) 18%, var(--miira-bg-primary));
 
-  --miira-color-success: #1f8a4c;
-  --miira-color-success-soft: #e3f4ea;
-  --miira-color-warning: #b86e00;
-  --miira-color-warning-soft: #fdf1dc;
-  --miira-color-danger: #c8323b;
-  --miira-color-danger-soft: #fbe5e6;
+  --miira-color-success: var(--miira-green);
+  --miira-color-success-soft: color-mix(in srgb, var(--miira-green) 14%, var(--miira-bg-primary));
+  --miira-color-warning: var(--miira-orange);
+  --miira-color-warning-soft: color-mix(in srgb, var(--miira-orange) 14%, var(--miira-bg-primary));
+  --miira-color-danger: var(--miira-red);
+  --miira-color-danger-soft: color-mix(in srgb, var(--miira-red) 14%, var(--miira-bg-primary));
 
-  --miira-color-diff-add: rgba(31, 138, 76, 0.14);
-  --miira-color-diff-remove: rgba(200, 50, 59, 0.14);
-  --miira-color-highlight: rgba(47, 91, 234, 0.12);
+  --miira-color-diff-add: color-mix(in srgb, var(--miira-green) 16%, transparent);
+  --miira-color-diff-remove: color-mix(in srgb, var(--miira-red) 16%, transparent);
+  --miira-color-highlight: color-mix(in srgb, var(--miira-accent) 16%, transparent);
 
-  --miira-shadow-sm: 0 1px 2px rgba(20, 24, 33, 0.06);
-  --miira-shadow-md: 0 4px 16px rgba(20, 24, 33, 0.1);
-  --miira-shadow-lg: 0 16px 48px rgba(20, 24, 33, 0.18);
+  --miira-shadow-sm: 0 1px 2px rgba(var(--miira-shadow-rgb), 0.08);
+  --miira-shadow-md: 0 4px 16px rgba(var(--miira-shadow-rgb), 0.12);
+  --miira-shadow-lg: 0 16px 48px rgba(var(--miira-shadow-rgb), 0.2);
   --miira-shadow-3d: 0 2px 0 var(--miira-color-border-strong);
   --miira-shadow-3d-accent: 0 2px 0 var(--miira-color-accent-shade);
-
-  --miira-overlay: rgba(16, 20, 28, 0.45);
-  --miira-focus-ring: 0 0 0 3px rgba(47, 91, 234, 0.35);
-}
-
-[data-theme="dark"] {
-  --miira-color-bg: #12151b;
-  --miira-color-surface: #1a1e26;
-  --miira-color-surface-2: #222731;
-  --miira-color-surface-3: #2b313d;
-  --miira-color-border: #2f3542;
-  --miira-color-border-strong: #424a5a;
-  --miira-color-text: #e8ebf0;
-  --miira-color-text-muted: #a3abb8;
-  --miira-color-text-subtle: #737c8b;
-
-  --miira-color-accent: #5b7ff2;
-  --miira-color-accent-hover: #6f8ff5;
-  --miira-color-accent-shade: #3550b8;
-  --miira-color-accent-soft: #232f52;
-
-  --miira-color-success-soft: #173325;
-  --miira-color-warning-soft: #3a2c12;
-  --miira-color-danger-soft: #3d1c1f;
-
-  --miira-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --miira-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
-  --miira-overlay: rgba(0, 0, 0, 0.6);
+  --miira-overlay: rgba(var(--miira-shadow-rgb), 0.45);
 }

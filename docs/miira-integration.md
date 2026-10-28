@@ -69,11 +69,15 @@ check `event.origin` against an allowlist.
 | Direction       | type                 | payload                                              | Meaning |
 |-----------------|----------------------|------------------------------------------------------|---------|
 | SlopTown → Miira| `drive:ready`        | `{}`                                                 | iframe loaded, send init |
-| Miira → SlopTown| `drive:init`         | `{ fileId, launchToken, theme: "light"\|"dark", locale: "da"\|"en" }` | start session |
-| Miira → SlopTown| `drive:theme`        | `{ theme }`                                          | theme switched |
+| Miira → SlopTown| `drive:init`         | `{ fileId, launchToken, theme: "light"\|"dark", miiraTheme, tokens, locale: "da"\|"en" }` | start session |
+| Miira → SlopTown| `drive:theme`        | `{ theme, miiraTheme, tokens }`                      | theme switched in Miira, or the school's theme changed |
 | SlopTown → Miira| `drive:share`        | `{ fileId }`                                         | open Miira's share dialog |
 | SlopTown → Miira| `drive:title`        | `{ fileId, title }`                                  | rename the file |
 | Miira → SlopTown| `drive:title`        | `{ fileId, title }`                                  | the file was renamed in Miira's top bar; the studio renames the project (owner/editor, trimmed to 120 characters) |
+| SlopTown → Miira| `drive:toolbar`      | `{ fileId, toolbar: ToolbarState \| null }`          | what Miira's top bar may offer (sent on every change; `null` when the editor closes) |
+| Miira → SlopTown| `drive:icon-state`   | `{ fileId, src, custom }`                            | the Vibe's icon as Miira shows it (a `data:image/...` URL), sent once the studio runs and on every change |
+| SlopTown → Miira| `drive:icon`         | `{ fileId }`                                         | open Miira's icon dialog (Indstillinger → Skift ikon) |
+| Miira → SlopTown| `drive:action`       | `{ fileId, action: "publish" \| "download" }`        | a press on one of those actions; the studio runs it as if its own button was pressed |
 | SlopTown → Miira| `drive:close`        | `{}`                                                 | user pressed back |
 | Miira → SlopTown| `drive:access-changed`| `{ fileId }`                                        | optional fast path after the share dialog closes |
 
@@ -82,10 +86,36 @@ iframe path): the studio is a third-party origin and gets none of the services t
 drive offers its own editors. On `drive:ready` Miira mints a fresh launch token and
 answers with `drive:init`; on `drive:title` it renames the file.
 
-With `?chrome=none` (what Miira sends) Miira draws the top bar every Miira editor has
-above the frame: back, file icon, editable name and Support. The studio then shows only
-its own actions (budget, open app, download, share, publish), and a rename in Miira's bar
-reaches the studio as `drive:title`.
+With `?chrome=none` (what Miira sends) the studio draws no top bar: Miira draws the only
+one, like for every Miira editor: back, file icon, editable name, then the studio's
+actions, Support, Del and the user menu. Del is Miira's own share dialog. The studio's
+actions are described by `drive:toolbar` and pressed with `drive:action`:
+
+```ts
+type ToolbarState = {
+  canEdit: boolean;
+  publish: { published: boolean; busy: boolean; disabled: boolean } | null; // null: scratch or viewer
+  appUrl: string | null;      // the published app, opened by Miira in a new tab
+  download: boolean;          // "Hent filer" may run now
+  budget: {                   // the build budget meter; null when budgets are off
+    state: "ok" | "warning" | "nerfed" | "blocked";
+    fraction: number | null;  // 0..1 of the limit, null = no limit
+    nerfMark: number | null;  // 0..1, where the downgrade limit sits
+    usedTokens: number;
+    limitTokens: number | null;
+  } | null;
+};
+```
+
+`miiraTheme` is Miira's theme (`miira`, `neutral`, `dark`, `kontrast` or `org`) and
+`tokens` the school's own `--miira-*` values when it has a theme of its own (empty
+otherwise), already worked out by Miira. The studio reads its colours from Miira's
+vendored tokens (`studio/src/styles/vendor/tokens.css`), so it wears every Miira theme
+and lays a school's tokens over it. `theme` stays for older builds. A school's own font
+is not carried: its files need the Miira session, which a studio on another site lacks.
+
+The download itself still happens in the frame (it needs the in-memory bearer), so the
+iframe keeps `allow-downloads`. Budget and publish-error dialogs stay in the studio.
 
 ## 4. OIDC provider
 

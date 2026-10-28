@@ -24,6 +24,9 @@ export type Project = {
   previewUrl: string | null;
   appUrl: string | null;
   publishedSha: string | null;
+  /** The published app opens without a Miira login. */
+  public: boolean;
+  description: string;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,0 +1,12 @@
+{
+  "source": "miira3",
+  "commit": "645ac156dbe98140dea8e6e445df83ece39a2bbc",
+  "syncedAt": "2026-10-28T16:01:25.948Z",
+  "fonts": false,
+  "files": {
+    "design/dist/components.css": "22d24dec1faa31b4a8c0e936b97edc7c1b4a82fe385c95fc00e5de67617cfd68",
+    "design/dist/tokens.css": "7f7c8fb0214de39859be27e0b7bb2b673d06ba5450feac5b35c21227bed63b18",
+    "studio/src/styles/vendor/components.css": "22d24dec1faa31b4a8c0e936b97edc7c1b4a82fe385c95fc00e5de67617cfd68",
+    "studio/src/styles/vendor/tokens.css": "7f7c8fb0214de39859be27e0b7bb2b673d06ba5450feac5b35c21227bed63b18"
+  }
+}

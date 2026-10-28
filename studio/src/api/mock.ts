@@ -134,6 +134,8 @@ function makeProject(pid: string, title: string, seeded: boolean): ProjectData {
       previewUrl: "/mock-preview.html",
       appUrl: null,
       publishedSha: null,
+      public: false,
+      description: "",
       createdAt: created,
       updatedAt: now(),
     },

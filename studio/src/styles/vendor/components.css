@@ -1,0 +1,4124 @@
+/* Vendored from miira3@645ac156dbe9:drive/public/styleguide.html by design/sync-from-miira.mjs. Do not edit. */
+/* @miira-tokens:start ===========================================
+     * Miira design tokens — SINGLE SOURCE OF TRUTH.
+     *
+     * Everything between @miira-tokens:start and @miira-tokens:end is the
+     * shared token contract for EVERY Miira app. Edit values here, then run
+     * `npm run sync:tokens` (from drive/) to regenerate every app's
+     * src/styles/tokens.css and the public mirror. CI fails if they drift.
+     *
+     * Do NOT put styleguide-only demo tokens (e.g. --miira-palette-*)
+     * inside this region — keep those in the
+     * "Styleguide-only chrome tokens" block after @miira-tokens:end.
+     * ============================================================ */
+
+    @font-face {
+      font-family: 'Roobert PRO';
+      font-style: normal; font-weight: 300; font-display: swap;
+      src: url('/fonts/RoobertPRO-Light.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Roobert PRO';
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url('/fonts/RoobertPRO-Regular.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Roobert PRO';
+      font-style: normal; font-weight: 500; font-display: swap;
+      src: url('/fonts/RoobertPRO-Medium.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Roobert PRO';
+      font-style: normal; font-weight: 600; font-display: swap;
+      src: url('/fonts/RoobertPRO-SemiBold.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Roobert PRO';
+      font-style: normal; font-weight: 700; font-display: swap;
+      src: url('/fonts/RoobertPRO-Bold.woff2') format('woff2');
+    }
+
+    /* OpenDyslexic — accessibility override (SIL OFL). Synced into every
+       app via `node scripts/sync-opendyslexic.mjs`. Activated by
+       `document.documentElement.dataset.dyslexiaFont = 'true'`. */
+    @font-face {
+      font-family: 'OpenDyslexic';
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url('/fonts/opendyslexic/OpenDyslexic-Regular.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'OpenDyslexic';
+      font-style: italic; font-weight: 400; font-display: swap;
+      src: url('/fonts/opendyslexic/OpenDyslexic-Italic.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'OpenDyslexic';
+      font-style: normal; font-weight: 700; font-display: swap;
+      src: url('/fonts/opendyslexic/OpenDyslexic-Bold.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'OpenDyslexic';
+      font-style: italic; font-weight: 700; font-display: swap;
+      src: url('/fonts/opendyslexic/OpenDyslexic-BoldItalic.woff2') format('woff2');
+    }
+
+    :root {
+      /* Brand (same in every theme) */
+      --miira-brown:   #5c4500;
+      --miira-yellow:  #ffbf00;
+      --miira-orange:  #ff8049;
+      --miira-green:   #00bd62;
+      --miira-blue:    #3368d1;
+      --miira-red:     #e74c3c;
+
+      /* Sticky notes (Tavle) — the six colours a card can be, plus the
+         ink that stays readable on all of them. Theme-independent on
+         purpose: a note's colour is authored content that a classmate
+         picked, so it must not change meaning when somebody switches to
+         the dark theme. They are muted enough to carry body text and
+         distinct enough to sort a board by eye. */
+      --miira-sticky-yellow: #ffe9a8;
+      --miira-sticky-orange: #ffd2bb;
+      --miira-sticky-green:  #c4ecd2;
+      --miira-sticky-blue:   #c7dcf7;
+      --miira-sticky-purple: #ddd2f2;
+      --miira-sticky-grey:   #e6e2d9;
+      --miira-sticky-ink:    #302400;
+      --miira-sticky-border: rgba(48, 36, 0, 0.14);
+
+      /* Radius */
+      --miira-radius-sm: 5px;
+      --miira-radius-md: 10px;
+      --miira-radius-lg: 20px;
+
+      /* Layout */
+      --miira-subheader-height: 49px;
+
+      /* Shadows */
+      --miira-shadow-rgb:    92, 69, 0;
+      --miira-shadow:        0 2px 8px rgba(var(--miira-shadow-rgb), 0.08);
+      --miira-shadow-strong: 0 4px 12px rgba(var(--miira-shadow-rgb), 0.14);
+      --miira-shadow-elev:   0 8px 24px rgba(var(--miira-shadow-rgb), 0.18);
+      --miira-shadow-modal:  0 20px 60px rgba(var(--miira-shadow-rgb), 0.28);
+
+      /* Typography */
+      --miira-font:
+        'Roobert PRO', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif;
+      /* Accessibility: when the user enables "dyslexia font" in account
+         preferences, swap the brand font for OpenDyslexic everywhere. */
+      --miira-font-dyslexia:
+        'OpenDyslexic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif;
+      --miira-font-size-h1: 2.5rem;
+      --miira-font-size-h2: 2rem;
+      --miira-font-size-h3: 1.5rem;
+      --miira-font-size-h4: 1.125rem;
+      --miira-font-size-h5: 0.9375rem;
+      --miira-font-size-body: 1rem;
+      --miira-font-size-sm:   0.875rem;
+      --miira-font-size-xs:   0.75rem;
+
+      /* Icon buttons */
+      --miira-icon-btn-size:       32px;
+      --miira-icon-btn-round-size: 44px;
+    }
+
+    /* ------- Themes ------- */
+
+    /* Miira (light, golden warm) — default */
+    :root,
+    [data-theme='miira'] {
+      --miira-bg-primary:     #fffdf8;
+      --miira-bg-secondary:   #fffcf5;
+      --miira-bg-surface:     #fff9ee;
+      --miira-bg-input:       #fffdf8;
+      --miira-bg-hover:       #f0e4cb;
+      --miira-text-primary:   #302400;
+      --miira-text-secondary: #8b7a63;
+      --miira-text-muted:     #b2a47b;
+      --miira-border-color:   #d7c7a9;
+      --miira-border-hover:   #c9ba94;
+      /* The edge and 2px shelf under a card. Identical to the hairline
+         colour in every built-in theme — it is a token of its own so a
+         school whose lines are darker than Miira's can lift the cards
+         off them (Administration → Organisationens udseende). */
+      --miira-card-edge:      #d7c7a9;
+      --miira-card-edge-hover: #c9ba94;
+      --miira-3d-shadow:      #d7c7a9;
+      /* Darker shade of the accent for 3D button lips/borders. In warm
+         themes this equals the 3D shelf colour so existing buttons are
+         unaffected; the neutral business theme overrides it to blue. */
+      --miira-accent-shade:   var(--miira-3d-shadow);
+      --miira-accent:         var(--miira-yellow);
+      --miira-accent-text:    var(--miira-brown);
+      /* Keyboard focus ring. A global `:focus-visible` rule paints this in
+         every app so tabbing never falls back to the browser's blue. */
+      --miira-focus-ring:     color-mix(in srgb, var(--miira-yellow) 65%, transparent);
+      --miira-shadow-rgb:     92, 69, 0;
+      --miira-avatar-default-bg:     #ffffff;
+      --miira-avatar-default-border: #e6d7b5;
+      /* Paper — the sheet a document/fagtekst/spreadsheet is rendered on,
+         both full size in an editor and miniaturised in a card thumb. Kept
+         apart from --miira-bg-* because a page is white in both light
+         themes while the surrounding chrome is warm. */
+      --miira-paper-bg:       #ffffff;
+      --miira-paper-text:     #1c140d;
+      --miira-paper-border:   #e6dcc7;
+      --miira-segmented-menu-bg:           var(--miira-bg-surface);
+      --miira-segmented-menu-indicator:    #f5e7c6;
+      --miira-segmented-menu-text:         var(--miira-text-secondary);
+      --miira-segmented-control-bg:        var(--miira-bg-surface);
+      --miira-segmented-control-indicator: #f5e7c6;
+      --miira-segmented-control-text:      var(--miira-text-secondary);
+      color-scheme: light;
+    }
+
+    /* Neutral (light, greyscale) */
+    [data-theme='neutral'] {
+      --miira-bg-primary:     #ffffff;
+      --miira-bg-secondary:   #fafafb;
+      --miira-bg-surface:     #f1f1f4;
+      --miira-bg-input:       #ffffff;
+      --miira-bg-hover:       #e8e8ed;
+      --miira-text-primary:   #1c1c1f;
+      --miira-text-secondary: #5b5b63;
+      --miira-text-muted:     #8b8b95;
+      --miira-border-color:   #dadae0;
+      --miira-border-hover:   #c4c4cc;
+      /* The edge and 2px shelf under a card. Identical to the hairline
+         colour in every built-in theme — it is a token of its own so a
+         school whose lines are darker than Miira's can lift the cards
+         off them (Administration → Organisationens udseende). */
+      --miira-card-edge:      #dadae0;
+      --miira-card-edge-hover: #c4c4cc;
+      --miira-3d-shadow:      #dadae0;
+      /* Business theme: blue accent on greyscale, no warm Miira tokens. */
+      --miira-accent-shade:   #1e3f80;
+      --miira-accent:         var(--miira-blue);
+      --miira-accent-text:    #ffffff;
+      --miira-focus-ring:     color-mix(in srgb, var(--miira-blue) 60%, transparent);
+      --miira-shadow-rgb:     0, 0, 0;
+      --miira-avatar-default-bg:     #ffffff;
+      --miira-avatar-default-border: #dadae0;
+      --miira-paper-bg:       #ffffff;
+      --miira-paper-text:     #1c1c1f;
+      --miira-paper-border:   #e1e1e6;
+      --miira-segmented-menu-bg:           var(--miira-bg-surface);
+      --miira-segmented-menu-indicator:    #ffffff;
+      --miira-segmented-menu-text:         var(--miira-text-secondary);
+      --miira-segmented-control-bg:        var(--miira-bg-surface);
+      --miira-segmented-control-indicator: #ffffff;
+      --miira-segmented-control-text:      var(--miira-text-secondary);
+      color-scheme: light;
+    }
+
+    /* Mørkt (dark) */
+    [data-theme='dark'] {
+      --miira-bg-primary:     #1e180a;
+      --miira-bg-secondary:   #241d0e;
+      --miira-bg-surface:     #2f2515;
+      --miira-bg-input:       #43341d;
+      --miira-bg-hover:       #3f3120;
+      --miira-text-primary:   #f4e7d5;
+      --miira-text-secondary: #c7b188;
+      --miira-text-muted:     #a68f66;
+      --miira-border-color:   #3f3120;
+      --miira-border-hover:   #594726;
+      /* The edge and 2px shelf under a card. Identical to the hairline
+         colour in every built-in theme — it is a token of its own so a
+         school whose lines are darker than Miira's can lift the cards
+         off them (Administration → Organisationens udseende). */
+      --miira-card-edge:      #3f3120;
+      --miira-card-edge-hover: #594726;
+      --miira-3d-shadow:      #3f3120;
+      --miira-accent-shade:   var(--miira-3d-shadow);
+      --miira-accent:         var(--miira-yellow);
+      --miira-accent-text:    var(--miira-brown);
+      --miira-focus-ring:     color-mix(in srgb, var(--miira-yellow) 70%, transparent);
+      --miira-shadow-rgb:     0, 0, 0;
+      --miira-avatar-default-bg:     #f4e7d5;
+      --miira-avatar-default-border: #c7b188;
+      --miira-paper-bg:       #2d2210;
+      --miira-paper-text:     #f4e7d5;
+      --miira-paper-border:   #4a3a23;
+      --miira-segmented-menu-bg:           var(--miira-bg-surface);
+      --miira-segmented-menu-indicator:    #4a3a22;
+      --miira-segmented-menu-text:         var(--miira-text-secondary);
+      --miira-segmented-control-bg:        var(--miira-bg-surface);
+      --miira-segmented-control-indicator: #4a3a22;
+      --miira-segmented-control-text:      var(--miira-text-secondary);
+      color-scheme: dark;
+    }
+
+    /* Kontrast (light, maximum contrast) — for readers with reduced
+       eyesight. Black ink and black borders on white, and no pair of
+       colours in the block below 11:1 — well past the 7:1 AAA bar,
+       because AAA is a floor for people with ordinary sight.
+
+       Two rules it is built on, both learned the hard way:
+
+       - There is no muted ink. The other themes fade secondary text into
+         the page to build hierarchy; here that is the first thing to
+         become unreadable, so hierarchy is carried by weight and size
+         and every label stays black.
+       - The accent is dark with white on it, not light with dark on it.
+         Miira's yellow carries black at 12.7:1, which passes and still
+         reads badly: a bright fill between white surfaces glares, and
+         thin dark glyphs on it are the hardest thing on the page. A deep
+         navy at 16.7:1 puts the label the other way round, and every
+         filled control in the app is `--miira-accent` +
+         `--miira-accent-text`, so the pair carries all of them. */
+    [data-theme='kontrast'] {
+      /* One surface, not a ramp. The other themes separate a card from
+         the page with a tint a shade or two apart; here the black border
+         does that job, and every tint spent on separation is contrast
+         taken off the text sitting on it. So page, card, panel and input
+         are all white — and so is everything else, because this theme is
+         two colours and no more. There is no light grey row, no grey
+         track, no near-black label: a tone between the two is a tone
+         somebody cannot see, which is the whole reason the theme exists. */
+      --miira-bg-primary:     #ffffff;
+      --miira-bg-secondary:   #ffffff;
+      --miira-bg-surface:     #ffffff;
+      --miira-bg-input:       #ffffff;
+      --miira-text-primary:   #000000;
+      --miira-text-secondary: #000000;
+      --miira-text-muted:     #000000;
+
+      /* Hover cannot be a fill here — ~210 rules write
+         `background: var(--miira-bg-hover)` and leave the ink alone, so
+         black would put black text on black and white would say nothing.
+         It is drawn instead, but **not** by this token: every one of
+         those rules carries a companion
+         `box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent)`,
+         which is transparent in every other theme and a black ring here.
+
+         A `background` gradient was the first attempt and it is the
+         instructive failure: four `linear-gradient` bars do draw a frame,
+         but a background is clipped by `border-radius` and the bars are
+         rectangular, so everything above `--miira-radius-sm` lost its
+         corners — a pill-shaped row hovered as four detached dashes. An
+         inset `box-shadow` is the only ring that follows the radius, and
+         it costs no layout, which a `border` would. So the token itself
+         goes back to being a plain colour: white, the same as the surface
+         under it, leaving the ring to say everything. */
+      --miira-bg-hover:       #ffffff;
+      --miira-border-color:   #000000;
+      --miira-border-hover:   #000000;
+      /* The edge and 2px shelf under a card. Identical to the hairline
+         colour in every built-in theme — it is a token of its own so a
+         school whose lines are darker than Miira's can lift the cards
+         off them (Administration → Organisationens udseende). */
+      --miira-card-edge:      #000000;
+      --miira-card-edge-hover: #000000;
+      /* The accent is black with a white label. Every filled control in
+         the app is `--miira-accent` + `--miira-accent-text`, so that one
+         pair turns all of them over at once — and the 3D shelf goes with
+         it, because a shelf needs a third tone and there isn't one. A
+         `.btn--3d` is a solid black block here that still lifts on
+         hover; the depth was never the message. */
+      --miira-3d-shadow:      #000000;
+      --miira-accent-shade:   #000000;
+      --miira-accent:         #000000;
+      --miira-accent-text:    #ffffff;
+      /* Solid, not the usual colour-mix: a translucent ring keeps almost
+         none of its contrast over whatever it sits on, which is the one
+         thing this theme exists to prevent. `outline-offset` puts the
+         ring on the surface rather than on the control, and every
+         surface here is white or near-white, so black is right for all
+         of them — including around the navy buttons. */
+      --miira-focus-ring:     #000000;
+      --miira-shadow-rgb:     0, 0, 0;
+      --miira-avatar-default-bg:     #ffffff;
+      --miira-avatar-default-border: #000000;
+      --miira-paper-bg:       #ffffff;
+      --miira-paper-text:     #000000;
+      --miira-paper-border:   #000000;
+      /* The pill that marks the chosen option cannot be filled black —
+         the *selected* label reads `--miira-text-primary` and would
+         disappear under it. So the pill stays white like the track, and
+         its boundary comes from the same inset ring hover uses: every
+         `.segmented__indicator` rule declares
+         `box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent)`
+         in place of the `none` it had.
+
+         A 4px bottom bar was tried first and is why the ring won: with no
+         outline of its own the pill was a black edge with nothing attached
+         to it, sitting under a hard black shelf, and it read as a rendering
+         fault rather than a selection. */
+      --miira-segmented-menu-bg:           #ffffff;
+      --miira-segmented-menu-indicator:    #ffffff;
+      --miira-segmented-menu-text:         #000000;
+      --miira-segmented-control-bg:        #ffffff;
+      --miira-segmented-control-indicator: #ffffff;
+      --miira-segmented-control-text:      #000000;
+
+      /* Depth without a grey blur. Every surface here already has a
+         black border, so the soft shadows the other themes use would be
+         the only grey left on the page — replaced by a hard black
+         offset, which says the same thing in two colours. */
+      --miira-shadow:        0 2px 0 0 #000000;
+      --miira-shadow-strong: 0 3px 0 0 #000000;
+      --miira-shadow-elev:   0 4px 0 0 #000000;
+      --miira-shadow-modal:  0 0 0 3px #000000;
+
+      /* The four below are declared by this theme and no other, and are
+         read as `var(--token, <what happens today>)` — so a theme that
+         does not set them is not opting out of anything, it simply never
+         hears about them. That is deliberate: each answers a question
+         only this theme asks, and a `none` in four other blocks (plus a
+         rule in `deriveTokens` for the schools) would be four more
+         places to keep in step for no behaviour.
+
+         The first three are one idea in three properties: **a faint tint
+         has no monochrome value.** Roughly 570 rules build a plate, an
+         edge or a label out of `color-mix(… var(--miira-X) N%,
+         transparent)` — a pale danger banner, a selected row, a chip on
+         a card. With a black source those all land on the mid-greys this
+         theme has none of anywhere else, and nudging the percentages
+         cannot help: the tint *is* a mid-tone. So the plate goes white,
+         the edge goes fully black, and the label goes fully black — a
+         coloured banner becomes a white one inside a black frame, which
+         is what it was always saying.
+
+         Note the asymmetry, because it is the whole trick: `wash` erases
+         and `wash-edge` asserts. A white border would delete the banner's
+         outline along with its colour; a black plate would delete the
+         text on it. */
+      --miira-wash:      #ffffff;
+      --miira-wash-edge: #000000;
+      --miira-wash-ink:  #000000;
+
+      /* What the illustrated file-type sprites are run through. They
+         are drawn pages in brand colours; desaturating alone turns those
+         fills into the mid-greys this theme has none of anywhere else.
+         `contrast(20)` is a threshold in everything but name — each
+         pixel lands on black or on white — so what is left is the
+         linework, which is what the drawing was. Some interior detail
+         goes with the greys (a quiz loses two of its four chips), and
+         that is the trade: a pencil, a bar chart, a target and a play
+         triangle are all still themselves. */
+      --miira-artwork-filter: grayscale(1) contrast(20);
+
+      /* The one theme that re-cuts the brand palette, and it cuts it down
+         to nothing. Everywhere else these are fixed, and that is right:
+         red means the same thing in every theme. But the palette is tuned
+         to be *legible*, not to be maximal, and each colour is used two
+         ways that both failed here — as a fill under white text
+         (`.btn--danger` sat at 3.8:1) and as a status dot or bar on a
+         white page, where the bright green reached 2.5:1 and simply was
+         not there for the reader this theme is for.
+
+         So they are black. The cost is real and worth stating: danger,
+         success and warning can no longer be told apart by colour, and
+         every one of them leans on the label or the icon beside it. That
+         is the trade this theme makes everywhere — a tone somebody
+         cannot see is not information.
+
+         Two that are not black, for opposite reasons:
+
+         - **Yellow is white.** It is never the fill under white text —
+           it is the fill under `--miira-brown`, 105 times over — so
+           black would be black on black. White plus the black border
+           those controls already carry is the monochrome version of a
+           highlighted chip. The important ones don't reach it anyway:
+           every accent-recolouring branch now lists `kontrast`, so a
+           primary button, a send button and an active toggle take
+           `--miira-accent` instead.
+         - **Brown is black**, and stays the ink rather than becoming a
+           surface: besides sitting on yellow it is the `.btn--3d` shelf
+           and a dozen status labels on a white page, which white would
+           erase.
+
+         The sticky-note colours below are untouched. A note's colour is
+         something a classmate picked, and authored content does not
+         change meaning because the reader switched theme. Their ink
+         (`--miira-sticky-ink`) is near-black already. */
+      --miira-brown:  #000000;
+      --miira-yellow: #ffffff;
+      --miira-red:    #000000;
+      --miira-green:  #000000;
+      --miira-blue:   #000000;
+      --miira-orange: #000000;
+
+      color-scheme: light;
+    }
+
+    /* Dyslexia font accessibility override — set
+       document.documentElement.dataset.dyslexiaFont = 'true' from account
+       preferences. Swaps --miira-font and forces every element (including
+       authored document/slide text with explicit font-family) onto
+       OpenDyslexic. SVG icons are unaffected. */
+    [data-dyslexia-font='true'] {
+      --miira-font: var(--miira-font-dyslexia);
+    }
+    [data-dyslexia-font='true'] body,
+    [data-dyslexia-font='true'] body * {
+      font-family: var(--miira-font) !important;
+    }
+    /* @miira-tokens:end ============================================ */
+
+    /* ============================================================
+     * Styleguide-only chrome tokens — NOT part of the shared system.
+     * These power the colour-matrix demo on this page (shown when the
+     * Neutral "business" theme is active). They are intentionally kept
+     * out of the @miira-tokens region so they never ship to apps.
+     * ============================================================ */
+    [data-theme='neutral'] {
+      /* Business palette: the blue accent + lighter/darker blues, then a
+         greyscale ramp. */
+      --miira-palette-blue:   var(--miira-blue);
+      --miira-palette-sky:    #5b8def;
+      --miira-palette-indigo: #1e3f80;
+      --miira-palette-slate:  #5b6573;
+      --miira-palette-grey:   #8b8b95;
+      --miira-palette-ink:    #1c1c1f;
+    }
+
+    /* ============================================================
+     * Page shell (styleguide chrome only — not part of the system)
+     * ============================================================ */
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--miira-font);
+      font-size: var(--miira-font-size-body);
+      line-height: 1.5;
+      background: var(--miira-bg-primary);
+      color: var(--miira-text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    /* Shared baseline (mirrored in every app's app.css): keyboard focus
+       follows the theme instead of the browser's default blue ring. */
+    :focus-visible {
+      outline: 2px solid var(--miira-focus-ring);
+      outline-offset: 2px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .workspace {
+      display: flex;
+      min-width: 0;
+      min-height: 100vh;
+    }
+
+    /* --- Sidebar nav --- */
+    .nav {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--miira-bg-secondary);
+      border-right: 1px solid var(--miira-border-color);
+      padding: 22px 14px;
+    }
+    .nav__brand {
+      padding: 0 6px 18px;
+    }
+    .nav__brand-lockup {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 0 4px;
+      color: var(--miira-text-primary);
+    }
+    .nav__brand-logo {
+      display: block;
+      height: 26px;
+      width: auto;
+      color: var(--miira-text-primary);
+    }
+    .nav__brand-label {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+      letter-spacing: 0.02em;
+    }
+    .nav__sections {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .nav__group {
+      display: flex;
+      flex-direction: column;
+    }
+    .nav__subs {
+      list-style: none;
+      margin: 0;
+      padding: 0 0 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .nav a {
+      display: block;
+      padding: 7px 10px;
+      border-radius: var(--miira-radius-sm);
+      color: var(--miira-text-secondary);
+      text-decoration: none;
+      font-size: var(--miira-font-size-sm);
+      line-height: 1.3;
+      transition: background 0.12s, color 0.12s;
+    }
+    .nav a.nav__section {
+      font-weight: 600;
+      color: var(--miira-text-primary);
+    }
+    .nav a.nav__sub {
+      padding: 5px 10px 5px 22px;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 500;
+      color: var(--miira-text-muted);
+    }
+    .nav a:hover,
+    .nav a:focus-visible {
+      background: var(--miira-bg-hover);
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+      color: var(--miira-text-primary);
+      outline: none;
+    }
+    .nav a.is-active {
+      background: color-mix(in srgb, var(--miira-yellow) 18%, var(--miira-bg-hover));
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+      color: var(--miira-text-primary);
+    }
+    .nav a.nav__sub.is-active {
+      font-weight: 600;
+    }
+
+    /* --- Main column --- */
+    .main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* --- Colors pane (sticky right, collapsible) --- */
+    .colors-pane {
+      --colors-pane-width: 300px;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      flex-shrink: 0;
+      width: var(--colors-pane-width);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--miira-border-color);
+      background: var(--miira-bg-secondary);
+      transition: width 0.22s cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    .layout--pane-collapsed .colors-pane {
+      width: 48px;
+    }
+    .colors-pane__header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--miira-border-color);
+      flex-shrink: 0;
+    }
+    .colors-pane__toggle {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-sm);
+      background: var(--miira-bg-primary);
+      color: var(--miira-text-secondary);
+      font-family: inherit;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+    }
+    .colors-pane__toggle:hover {
+      border-color: var(--miira-border-hover);
+      color: var(--miira-text-primary);
+      background: var(--miira-bg-hover);
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    .colors-pane__toggle-icon {
+      display: block;
+      transition: transform 0.22s cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    .layout--pane-collapsed .colors-pane__toggle-icon {
+      transform: rotate(180deg);
+    }
+    .colors-pane__intro {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .layout--pane-collapsed .colors-pane__intro {
+      display: none;
+    }
+    .colors-pane__title {
+      margin: 0;
+      font-size: var(--miira-font-size-sm);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+    }
+    .colors-pane__theme {
+      margin: -4px 0 0;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+      line-height: 1.35;
+    }
+    .colors-pane__reset {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin: 0;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 500;
+      line-height: 1.25;
+      padding: 7px 12px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .colors-pane__body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 4px 12px 20px;
+      overscroll-behavior: contain;
+    }
+    .layout--pane-collapsed .colors-pane__body {
+      display: none;
+    }
+    .layout--pane-collapsed .colors-pane__header {
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 8px;
+      border-bottom: none;
+    }
+    .colors-pane__group {
+      margin: 14px 0 6px;
+      padding: 0 4px;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--miira-text-muted);
+    }
+    .colors-pane__group:first-child {
+      margin-top: 4px;
+    }
+    .color-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .color-list__item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      border-radius: var(--miira-radius-sm);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .color-list__item:hover {
+      background: var(--miira-bg-hover);
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    .color-list__item--highlighted {
+      background: color-mix(in srgb, var(--miira-yellow) 24%, var(--miira-bg-hover));
+      box-shadow: inset 0 0 0 2px var(--miira-yellow);
+    }
+    .color-list__item--highlighted:hover {
+      background: color-mix(in srgb, var(--miira-yellow) 32%, var(--miira-bg-hover));
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    .colors-pane__inspect {
+      margin: 0;
+      padding: 0 4px 4px;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+      line-height: 1.35;
+    }
+    .colors-pane__inspect[hidden] {
+      display: none;
+    }
+    .color-list__chip {
+      position: relative;
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--miira-radius-sm);
+      border: 1px solid var(--miira-border-color);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--miira-text-primary) 6%, transparent);
+    }
+    .color-list__picker {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      border: none;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .color-list__meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .color-list__name {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .color-list__var {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      color: var(--miira-text-muted);
+      word-break: break-all;
+      line-height: 1.3;
+    }
+    .color-list__hex {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 32px;
+      background: color-mix(in srgb, var(--miira-bg-secondary) 88%, transparent);
+      backdrop-filter: saturate(1.4) blur(8px);
+      border-bottom: 1px solid var(--miira-border-color);
+    }
+    .topbar h1 { margin: 0; font-size: var(--miira-font-size-h4); font-weight: 600; }
+    .topbar h1 small { color: var(--miira-text-muted); font-weight: 400; }
+
+    /* Theme selector (segmented menu) — same radii as .segmented */
+    .theme-switch {
+      position: relative;
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      background: var(--miira-segmented-menu-bg);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+    }
+    .theme-switch .segmented__indicator {
+      top: 2px;
+      bottom: 2px;
+      border-radius: 7px;
+      background: var(--miira-segmented-menu-indicator);
+      /* The boundary the selected pill needs in `kontrast`, where the
+         pill and the track are both white. Transparent elsewhere. */
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    .theme-switch button {
+      position: relative;
+      z-index: 1;
+      appearance: none;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      color: var(--miira-segmented-menu-text);
+      padding: 6px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .theme-switch button:hover { color: var(--miira-text-primary); }
+    .theme-switch button[aria-pressed='true'] {
+      color: var(--miira-text-primary);
+    }
+
+    /* Segmented control (view / mode) — same as .toolbar__view-toggle */
+    .segmented,
+    .toolbar__view-toggle {
+      position: relative;
+      display: inline-flex;
+      background: var(--miira-segmented-control-bg);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      padding: 2px;
+      gap: 2px;
+    }
+    .segmented__indicator {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      left: 0;
+      width: 0;
+      border-radius: 7px;
+      background: var(--miira-segmented-control-indicator);
+      /* The boundary the selected pill needs in `kontrast`, where the
+         pill and the track are both white. Transparent elsewhere. */
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0;
+      transform: translateX(0);
+      transition:
+        transform 0.28s cubic-bezier(0.45, 0, 0.55, 1),
+        width 0.28s cubic-bezier(0.45, 0, 0.55, 1),
+        opacity 0.15s ease;
+    }
+    .segmented button,
+    .toolbar__view-toggle button {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 500;
+      color: var(--miira-segmented-control-text);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap;
+      box-shadow: none;
+    }
+    .segmented button:hover:not(.active),
+    .toolbar__view-toggle button:hover:not(.active) {
+      background: var(--miira-bg-hover);
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+      color: var(--miira-text-primary);
+    }
+    .segmented button.active,
+    .toolbar__view-toggle button.active {
+      color: var(--miira-text-primary);
+    }
+
+    /* Single-button toggles (cycle one setting per click) */
+    .theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--miira-bg-surface);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 500;
+      color: var(--miira-text-primary);
+      cursor: pointer;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s,
+        background 0.15s,
+        color 0.15s;
+    }
+    .theme-toggle:hover {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+    }
+    .theme-toggle:active {
+      transform: translateY(1px);
+      box-shadow: 0 0 0 0 transparent;
+    }
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--miira-accent);
+      outline-offset: 2px;
+    }
+    .theme-toggle svg { color: var(--miira-text-secondary); }
+    .theme-toggle[data-theme='miira'] svg,
+    .theme-toggle[data-theme='dark'] svg { color: var(--miira-yellow); }
+    .theme-toggle__label { letter-spacing: 0.01em; }
+
+    /* Boolean on/off switch */
+    .switch {
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+      width: 48px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid var(--miira-border-color);
+      background: var(--miira-bg-surface);
+      padding: 0;
+      transition:
+        background 0.28s cubic-bezier(0.45, 0, 0.55, 1),
+        border-color 0.28s cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    button.switch {
+      appearance: none;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+    }
+    button.switch:focus-visible {
+      outline: 2px solid var(--miira-accent);
+      outline-offset: 2px;
+    }
+    .switch__thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--miira-brown);
+      transition: transform 0.28s cubic-bezier(0.45, 0, 0.55, 1);
+    }
+    [data-theme='neutral'] .switch__thumb {
+      background: var(--miira-text-secondary);
+    }
+    .switch--on,
+    button.switch[aria-checked='true'] {
+      background: color-mix(in srgb, var(--miira-green) 24%, var(--miira-bg-surface));
+    }
+    .switch--on .switch__thumb,
+    button.switch[aria-checked='true'] .switch__thumb {
+      transform: translateX(20px);
+    }
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      width: 100%;
+      max-width: 520px;
+      padding: 16px 18px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-lg);
+      background: var(--miira-bg-secondary);
+      text-align: left;
+    }
+    button.switch-row {
+      appearance: none;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    button.switch-row:hover {
+      background: color-mix(in srgb, var(--miira-bg-hover) 35%, var(--miira-bg-secondary));
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    button.switch-row:focus-visible {
+      outline: 2px solid var(--miira-accent);
+      outline-offset: 2px;
+    }
+    button.switch-row[aria-checked='true'] {
+      background: color-mix(in srgb, var(--miira-bg-hover) 22%, var(--miira-bg-secondary));
+
+      box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent);
+    }
+    .switch-row__icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--miira-radius-md);
+      background: var(--miira-bg-surface);
+      color: var(--miira-text-primary);
+    }
+    .switch-row__copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+    .switch-row__title {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 600;
+      color: var(--miira-text-primary);
+      line-height: 1.25;
+    }
+    .switch-row__desc {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+      line-height: 1.35;
+    }
+    button.switch-row .switch {
+      pointer-events: none;
+    }
+
+    .content { padding: 32px; max-width: 1040px; }
+
+    section { margin-bottom: 56px; scroll-margin-top: 96px; }
+    section > h2 {
+      font-size: var(--miira-font-size-h3);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 4px;
+    }
+    section > .section-desc {
+      margin: 0 0 22px;
+      color: var(--miira-text-secondary);
+      font-size: var(--miira-font-size-sm);
+      max-width: 60ch;
+    }
+    h3.sub {
+      font-size: var(--miira-font-size-h5);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--miira-text-muted);
+      margin: 28px 0 12px;
+      scroll-margin-top: 96px;
+    }
+
+    /* Demo surface + code block */
+    .demo {
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-lg);
+      overflow: hidden;
+      background: var(--miira-bg-secondary);
+    }
+    .demo__stage {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      padding: 28px;
+      background: var(--miira-bg-primary);
+    }
+    .demo__stage--col { flex-direction: column; align-items: stretch; }
+    .demo__stage--rows {
+      padding: 28px;
+      align-items: flex-start;
+    }
+    .rows-demo {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
+      width: 100%;
+      max-width: 720px;
+    }
+    .rows-demo__toggle { align-self: flex-start; }
+    .demo__code {
+      margin: 0;
+      padding: 14px 18px;
+      border-top: 1px solid var(--miira-border-color);
+      background: var(--miira-bg-surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: var(--miira-font-size-xs);
+      line-height: 1.6;
+      color: var(--miira-text-secondary);
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .grid { display: grid; gap: 14px; }
+
+    /* --- Logo --- */
+    .logo-demo__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px 32px;
+    }
+    .logo-demo__item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .logo-demo__label {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+    }
+    .app-icon-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px 28px;
+    }
+    .app-icon-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      max-width: 132px;
+    }
+    /* The installers round the corners themselves; the shipped PNG is a full
+       square, so preview it the way the Dock and home screen show it. */
+    .app-icon-tile__img {
+      width: 96px;
+      height: 96px;
+      display: block;
+      border-radius: 22px;
+      box-shadow: var(--miira-shadow-strong);
+    }
+    .app-icon-tile__label {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+      text-align: center;
+      line-height: 1.35;
+    }
+    .logo-demo__panels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      width: 100%;
+    }
+    .logo-demo__panel {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      min-width: 180px;
+      min-height: 96px;
+      padding: 28px 32px;
+      border-radius: var(--miira-radius-md);
+      border: 1px solid var(--miira-border-color);
+      background: var(--miira-bg-primary);
+      color: var(--miira-text-primary);
+    }
+    .logo-demo__panel--dark {
+      background: #1e180a;
+      border-color: #3f3120;
+      color: #f4e7d5;
+    }
+    .miira-logo {
+      display: block;
+      height: 30px;
+      width: auto;
+      color: inherit;
+    }
+    .miira-logo--sm {
+      height: 22px;
+    }
+    .miira-mark {
+      display: block;
+      width: 28px;
+      height: 28px;
+    }
+    .logo-brand-dots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .logo-brand-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+    }
+    .logo-brand-dot__chip {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: 1px solid var(--miira-border-color);
+    }
+    .logo-brand-dot__chip--letterforms {
+      background: var(--miira-text-primary);
+    }
+
+    /* --- Color swatches --- */
+    .swatches { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .swatch {
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      overflow: hidden;
+      background: var(--miira-bg-secondary);
+    }
+    .swatch__chip {
+      position: relative;
+      height: 72px;
+      border-bottom: 1px solid var(--miira-border-color);
+    }
+    .swatch--editable { cursor: pointer; }
+    .swatch--editable:hover .swatch__chip::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: color-mix(in srgb, var(--miira-text-primary) 8%, transparent);
+      pointer-events: none;
+    }
+    .swatch__picker {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      border: none;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .swatch__meta { padding: 8px 10px; }
+    .swatch__name { font-size: var(--miira-font-size-sm); font-weight: 600; }
+    .swatch__var {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+      word-break: break-all;
+    }
+    .swatch__hex {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Button matrix (types × theme colors) */
+    .btn-matrix-wrap {
+      overflow-x: auto;
+      margin-top: 20px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      background: var(--miira-bg-primary);
+    }
+    .btn-matrix {
+      display: grid;
+      min-width: min(100%, 720px);
+      width: max-content;
+    }
+    .btn-matrix__corner,
+    .btn-matrix__head {
+      padding: 10px 12px;
+      background: var(--miira-bg-secondary);
+      border-bottom: 1px solid var(--miira-border-color);
+      border-right: 1px solid var(--miira-border-color);
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+    }
+    .btn-matrix__corner {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+    }
+    .btn-matrix__head {
+      text-align: center;
+      color: var(--miira-text-secondary);
+    }
+    .btn-matrix__head-swatch {
+      width: 22px;
+      height: 22px;
+      margin: 0 auto 6px;
+      border-radius: 5px;
+      border: 1px solid var(--miira-border-color);
+    }
+    .btn-matrix__head-name { display: block; }
+    .btn-matrix__head-var {
+      display: block;
+      margin-top: 2px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 400;
+      color: var(--miira-text-muted);
+      font-size: 0.65rem;
+    }
+    .btn-matrix__row-head {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      padding: 12px 14px;
+      background: var(--miira-bg-secondary);
+      border-bottom: 1px solid var(--miira-border-color);
+      border-right: 1px solid var(--miira-border-color);
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      color: var(--miira-text-primary);
+      min-width: 118px;
+    }
+    .btn-matrix__row-head code {
+      font-size: 0.65rem;
+      font-weight: 400;
+      color: var(--miira-text-muted);
+    }
+    .btn-matrix__cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 16px;
+      min-height: 58px;
+      border-bottom: 1px solid var(--miira-border-color);
+      border-right: 1px solid var(--miira-border-color);
+      background: var(--miira-bg-primary);
+    }
+    /* Tint primary + 3d per brand column (include hover/active — base
+       .btn--3d:hover loses the specificity fight on box-shadow here). */
+    .btn-matrix__cell[data-matrix-accent] .btn--primary {
+      background: var(--matrix-accent);
+      color: var(--matrix-accent-text);
+      border-color: transparent;
+      box-shadow: 0 2px 0 0 var(--matrix-3d-shadow);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--primary:hover {
+      border-color: transparent;
+      filter: brightness(1.02);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--matrix-3d-shadow);
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--primary:active {
+      border-color: transparent;
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 0 var(--matrix-3d-shadow);
+      filter: brightness(0.98);
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--3d {
+      background: var(--matrix-accent);
+      color: var(--matrix-accent-text);
+      border-color: var(--matrix-3d-border);
+      box-shadow: 0 4px 0 0 var(--matrix-3d-shadow);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--3d:hover {
+      filter: brightness(1.02);
+      transform: translateY(-3px);
+      box-shadow: 0 7px 0 0 var(--matrix-3d-shadow);
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--3d:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 0 var(--matrix-3d-shadow);
+      filter: brightness(0.98);
+    }
+    .btn-matrix__cell[data-matrix-accent] .btn--3d:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--matrix-accent) 60%, transparent);
+      outline-offset: 2px;
+    }
+
+    .type-row { display: flex; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--miira-border-color); }
+    .type-row__label { width: 120px; flex-shrink: 0; font-size: var(--miira-font-size-xs); color: var(--miira-text-muted); font-family: ui-monospace, monospace; }
+
+    .note {
+      font-size: var(--miira-font-size-sm);
+      color: var(--miira-text-secondary);
+      background: var(--miira-bg-surface);
+      border-left: 3px solid var(--miira-accent);
+      border-radius: var(--miira-radius-sm);
+      padding: 10px 14px;
+      margin: 14px 0 0;
+    }
+
+    .dev-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 4px 0 0;
+    }
+    .dev-links .btn { text-decoration: none; }
+
+    /* ============================================================
+     * COMPONENTS — copied verbatim from drive/src/styles/app.css
+     * (and the editors, which share the same classes). Keep in sync.
+     * ============================================================ */
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      color: var(--miira-text-primary);
+      background: var(--miira-bg-surface);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      padding: 6px 12px;
+      cursor: pointer;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s;
+      user-select: none;
+    }
+    /* Subtle 3D shelf — half the travel of .btn--primary (−1px / +1px, 1px → 2px shadow) */
+    .btn:hover {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 0 0 0 transparent;
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+
+    .btn--primary {
+      background: var(--miira-accent);
+      color: var(--miira-accent-text);
+      border-color: transparent;
+      font-weight: 600;
+      box-shadow: 0 2px 0 0 var(--miira-3d-shadow);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    /* Smaller 3D lift than .btn--3d: 2px shadow → 4px, −2px / +1px travel */
+    .btn--primary:hover {
+      border-color: transparent;
+      filter: brightness(1.02);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--miira-3d-shadow);
+    }
+    .btn--primary:active {
+      border-color: transparent;
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 0 var(--miira-3d-shadow);
+      filter: brightness(0.98);
+    }
+
+    .btn--danger {
+      background: var(--miira-red);
+      color: #fff;
+      border-color: transparent;
+      font-weight: 600;
+      --btn-danger-shadow: color-mix(in srgb, var(--miira-red) 55%, var(--miira-text-primary));
+      box-shadow: 0 2px 0 0 var(--btn-danger-shadow);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .btn--danger:hover {
+      border-color: transparent;
+      filter: brightness(1.02);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--btn-danger-shadow);
+    }
+    .btn--danger:active {
+      border-color: transparent;
+      transform: translateY(1px);
+      box-shadow: 0 1px 0 0 var(--btn-danger-shadow);
+      filter: brightness(0.98);
+    }
+    /* Dark theme: mix toward black (text-primary is light here) so the
+       shadow lip is a darker red rather than a washed-out pink. */
+    [data-theme='dark'] .btn--danger {
+      --btn-danger-shadow: color-mix(in srgb, var(--miira-red) 58%, #000);
+    }
+
+    .btn--ghost {
+      background: transparent;
+      border-color: var(--miira-border-color);
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    .btn--ghost:hover {
+      background: transparent;
+      border-color: var(--miira-border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+    }
+    .btn--ghost:active {
+      background: transparent;
+      transform: translateY(1px);
+      box-shadow: 0 0 0 0 transparent;
+    }
+
+    .btn--3d {
+      background: var(--miira-yellow);
+      color: var(--miira-brown);
+      font-weight: 700;
+      border: 2px solid var(--miira-brown);
+      border-radius: var(--miira-radius-md);
+      padding: 9px 18px;
+      letter-spacing: -0.005em;
+      box-shadow: 0 4px 0 0 var(--miira-brown);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .btn--3d:hover { filter: brightness(1.02); transform: translateY(-3px); box-shadow: 0 7px 0 0 var(--miira-brown); border-color: var(--miira-brown); }
+    .btn--3d:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--miira-brown); filter: brightness(0.98); border-color: var(--miira-brown); }
+    .btn--3d:focus-visible { outline: 3px solid var(--miira-focus-ring); outline-offset: 2px; }
+    /* Dark = warm Miira 3D (yellow face, brown lip). */
+    [data-theme='dark'] .btn--3d { border-color: var(--miira-brown); box-shadow: 0 4px 0 0 var(--miira-3d-shadow); }
+    [data-theme='dark'] .btn--3d:hover { box-shadow: 0 7px 0 0 var(--miira-3d-shadow); }
+    [data-theme='dark'] .btn--3d:active { box-shadow: 0 2px 0 0 var(--miira-3d-shadow); }
+    /* The base rule hardcodes Miira's yellow face and warm brown lip.
+       Every theme whose accent is not that pair restates it from its own
+       tokens: neutral in the blue business accent, kontrast in a deep
+       navy with a white label. */
+    [data-theme='neutral'] .btn--3d,
+    [data-theme='kontrast'] .btn--3d {
+      background: var(--miira-accent);
+      color: var(--miira-accent-text);
+      border-color: var(--miira-accent-shade);
+      box-shadow: 0 4px 0 0 var(--miira-accent-shade);
+    }
+    [data-theme='neutral'] .btn--3d:hover,
+    [data-theme='kontrast'] .btn--3d:hover { box-shadow: 0 7px 0 0 var(--miira-accent-shade); border-color: var(--miira-accent-shade); }
+    [data-theme='neutral'] .btn--3d:active,
+    [data-theme='kontrast'] .btn--3d:active { box-shadow: 0 2px 0 0 var(--miira-accent-shade); border-color: var(--miira-accent-shade); }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--miira-icon-btn-size);
+      height: var(--miira-icon-btn-size);
+      padding: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--miira-radius-sm);
+      color: var(--miira-text-primary);
+      cursor: pointer;
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        color 0.15s,
+        background 0.15s,
+        border-color 0.15s;
+    }
+    .icon-btn:hover:not(:disabled):not(.icon-btn--round) { transform: translateY(-1px) scale(1.2); }
+    .icon-btn:active:not(:disabled):not(.icon-btn--round) { transform: translateY(1px) scale(0.92); }
+    /* `.active` is the toggle's on state (B / I / U in a toolbar, an armed
+       reading tool, an open popover anchor) and must survive hover *and*
+       focus: a filled accent chip, not a recoloured glyph. The chip tints
+       from `--miira-accent` so every theme answers with its own accent;
+       kontrast re-cuts that through `--miira-wash` / `--miira-wash-edge`
+       into its monochrome version — white plate, black frame. */
+    .icon-btn.active {
+      color: var(--miira-brown);
+      background: var(--miira-wash, color-mix(in srgb, var(--miira-accent) 22%, var(--miira-bg-surface)));
+      border-color: var(--miira-wash-edge, color-mix(in srgb, var(--miira-accent) 55%, var(--miira-border-color)));
+    }
+    /* Yellow ink would drown on the yellow-tinted chip in Miira and dark;
+       the themes whose accent is not the chip tint recolour instead. */
+    [data-theme='neutral'] .icon-btn.active,
+    [data-theme='dark'] .icon-btn.active,
+    [data-theme='kontrast'] .icon-btn.active { color: var(--miira-accent); }
+    .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .icon-btn.icon-btn--round {
+      width: var(--miira-icon-btn-round-size);
+      height: var(--miira-icon-btn-round-size);
+      border-radius: 50%;
+      aspect-ratio: 1;
+      flex-shrink: 0;
+    }
+    .icon-btn.icon-btn--round:not(.icon-btn--3d) {
+      background: var(--miira-bg-surface);
+      border: 1px solid var(--miira-border-color);
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s,
+        background 0.15s;
+    }
+    .icon-btn.icon-btn--round:not(.icon-btn--3d):hover:not(:disabled) {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+    }
+    .icon-btn.icon-btn--round:not(.icon-btn--3d):active:not(:disabled) {
+      transform: translateY(1px);
+      box-shadow: 0 0 0 0 transparent;
+    }
+    .icon-btn.icon-btn--round:not(.icon-btn--3d):disabled {
+      opacity: 0.4;
+      transform: none;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    /* Same chip as the flat `.icon-btn.active` above — restated because the
+       round rest state outranks it on specificity. */
+    .icon-btn.icon-btn--round:not(.icon-btn--3d).active {
+      background: var(--miira-wash, color-mix(in srgb, var(--miira-accent) 22%, var(--miira-bg-surface)));
+      border-color: var(--miira-wash-edge, color-mix(in srgb, var(--miira-accent) 55%, var(--miira-border-color)));
+    }
+    .icon-btn.icon-btn--3d.icon-btn--round {
+      background: var(--miira-yellow);
+      color: var(--miira-brown);
+      border: 2px solid var(--miira-brown);
+      box-shadow: 0 3px 0 0 var(--miira-brown);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .icon-btn.icon-btn--3d.icon-btn--round:hover:not(:disabled) {
+      filter: brightness(1.02);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 0 0 var(--miira-brown);
+    }
+    .icon-btn.icon-btn--3d.icon-btn--round:active:not(:disabled) {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 0 var(--miira-brown);
+      filter: brightness(0.98);
+    }
+    .icon-btn.icon-btn--3d.icon-btn--round:focus-visible {
+      outline: 3px solid var(--miira-focus-ring);
+      outline-offset: 2px;
+    }
+    .icon-btn.icon-btn--3d.icon-btn--round:disabled {
+      opacity: 0.4;
+      transform: none;
+      box-shadow: 0 3px 0 0 var(--miira-brown);
+    }
+    [data-theme='dark'] .icon-btn.icon-btn--3d.icon-btn--round {
+      border-color: var(--miira-brown);
+      box-shadow: 0 3px 0 0 var(--miira-3d-shadow);
+    }
+    [data-theme='dark'] .icon-btn.icon-btn--3d.icon-btn--round:hover:not(:disabled) {
+      box-shadow: 0 4px 0 0 var(--miira-3d-shadow);
+    }
+    [data-theme='dark'] .icon-btn.icon-btn--3d.icon-btn--round:active:not(:disabled) {
+      box-shadow: 0 1px 0 0 var(--miira-3d-shadow);
+    }
+    [data-theme='neutral'] .icon-btn.icon-btn--3d.icon-btn--round,
+    [data-theme='kontrast'] .icon-btn.icon-btn--3d.icon-btn--round {
+      background: var(--miira-accent);
+      color: var(--miira-accent-text);
+      border-color: var(--miira-accent-shade);
+      box-shadow: 0 3px 0 0 var(--miira-accent-shade);
+    }
+    [data-theme='neutral'] .icon-btn.icon-btn--3d.icon-btn--round:hover:not(:disabled),
+    [data-theme='kontrast'] .icon-btn.icon-btn--3d.icon-btn--round:hover:not(:disabled) {
+      box-shadow: 0 4px 0 0 var(--miira-accent-shade);
+    }
+    [data-theme='neutral'] .icon-btn.icon-btn--3d.icon-btn--round:active:not(:disabled),
+    [data-theme='kontrast'] .icon-btn.icon-btn--3d.icon-btn--round:active:not(:disabled) {
+      box-shadow: 0 1px 0 0 var(--miira-accent-shade);
+    }
+    [data-theme='neutral'] .icon-btn.icon-btn--3d.icon-btn--round:disabled,
+    [data-theme='kontrast'] .icon-btn.icon-btn--3d.icon-btn--round:disabled {
+      box-shadow: 0 3px 0 0 var(--miira-accent-shade);
+    }
+
+    /* ---------- Inputs ---------- */
+    .field {
+      font-family: inherit;
+      font-size: var(--miira-font-size-body);
+      background: var(--miira-bg-primary);
+      color: var(--miira-text-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      padding: 10px 12px;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .field:focus { border-color: var(--miira-yellow); background: var(--miira-bg-primary); }
+    [data-theme='neutral'] .field:focus { border-color: var(--miira-accent); }
+    .field::placeholder { color: var(--miira-text-muted); }
+    /* No `select.field`: a native <select>'s option popup is browser chrome
+       no token can reach. Dropdowns are a .field-styled trigger opening a
+       .menu popover (SearchableSelect) — see design-system.md §4 Inputs. */
+    textarea.field { resize: vertical; min-height: 88px; }
+
+    /* ---------- Badges ---------- */
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+    }
+    .role-badge--admin { background: color-mix(in srgb, var(--miira-orange) 18%, transparent); color: var(--miira-orange); }
+    .role-badge--ok { background: color-mix(in srgb, var(--miira-green) 18%, transparent); color: var(--miira-green); }
+    .role-badge--info { background: color-mix(in srgb, var(--miira-blue) 18%, transparent); color: var(--miira-blue); }
+
+    /* ---------- System message pill ----------
+       The operator's one line to everybody, in the top bar of the drive and
+       of every editor. `.role-badge` is the right shape but static; this is
+       a real `<button>` that opens a dialog with the whole message.
+
+       It pulses because it has to be noticed by somebody who did not come
+       looking for it, and it pulses SLOWLY because it sits in the chrome of
+       a page people work in all day. `.notif--pulse` (1.6s) and
+       `.pipeline-bar-pulse` (1.4s) both read as a blink at that speed,
+       which is right for a badge that just appeared and wrong for a state
+       that may hold for an afternoon. The ring here takes ~3.2s and fades
+       rather than snapping, so it registers in peripheral vision without
+       ever pulling the eye off the document. */
+    .system-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 220px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--miira-orange) 42%, transparent);
+      background: color-mix(in srgb, var(--miira-orange) 18%, transparent);
+      color: var(--miira-orange);
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      font-family: inherit;
+      cursor: pointer;
+      animation: system-pill-pulse 3.2s ease-in-out infinite;
+      transition:
+        transform var(--miira-transition-fast),
+        box-shadow var(--miira-transition-fast);
+    }
+    /* The 3D shelf, never a darker fill: hover must not restate the tint,
+       which is already carrying the "something is up" meaning. */
+    .system-pill:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 color-mix(in srgb, var(--miira-orange) 40%, transparent);
+    }
+    .system-pill:active { transform: translateY(0); box-shadow: none; }
+    .system-pill:focus-visible {
+      outline: 2px solid var(--miira-orange);
+      outline-offset: 2px;
+    }
+    .system-pill__icon { flex-shrink: 0; }
+    /* A long title is elided rather than allowed to push the rest of the
+       top bar around — the full text is in the dialog it opens. */
+    .system-pill__label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @keyframes system-pill-pulse {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--miira-orange) 34%, transparent); }
+      55% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--miira-orange) 0%, transparent); }
+      100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--miira-orange) 0%, transparent); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .system-pill { animation: none; }
+    }
+
+    /* ---------- Beta stamp on a file-type icon ----------
+       A file type still under test carries its marker on the artwork rather
+       than beside the type name, so one badge reaches every surface that
+       draws the sprite — cards, rows, tiles, pickers, forløb chips. The
+       artwork itself is never edited: the drive wraps the sprite only while
+       the type is flagged, so clearing the flag restores the plain icon. */
+    .file-type-icon-wrap {
+      position: relative;
+      display: inline-flex;
+      /* The sprite is drawn anywhere from 22px in a folder peek to 72px on an
+         empty card thumb, so the stamp is sized in `cqw` off this box rather
+         than in fixed px — at one fixed size it either swamps the small chips
+         or disappears on the large ones. */
+      container-type: inline-size;
+      width: 100%;
+      height: 100%;
+      flex-shrink: 0;
+    }
+    /* Squared, not a pill: it reads as a stamp on the page the artwork draws
+       rather than as a second label. Centred horizontally, and a quarter of
+       the box below the middle vertically — never hugging an edge, which is
+       what lands it the same on every sprite: the artwork is a page with a
+       folded top-right corner and a coloured spine down the left, so a stamp
+       against any edge sits over a different part of each icon and reads as
+       crooked across a row of them. Sitting low leaves each sprite's own
+       device legible above it while staying well inside the page. Solid
+       yellow on brown is the same "in progress" pairing as `.notif--yellow`,
+       and both are constant brand colours, so it needs no per-theme
+       handling. */
+    .file-type-icon__beta {
+      position: absolute;
+      left: 50%;
+      top: 75%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+      padding: 1cqw 4cqw;
+      border-radius: var(--miira-radius-sm);
+      background: var(--miira-yellow);
+      color: var(--miira-brown);
+      border: 1px solid var(--miira-brown);
+      font-family: var(--miira-font);
+      font-size: clamp(4px, 14cqw, 10px);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* ---------- Notification indicator (global "new" / count badge) ----------
+       A small corner badge for "you have new things" signals — unread
+       messages, pending actions, fresh results. Make any host a positioning
+       context with `.notif-anchor`, then drop a `.notif` inside it. Count pill
+       by default; `.notif--dot` for a bare presence dot. Fill, ring and offset
+       are local custom properties, so the same component drops onto a button,
+       an icon button, an avatar or a tab, on any surface, and can carry a
+       semantic hue — without forking the CSS. */
+    .notif-anchor {
+      position: relative;
+    }
+    .notif {
+      /* Local knobs — override per host/surface, never fork the component. */
+      --notif-bg: var(--miira-red);
+      /* Text on the fill. White reads on every brand hue except yellow, which
+         swaps to brand brown via `.notif--yellow`. Mirrors `.btn--danger`. */
+      --notif-fg: #fff;
+      /* The cut-out ring that lifts the badge off whatever it sits on.
+         Defaults to the page background; `.notif--on-surface` matches raised
+         surfaces (cards, toolbars) so the ring blends in there instead. */
+      --notif-ring: var(--miira-bg-primary);
+      --notif-size: 18px;
+      --notif-offset: -6px;
+      /* Rounded-square count pill; the dot overrides this back to a circle. */
+      --notif-radius: 7px;
+
+      position: absolute;
+      top: var(--notif-offset);
+      right: var(--notif-offset);
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      min-width: var(--notif-size);
+      height: var(--notif-size);
+      padding: 0 5px;
+      border-radius: var(--notif-radius);
+      background: var(--notif-bg);
+      color: var(--notif-fg);
+      border: 2px solid var(--notif-ring);
+      font-family: var(--miira-font);
+      font-size: var(--miira-font-size-xs);
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+      /* Pop in on appear — the same shelf curve as buttons/cards. */
+      animation: notif-pop 0.18s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    /* Bare dot — a presence signal with no number. Stays a full circle. */
+    .notif--dot {
+      --notif-size: 10px;
+      --notif-offset: -3px;
+      --notif-radius: 999px;
+      min-width: var(--notif-size);
+      width: var(--notif-size);
+      padding: 0;
+    }
+    /* In-flow placement — the badge sits in its host's own layout (a list
+       row's trailing slot) instead of clipping the corner. The cut-out ring
+       only exists to lift the badge off something it overlaps, so in flow it
+       goes; `flex-shrink` keeps a long title from squashing the count. */
+    .notif--inline {
+      position: static;
+      border: none;
+      flex-shrink: 0;
+    }
+    /* Semantic hues — swap the fill only; ring + text stay put. */
+    .notif--blue { --notif-bg: var(--miira-blue); }
+    .notif--green { --notif-bg: var(--miira-green); }
+    .notif--orange { --notif-bg: var(--miira-orange); }
+    .notif--yellow { --notif-bg: var(--miira-yellow); --notif-fg: var(--miira-brown); }
+    /* On raised surfaces (cards, toolbars) the cut-out ring should match. */
+    .notif--on-surface { --notif-ring: var(--miira-bg-surface); }
+    /* Optional attention "ping" for genuinely new events — a soft colored ring
+       that expands and fades out of the badge edge. Off by default (iOS badges
+       don't pulse); opt in with `.notif--pulse`. Uses box-shadow so it never
+       tints the count text. */
+    .notif--pulse {
+      animation:
+        notif-pop 0.18s cubic-bezier(0.2, 0.7, 0.2, 1),
+        notif-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes notif-pop {
+      from { transform: scale(0.4); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes notif-ping {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--notif-bg) 55%, transparent); }
+      70% { box-shadow: 0 0 0 8px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .notif,
+      .notif--pulse { animation: none; }
+    }
+
+    /* Notification-indicator playground (styleguide only) */
+    .notif-demo__hosts {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 22px;
+    }
+    .notif-demo__avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--miira-blue) 20%, var(--miira-bg-surface));
+      color: var(--miira-blue);
+      font-weight: 700;
+      font-size: var(--miira-font-size-sm);
+    }
+    .notif-demo__tag {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+    }
+    /* A stand-in list row for the inline-count demo — the card + shelf a real
+       conversation row uses, so the badge is shown where it belongs. */
+    .notif-demo__row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 280px;
+      padding: 10px 12px;
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      box-shadow: 0 2px 0 0 var(--miira-border-color);
+    }
+    .notif-demo__row-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      overflow: hidden;
+    }
+    .notif-demo__row-title {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 600;
+      color: var(--miira-text-primary);
+    }
+    .notif-demo__row-preview {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ---------- Loading tiles (3-up wave) ---------- */
+    .loading-tiles {
+      --loading-tile-lift: 3px;
+      --loading-tile-wave-duration: 2.1s;
+      --loading-tile-stagger: 120ms;
+      --loading-tile-size: 8px;
+      display: inline-grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+      width: calc(var(--loading-tile-size) * 3 + 4px);
+      height: var(--loading-tile-size);
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .loading-tiles--sm {
+      --loading-tile-lift: 2px;
+      --loading-tile-size: 7px;
+    }
+    .loading-tiles--xs {
+      --loading-tile-lift: 2px;
+      --loading-tile-stagger: 100ms;
+      --loading-tile-size: 6px;
+    }
+    .loading-tiles__tile {
+      display: block;
+      position: relative;
+      width: var(--loading-tile-size);
+      height: var(--loading-tile-size);
+      min-width: 0;
+      border-radius: 2px;
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .loading-tiles__tile:hover {
+      transform: translateY(calc(-1 * var(--loading-tile-lift)));
+      box-shadow: 0 var(--loading-tile-lift) 0 0 var(--miira-3d-shadow);
+      filter: brightness(1.06);
+    }
+    .loading-tiles__tile:active {
+      transform: translateY(0);
+      box-shadow: none;
+      filter: brightness(0.99);
+    }
+    .loading-tiles__tile:hover .loading-tiles__face {
+      animation: none;
+      transform: none;
+      box-shadow: none;
+    }
+    .loading-tiles__face {
+      position: absolute;
+      inset: 0;
+      border-radius: 2px;
+      background-color: var(--miira-accent);
+      transform: translateY(0);
+      animation: loading-tile-wave var(--loading-tile-wave-duration) ease-in-out infinite;
+      animation-delay: calc(var(--tile-col) * var(--loading-tile-stagger));
+    }
+    @keyframes loading-tile-wave {
+      0%, 22%, 100% {
+        transform: translateY(0);
+        box-shadow: none;
+        filter: none;
+      }
+      12% {
+        transform: translateY(calc(-1 * var(--loading-tile-lift)));
+        box-shadow: 0 var(--loading-tile-lift) 0 0 var(--miira-3d-shadow);
+        filter: brightness(1.06);
+      }
+    }
+    /* Conversation starters: shared ghost button, plus an inert modifier for
+       the placeholder state (mirrors drive/src/styles/app.css). */
+    .chat-thread__suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .chat-thread__suggestion--loading {
+      pointer-events: none;
+      cursor: default;
+    }
+
+    /* Text-line variant: the same wave over --loading-tile-cols tiles,
+       standing in for copy that is still being written. */
+    .loading-tiles--line {
+      --loading-tile-lift: 2px;
+      --loading-tile-stagger: 70ms;
+      --loading-tile-wave-duration: 2.4s;
+      --loading-tile-size: 7px;
+      grid-template-columns: repeat(var(--loading-tile-cols, 24), var(--loading-tile-size));
+      grid-template-rows: var(--loading-tile-size);
+      align-content: center;
+      width: auto;
+      max-width: 100%;
+      height: 1.15em;
+      overflow: hidden;
+    }
+    .loading-tiles--line .loading-tiles__face {
+      background-color: color-mix(in srgb, var(--miira-text-muted) 34%, var(--miira-bg-surface));
+    }
+    .loading-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--miira-text-muted);
+      font-size: var(--miira-font-size-sm);
+    }
+    .loading-inline--secondary {
+      color: var(--miira-text-secondary);
+    }
+    .file-view__loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--miira-text-muted);
+      font-size: var(--miira-font-size-sm);
+    }
+    .loading-demo {
+      position: relative;
+      min-height: 140px;
+      width: min(360px, 100%);
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+    }
+    .loading-sizes {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 24px;
+    }
+
+    /* Image generation skeleton (mirrors drive/src/styles/app.css) */
+    .chat-img-skeleton {
+      --chat-img-tile-cols: 20;
+      --chat-img-tile-lift: 4px;
+      --chat-img-tile-stagger: 36ms;
+      --chat-img-tile-wave-duration: 3.4s;
+      --chat-img-tile-grout: color-mix(
+        in srgb,
+        var(--miira-text-muted) 12%,
+        var(--miira-bg-surface)
+      );
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: min(360px, 100%);
+    }
+    .chat-img-skeleton__frame {
+      display: flex;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      padding: 1px;
+      box-sizing: border-box;
+      border-radius: var(--miira-radius-sm, 10px);
+      border: 1px solid var(--miira-border-color);
+      background: var(--chat-img-tile-grout);
+      overflow: hidden;
+    }
+    .chat-img-skeleton__tiles {
+      display: grid;
+      grid-template-columns: repeat(var(--chat-img-tile-cols), 1fr);
+      gap: 2px;
+      width: 100%;
+      height: 100%;
+      background: var(--chat-img-tile-grout);
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+    }
+    .chat-img-skeleton__tile {
+      position: relative;
+      aspect-ratio: 1;
+      min-width: 0;
+      animation: chat-img-tile-enter 0.42s ease both;
+      animation-delay: calc(
+        (var(--tile-col) + var(--tile-row)) * var(--chat-img-tile-stagger)
+      );
+    }
+    .chat-img-skeleton__tile-face {
+      position: absolute;
+      inset: 0;
+      background-color: var(--miira-bg-primary);
+      transform: translateY(0);
+      transition:
+        background-color 2s ease,
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+      animation: chat-img-tile-wave var(--chat-img-tile-wave-duration) ease-in-out infinite;
+      animation-delay: calc(
+        0.48s + (var(--tile-col) + var(--tile-row)) * var(--chat-img-tile-stagger)
+      );
+    }
+    .chat-img-skeleton__tile:hover {
+      z-index: 1;
+      transform: translateY(calc(-1 * var(--chat-img-tile-lift)));
+      filter: brightness(1.02);
+    }
+    .chat-img-skeleton__tile:hover .chat-img-skeleton__tile-face {
+      animation: none;
+      transform: none;
+      box-shadow: 0 calc(1px + var(--chat-img-tile-lift)) 0 0 var(--miira-3d-shadow);
+    }
+    .chat-img-skeleton__tile[data-paint] .chat-img-skeleton__tile-face {
+      transition:
+        background-color 0s,
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        filter 0.12s ease;
+    }
+    .chat-img-skeleton__tile[data-paint='yellow'] .chat-img-skeleton__tile-face {
+      background-color: color-mix(in srgb, var(--miira-yellow) 62%, var(--miira-bg-primary));
+    }
+    .chat-img-skeleton__tile[data-paint='orange'] .chat-img-skeleton__tile-face {
+      background-color: color-mix(in srgb, var(--miira-orange) 58%, var(--miira-bg-primary));
+    }
+    .chat-img-skeleton__tile[data-paint='green'] .chat-img-skeleton__tile-face {
+      background-color: color-mix(in srgb, var(--miira-green) 52%, var(--miira-bg-primary));
+    }
+    .chat-img-skeleton__tile[data-paint='blue'] .chat-img-skeleton__tile-face {
+      background-color: color-mix(in srgb, var(--miira-blue) 55%, var(--miira-bg-primary));
+    }
+    .chat-img-skeleton__tile[data-paint='red'] .chat-img-skeleton__tile-face {
+      background-color: color-mix(in srgb, var(--miira-red) 50%, var(--miira-bg-primary));
+    }
+    .chat-img-skeleton__meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--miira-text-muted);
+    }
+    .chat-img-skeleton__dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--miira-accent);
+      animation: chat-img-dot 1.1s ease-in-out infinite;
+    }
+    .chat-img-skeleton__label {
+      font-weight: 500;
+    }
+    .chat-img-skeleton__timer {
+      font-variant-numeric: tabular-nums;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: color-mix(
+        in srgb,
+        var(--miira-text-muted) 12%,
+        transparent
+      );
+      color: var(--miira-text-primary);
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+    @keyframes chat-img-tile-enter {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes chat-img-tile-wave {
+      0%, 100%, 22% {
+        transform: translateY(0);
+        box-shadow: none;
+        filter: none;
+      }
+      12% {
+        transform: translateY(calc(-1 * var(--chat-img-tile-lift)));
+        box-shadow: 0 calc(1px + var(--chat-img-tile-lift)) 0 0 var(--miira-3d-shadow);
+        filter: brightness(1.02);
+      }
+    }
+    @keyframes chat-img-dot {
+      0%, 100% { opacity: 0.35; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .loading-tiles__face,
+      .chat-img-skeleton__tile,
+      .chat-img-skeleton__tile-face,
+      .chat-img-skeleton__dot {
+        animation: none;
+      }
+    }
+
+    /* ---------- Voice-mode grid (audio indicator) ----------
+     * Wide-and-short grid of tiles inside the chat composer that lifts
+     * upward when someone is speaking. JS writes a per-tile `--tile-lift`
+     * (0..1) on each frame; CSS turns that into translateY + a matching
+     * shelf shadow. Resting tiles match --voice-tile-rest (the composer
+     * shell colour) so they vanish into the background. */
+    .voice-grid {
+      --voice-grid-cols: 40;
+      --voice-tile-max-lift: 10px;
+      --voice-tile-gap: 1px;
+      --voice-tile-radius: 2px;
+      --voice-accent: var(--miira-accent);
+      --voice-tile-rest: var(--miira-bg-primary);
+      --voice-tile-shadow: #8b7a63;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 6px 4px;
+    }
+    [data-theme='dark'] .voice-grid {
+      --voice-tile-rest: var(--miira-bg-surface);
+    }
+    .voice-grid__tiles {
+      display: grid;
+      grid-template-columns: repeat(var(--voice-grid-cols), 1fr);
+      gap: var(--voice-tile-gap);
+      width: 100%;
+      max-width: 560px;
+    }
+    .voice-grid__tile {
+      position: relative;
+      aspect-ratio: 1;
+      min-width: 0;
+    }
+    .voice-grid__tile-face {
+      position: absolute;
+      inset: 0;
+      border-radius: var(--voice-tile-radius);
+      background: transparent;
+      /* Same shelf pattern as .btn--3d / .chat-img-skeleton__tile-face:
+         solid shadow colour, offset grows with the lift so the shadow
+         bottom stays planted. No transition on transform / box-shadow.
+         The face carries only the smooth `--tile-lift`; the noise lives
+         on the ::before pseudo (scaleY from the bottom edge) so only
+         the visible top of the body wiggles. */
+      transform: translateY(
+        calc(var(--tile-lift, 0) * var(--voice-tile-max-lift) * -1)
+      );
+      box-shadow: 0
+        calc(var(--tile-lift, 0) * var(--voice-tile-max-lift))
+        0 0
+        var(--voice-tile-shadow);
+      transition: none;
+    }
+    .voice-grid__tile-face::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background-color: color-mix(
+        in srgb,
+        var(--voice-accent) clamp(0%, calc(var(--tile-lift, 0) * 1000%), 100%),
+        var(--voice-tile-rest)
+      );
+      transform: scaleY(calc(1 + var(--tile-noise, 0)));
+      transform-origin: bottom;
+      transition: background-color 120ms ease;
+    }
+    .voice-grid[data-state='listening'] { --voice-accent: var(--miira-green); }
+    .voice-grid[data-state='speaking']  { --voice-accent: var(--miira-blue); }
+    .voice-grid[data-state='thinking']  { --voice-accent: var(--miira-text-muted); }
+    .voice-grid[data-state='error']     { --voice-accent: var(--miira-red); }
+    .voice-grid__status {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      color: var(--miira-text-secondary);
+      min-height: 1.4em;
+      text-align: center;
+      letter-spacing: 0.01em;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .voice-grid__tile-face,
+      .voice-grid__tile-face::before {
+        transform: none;
+        box-shadow: none;
+        transition: background-color 120ms ease;
+      }
+    }
+
+    /* Demo controls for the audio-indicator section. Lay out the
+     * segmented control + loudness slider in a column above the grid
+     * stage so they read as the playground controls, not part of the
+     * component spec. */
+    .voice-demo {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+    }
+    .voice-demo__controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px 24px;
+    }
+    .voice-demo__control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .voice-demo__control--grow {
+      flex: 1 1 280px;
+    }
+    .voice-demo__label {
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--miira-text-muted);
+    }
+    .voice-demo__slider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .voice-demo__slider input[type='range'] {
+      flex: 1 1 auto;
+      accent-color: var(--miira-accent);
+    }
+    .voice-demo__slider-value {
+      font-variant-numeric: tabular-nums;
+      font-size: var(--miira-font-size-sm);
+      color: var(--miira-text-secondary);
+      min-width: 3ch;
+      text-align: right;
+    }
+    .voice-demo__stage {
+      width: 100%;
+      padding: 18px 16px 14px;
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-lg);
+    }
+    [data-theme='dark'] .voice-demo__stage {
+      background: var(--miira-bg-surface);
+    }
+
+    /* ---------- Cards ---------- */
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      color: var(--miira-text-primary);
+      box-shadow: 0 2px 0 0 var(--miira-border-color);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s;
+      overflow: hidden;
+      width: 200px;
+    }
+    .card:hover {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--miira-border-hover);
+    }
+    .card:active:not(:has(.card__menu-btn:active)):not(:has(.card__thumb-audio-toggle:active)):not(:has(.card__thumb-audio-wave:active)) {
+      transform: translateY(0);
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    .card__thumb {
+      height: 110px;
+      background: var(--miira-bg-primary);
+      border-bottom: 1px solid var(--miira-border-color);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .card__thumb--preview { align-items: stretch; justify-content: stretch; }
+    .card--has-doc-preview .card__thumb {
+      border-bottom: none; overflow: visible; background: transparent; position: static;
+    }
+    .card--has-doc-preview .card__thumb-preview--document,
+    .card--has-doc-preview .card__thumb-preview--pdf {
+      position: absolute; top: 8px; left: 0; right: 0; bottom: 0;
+      padding: 0 10px; background: transparent; pointer-events: auto;
+    }
+    .card--has-doc-preview .card__thumb-document-page {
+      max-width: 82%; height: 100%; margin: 0 auto; border-radius: 2px 2px 0 0;
+    }
+    .card--has-doc-preview .card__body {
+      position: relative; z-index: 1; background: var(--miira-bg-primary);
+    }
+    .card__thumb-preview {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      border: none; margin: 0; padding: 0; pointer-events: none;
+    }
+    .card__thumb-preview--image { object-fit: cover; display: block; }
+    .card__thumb-preview--document {
+      pointer-events: auto;
+      display: flex; align-items: stretch; justify-content: center;
+      padding: 8px 10px;
+      background: var(--miira-bg-primary);
+      overflow: hidden;
+    }
+    .card__thumb-document-page {
+      flex: 1; min-width: 0; max-width: 82%; margin: 0 auto;
+      display: flex; flex-direction: column; min-height: 0;
+      background: #ffffff; color: #1c1917; border-radius: 2px;
+      box-shadow: 0 2px 6px color-mix(in srgb, #000 16%, transparent);
+    }
+    /* Dark theme: the document page reads as a dark sheet with light text. */
+    [data-theme='dark'] .card__thumb-document-page {
+      background: var(--miira-bg-surface);
+      color: var(--miira-text-primary);
+    }
+    .card__thumb-document-scroll {
+      flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto;
+      padding: 8px 10px 10px; font-size: 6.5px; line-height: 1.55;
+      scrollbar-width: thin;
+    }
+    .card__thumb-document-scroll p { margin: 0 0 0.65em; }
+    .card__thumb-document-scroll p:last-child { margin-bottom: 0; }
+    .card__thumb-preview--pdf {
+      padding: 8px 10px;
+      background: var(--miira-bg-primary);
+    }
+    .card__thumb-document-scroll--pdf {
+      padding: 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .card__thumb-pdf-page {
+      flex-shrink: 0; width: 82%;
+      background: #ffffff; border-radius: 2px;
+      box-shadow: 0 2px 6px color-mix(in srgb, #000 16%, transparent);
+    }
+    .card__thumb-pdf-page img { display: block; width: 100%; height: auto; }
+    .card__thumb-preview--slide {
+      background: var(--slide-bg, #fff);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card__thumb-preview__slide-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .card__thumb-preview--grid {
+      border-collapse: collapse; table-layout: fixed;
+      font-size: 8px; line-height: 1.2; color: var(--miira-text-secondary);
+      background: var(--miira-bg-surface);
+    }
+    .card__thumb-preview--grid td {
+      border: 1px solid var(--miira-border-color);
+      padding: 3px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .card__thumb-preview--grid tr:first-child td {
+      font-weight: 600; color: var(--miira-text-primary);
+      background: color-mix(in srgb, var(--type-color, var(--miira-accent)) 8%, transparent);
+    }
+    .card__thumb-preview--audio {
+      pointer-events: auto;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--miira-bg-primary);
+    }
+    .card__thumb-preview--audio--active {
+      gap: 8px; padding: 10px 12px; justify-content: flex-start;
+    }
+    .card__thumb-audio-toggle {
+      flex-shrink: 0; border: none; padding: 0; cursor: pointer;
+      font: inherit; color: inherit;
+    }
+    .card__thumb-audio-toggle--idle .card__thumb-audio-idle-icon--hover { display: none; }
+    .card:hover .card__thumb-audio-toggle--idle .card__thumb-audio-idle-icon--default { display: none; }
+    .card:hover .card__thumb-audio-toggle--idle .card__thumb-audio-idle-icon--hover { display: block; }
+    .card__thumb-audio-wave { flex: 1; min-width: 0; height: 48px; display: block; cursor: pointer; }
+    .card__thumb-audio-toggle svg.card__thumb-audio-idle-icon { width: 26px; height: 26px; }
+    .card__thumb-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--miira-wash, var(--type-color-soft, var(--miira-bg-surface)));
+      color: var(--type-color, var(--miira-text-secondary));
+      font-size: 1.75rem; line-height: 1;
+    }
+    .card__thumb-icon svg { width: 36px; height: 36px; flex-shrink: 0; }
+    .card__body { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+    /* Footer type marker. Ports the real drive's `.card__type-dot`
+       (drive/src/styles/app.css): an 18px square holding the illustrated
+       file-type sprite from `@miira/file-type-icons`. The sprite brings
+       its own colour, so the chip has no tinted plate. */
+    .card__type-dot {
+      width: 18px; height: 18px; border-radius: var(--miira-radius-sm);
+      flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+      background: var(--miira-wash, var(--type-color-soft, var(--miira-bg-surface)));
+      color: var(--type-color, var(--miira-text-muted));
+    }
+    .card__type-dot svg { width: 11px; height: 11px; flex-shrink: 0; }
+    /* Illustrated file-type sprites (packages/file-type-icons, served from
+       /public/brand/file-types/). They carry their own colour, so the chip drops
+       the tinted plate the Lucide glyphs needed.
+
+       `--miira-artwork-filter` is set by `kontrast` alone, so switching this
+       page to that theme shows the same black-and-white artwork the product
+       draws — the catalog is not allowed to be prettier than the app. */
+    .file-type-icon {
+      width: 100%; height: 100%; object-fit: contain;
+      display: block; flex-shrink: 0;
+      filter: var(--miira-artwork-filter, none);
+    }
+    .file-type-icon-wrap > img { filter: var(--miira-artwork-filter, none); }
+    .card__type-dot:has(> .file-type-icon),
+    .row__icon-wrap:has(> .file-type-icon),
+    .card__thumb-icon:has(> .file-type-icon) {
+      background: transparent;
+      border-color: transparent;
+    }
+    .card__thumb-icon:has(> .file-type-icon) {
+      width: 72px; height: 72px; border-radius: 0;
+    }
+    .card__title { font-size: var(--miira-font-size-sm); font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+
+    /* Scrollable mini-slides preview ("look through the slides") — ported
+       from .card__thumb-preview--slides / CardThumbSlide in the drive. A
+       vertical stack of mini slide pages scrolls inside the thumb; each
+       page composes a background + positioned elements at scale. */
+    .card__thumb-preview--slides { padding: 8px 10px; background: transparent; }
+    .card__thumb-document-scroll--slides {
+      padding: 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .card__thumb-slide-page {
+      flex-shrink: 0; width: 82%; max-width: 100%; aspect-ratio: 16 / 9;
+      position: relative; overflow: hidden;
+      background: var(--slide-bg, #ffffff); border-radius: 2px;
+      box-shadow: 0 2px 6px color-mix(in srgb, #000 16%, transparent);
+    }
+    .card__thumb-slide-canvas { position: absolute; inset: 0; overflow: hidden; }
+    .card__thumb-slide-el { position: absolute; }
+    .card__thumb-pdf-more,
+    .card__thumb-slides-more {
+      margin: 0; font-size: 8px; color: var(--miira-text-muted); text-align: center;
+    }
+    .card--has-doc-preview .card__thumb-preview--slides {
+      position: absolute; top: 8px; left: 0; right: 0; bottom: 0;
+      padding: 0 10px; background: transparent; pointer-events: auto;
+    }
+    .card--has-doc-preview .card__thumb-slide-page { max-width: 82%; margin: 0 auto; border-radius: 2px 2px 0 0; }
+
+    /* ---------- Pipeline / processing states ---------- */
+    /* Ported from drive/src/components/PipelineStepper.tsx +
+       drive/src/styles/app.css. Two surfaces:
+       1. .pipeline-stepper--compact — the YouTube/Pace.js-style loading
+          bar pinned to the seam between thumb and body on every card; a
+          single accent fill grows as stages finish, then fades on `done`.
+       2. .pipeline-stepper (chips) — the full named-stage row shown in
+          the hover popover: Eksempel → Tekstudtræk → OCR → Indekseret. */
+    .pipeline-stepper {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin-top: 8px; font-size: 11px;
+    }
+    .card .pipeline-stepper--compact {
+      position: absolute; left: 0; right: 0; top: calc(110px - 3px);
+      height: 3px; margin: 0; padding: 0; background: transparent;
+      border: none; border-radius: 0; box-shadow: none;
+      pointer-events: none; z-index: 3;
+    }
+    .pipeline-bar {
+      position: relative; width: 100%; height: 3px;
+      background: color-mix(in srgb, var(--miira-border-color) 50%, transparent);
+      overflow: hidden; transition: opacity 320ms ease;
+    }
+    .pipeline-bar__fill {
+      position: absolute; inset: 0 auto 0 0; width: var(--pipeline-progress, 0%);
+      background: var(--miira-accent);
+      transition: width 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+    .pipeline-stepper--compact[data-phase='fading'] .pipeline-bar { opacity: 0; }
+    .pipeline-bar[data-state='error'] .pipeline-bar__fill { width: 100%; background: var(--miira-red); }
+    .pipeline-bar[data-state='warn'] .pipeline-bar__fill { background: var(--miira-orange); }
+    .pipeline-bar[data-state='processing'] .pipeline-bar__fill {
+      animation: pipeline-bar-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pipeline-bar-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+    .pipeline-step {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 999px;
+      background: var(--miira-bg-surface); color: var(--miira-text-secondary);
+      border: 1px solid var(--miira-border-color); white-space: nowrap; line-height: 1;
+    }
+    .pipeline-step__icon { display: inline-flex; align-items: center; justify-content: center; opacity: 0.85; }
+    .pipeline-step__icon svg { width: 12px; height: 12px; }
+    .pipeline-step__label { font-weight: 500; }
+    .pipeline-step__badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: color-mix(in srgb, var(--miira-text-secondary) 22%, transparent);
+      color: var(--miira-bg-primary);
+    }
+    .pipeline-step__badge svg { width: 11px; height: 11px; }
+    .pipeline-step__badge--dot { width: 6px; height: 6px; }
+    .pipeline-step__spinner { animation: pipeline-spin 900ms linear infinite; }
+    @keyframes pipeline-spin { to { transform: rotate(360deg); } }
+    .pipeline-step--done {
+      color: color-mix(in srgb, var(--miira-green) 80%, var(--miira-text-primary));
+      border-color: color-mix(in srgb, var(--miira-green) 35%, var(--miira-border-color));
+      background: color-mix(in srgb, var(--miira-green) 14%, var(--miira-bg-surface));
+    }
+    .pipeline-step--done .pipeline-step__badge { background: var(--miira-green); color: #fff; }
+    .pipeline-step--processing {
+      color: color-mix(in srgb, var(--miira-accent) 75%, var(--miira-text-primary));
+      border-color: color-mix(in srgb, var(--miira-accent) 45%, var(--miira-border-color));
+      background: color-mix(in srgb, var(--miira-accent) 14%, var(--miira-bg-surface));
+    }
+    .pipeline-step--processing .pipeline-step__badge { background: var(--miira-accent); color: var(--miira-accent-text); }
+    .pipeline-step--pending { color: var(--miira-text-secondary); }
+    .pipeline-step--skipped, .pipeline-step--none { opacity: 0.6; }
+
+    /* Styleguide-only scaffolding: a captioned card cell so the pipeline
+       progression reads as a labelled sequence (uploading → ready). */
+    .card-demo-figure { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0; }
+    .card-demo-figure__cap {
+      font-size: var(--miira-font-size-xs); color: var(--miira-text-muted); text-align: center; max-width: 200px;
+    }
+    /* Live processing status line — shown inside the card, directly under
+       the compact loading bar, naming the stage the pipeline is on. */
+    .card__pipeline-status {
+      position: relative; z-index: 1; background: var(--miira-bg-primary);
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px 0; margin: 0;
+      font-size: var(--miira-font-size-xs); font-weight: 500;
+      color: color-mix(in srgb, var(--miira-accent) 78%, var(--miira-text-primary));
+    }
+    .card__pipeline-status svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+    /* ---------- List rows ---------- */
+    .items__section { margin-bottom: 20px; }
+    .items__section:last-child { margin-bottom: 0; }
+    .items__section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--miira-text-muted);
+      padding: 4px 6px 10px;
+    }
+    .items__list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--miira-border-color);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      overflow: hidden;
+    }
+    .rows-full-example {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+    }
+    .rows-full-example[hidden] { display: none; }
+    .row {
+      display: grid;
+      grid-template-columns: 32px 1fr 130px 150px 32px;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--miira-bg-primary);
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      color: var(--miira-text-primary);
+      transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1);
+      width: 100%;
+    }
+    .row:hover,
+    .row.row--menu-open { transform: translateY(-2px) scale(1.01); }
+    .row:active:not(:has(.row__menu-slot :active)) { transform: none; }
+    .row.row--menu-open:active { transform: translateY(-2px) scale(1.01); }
+    .row__icon-wrap {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--miira-wash, var(--type-color-soft, var(--miira-bg-surface)));
+      color: var(--type-color, var(--miira-text-secondary));
+    }
+    .row__icon-wrap svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .row__name { font-size: var(--miira-font-size-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row__type { font-size: var(--miira-font-size-xs); color: var(--miira-text-secondary); }
+    .row__date { font-size: var(--miira-font-size-xs); color: var(--miira-text-muted); font-variant-numeric: tabular-nums; }
+    .row__menu-slot { position: relative; display: flex; justify-content: flex-end; }
+    .row__menu-btn {
+      background: transparent; border: none; padding: 4px;
+      border-radius: var(--miira-radius-sm); color: var(--miira-text-muted);
+      cursor: pointer; display: inline-flex; opacity: 0;
+      transition: opacity 0.15s, background 0.15s, color 0.15s;
+    }
+    .row:hover .row__menu-btn,
+    .row__menu-btn:focus-visible,
+    .row__menu-btn[aria-expanded='true'] { opacity: 1; }
+    .row__menu-btn:hover { background: var(--miira-bg-hover);
+ box-shadow: inset 0 0 0 2px var(--miira-wash-edge, transparent); color: var(--miira-text-primary); }
+    .row__menu-popover[hidden] { display: none; }
+    .scrim { position: fixed; inset: 0; z-index: 50; background: transparent; }
+    .scrim[hidden] { display: none; }
+
+    /* ---------- Popovers / menus ---------- */
+    .menu {
+      min-width: 240px;
+      background: var(--miira-bg-primary);
+      color: var(--miira-text-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      box-shadow: var(--miira-shadow-elev);
+      padding: 0;
+      display: flex; flex-direction: column; gap: 0;
+      /* Bounded so a long menu scrolls instead of running off the bottom of
+         the window; `hidden` inline keeps the corners clipping the end rows. */
+      max-height: calc(100dvh - 16px);
+      overflow: hidden auto;
+      overscroll-behavior: contain;
+    }
+    .menu__group {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: var(--miira-bg-primary);
+    }
+    .menu__item {
+      position: relative;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px;
+      background: var(--miira-bg-primary);
+      border: 1px solid transparent;
+      border-radius: 0;
+      font-family: inherit; font-size: var(--miira-font-size-sm);
+      color: var(--miira-text-primary);
+      cursor: pointer; text-align: left; width: 100%;
+      box-shadow: none;
+      transform: translateY(0);
+      transition:
+        transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.18s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.18s;
+    }
+    .menu__item:hover,
+    .menu__item:focus-visible {
+      z-index: 1;
+      background: var(--miira-bg-primary);
+      border-color: transparent;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+      outline: none;
+    }
+    .menu__item:active {
+      transform: none;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    .menu__item-icon {
+      width: 28px; height: 28px; border-radius: 7px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--miira-wash, var(--type-color-soft, var(--miira-bg-surface)));
+      color: var(--type-color, var(--miira-text-secondary));
+      flex-shrink: 0;
+    }
+    .menu__item-text { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .menu__item-title { font-weight: 500; }
+    .menu__item-sub { font-size: var(--miira-font-size-xs); color: var(--miira-text-muted); }
+    .menu__group + .menu__group { margin-top: 0; padding-top: 0; border-top: none; }
+    .menu__danger { color: var(--miira-red); }
+    .menu__danger .menu__item-icon { background: rgba(231, 76, 60, 0.14); color: var(--miira-red); }
+
+    /* ---------- Chat history card ---------- */
+    .chat-history-demo {
+      width: 100%;
+      max-width: 280px;
+      padding: 16px;
+      background: var(--miira-bg-secondary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+    }
+    .chat-sidebar__group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .chat-sidebar__group-label {
+      padding: 8px 8px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--miira-text-muted);
+    }
+    .chat-sidebar__row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding-right: 4px;
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      box-shadow: 0 2px 0 0 var(--miira-border-color);
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s;
+    }
+    .chat-sidebar__row:hover {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--miira-border-hover);
+    }
+    .chat-sidebar__row:active:not(:has(.chat-sidebar__row-more:active)) {
+      transform: translateY(0);
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    .chat-sidebar__row--active {
+      border-color: var(--miira-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 0 0 var(--miira-accent);
+    }
+    .chat-sidebar__row--active:hover {
+      border-color: var(--miira-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 5px 0 0 var(--miira-accent);
+    }
+    .chat-sidebar__row--menu-open:not(.chat-sidebar__row--active) {
+      border-color: var(--miira-border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--miira-border-hover);
+    }
+    .chat-sidebar__row--menu-open {
+      z-index: 30;
+    }
+    .chat-sidebar__row--active:active:not(:has(.chat-sidebar__row-more:active)) {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 0 0 var(--miira-accent);
+    }
+    .chat-sidebar__row--menu-open:not(.chat-sidebar__row--active):active:not(
+        :has(.chat-sidebar__row-more:active)
+      ) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 0 0 var(--miira-border-hover);
+    }
+    .chat-sidebar__row--active .chat-sidebar__row-title { font-weight: 600; }
+    .chat-sidebar__row-label {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: none;
+      border: none;
+      text-align: left;
+      padding: 12px 14px;
+      color: var(--miira-text-secondary);
+      font-family: inherit;
+      font-size: var(--miira-font-size-sm);
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .chat-sidebar__row-assistant {
+      font-size: var(--miira-font-size-xs);
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-sidebar__row-title {
+      color: var(--miira-text-primary);
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-sidebar__row-more {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      background: none;
+      border: none;
+      border-radius: var(--miira-radius-sm);
+      color: var(--miira-text-secondary);
+      cursor: pointer;
+      opacity: 0;
+      transform: scale(1);
+      transition: opacity 0.12s, transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .chat-sidebar__row:hover .chat-sidebar__row-more,
+    .chat-sidebar__row--active .chat-sidebar__row-more,
+    .chat-sidebar__row--menu-open .chat-sidebar__row-more { opacity: 1; }
+    .chat-sidebar__row-more:hover {
+      color: var(--miira-text-primary);
+      transform: scale(1.2);
+    }
+    .chat-sidebar__row-more:active {
+      transform: scale(0.92);
+    }
+    .chat-sidebar__row-menu {
+      position: fixed;
+      z-index: 100;
+      min-width: 160px;
+      background: var(--miira-border-color);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      box-shadow: var(--miira-shadow-elev);
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      overflow: hidden;
+    }
+    .chat-sidebar__row-menu button {
+      position: relative;
+      background: var(--miira-bg-primary);
+      border: 1px solid transparent;
+      box-shadow: none;
+      transform: translateY(0);
+      transition:
+        transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+        border-color 0.15s;
+    }
+    .chat-sidebar__row-menu button:hover,
+    .chat-sidebar__row-menu button:focus-visible {
+      z-index: 1;
+      background: var(--miira-bg-primary);
+      border-color: var(--miira-border-color);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 0 0 var(--miira-border-hover);
+      outline: none;
+    }
+    .chat-sidebar__row-menu button:active {
+      transform: none;
+      box-shadow: 0 1px 0 0 var(--miira-border-color);
+    }
+    .chat-sidebar__row-menu[hidden] { display: none; }
+
+    /* ---------- Modal dialog ---------- */
+    .modal-preview {
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      background:
+        repeating-conic-gradient(var(--miira-bg-surface) 0% 25%, transparent 0% 50%)
+        50% / 22px 22px;
+      border-radius: var(--miira-radius-md);
+    }
+    .modal {
+      background: var(--miira-bg-primary);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-lg);
+      box-shadow: var(--miira-shadow-modal);
+      width: min(420px, 100%);
+      /* Capped against the *visible* viewport and scrollable, so a dialog is
+         never taller than the screen it opens on. A body with
+         `flex: 1; min-height: 0` takes the scroll instead when there is one. */
+      max-height: calc(100dvh - 32px);
+      overflow: hidden auto;
+      overscroll-behavior: contain;
+      margin: auto;
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .modal h3 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+    .modal__message { margin: 0; font-size: var(--miira-font-size-body); color: var(--miira-text-secondary); line-height: 1.45; }
+    .modal__row { display: flex; justify-content: flex-end; gap: 8px; }
+
+    /* ---------- Misc ---------- */
+    .divider { width: 1px; align-self: stretch; background: var(--miira-border-color); margin: 0 4px; }
+
+    /* ---------- Hover tooltip (shared) ----------
+       Themed hover/focus label for icon-only controls. A control that
+       needs a hover label gets `.has-tip` + `data-tooltip` and drops
+       `title`. Placement is above and centred;
+       `data-tip-place="bottom"` flips it below and
+       `data-tip-align="left" | "right"` pins it to that edge.
+       `--tip-delay` is hover intent: the pointer has to rest on the
+       control before the label shows, so sweeping across a toolbar
+       doesn't pop one label after another. Hiding and keyboard focus
+       stay immediate. */
+    .has-tip {
+      position: relative;
+      --tip-dx: -50%;
+      --tip-dy: 3px;
+      --tip-delay: 1.2s;
+      --tip-origin-x: center;
+      --tip-origin-y: bottom;
+    }
+    .has-tip[data-tip-place='bottom'] { --tip-dy: -3px; --tip-origin-y: top; }
+    .has-tip[data-tip-align='left'],
+    .has-tip[data-tip-align='right'] { --tip-dx: 0; }
+    .has-tip[data-tip-align='left'] { --tip-origin-x: left; }
+    .has-tip[data-tip-align='right'] { --tip-origin-x: right; }
+    .has-tip[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      z-index: 31;
+      width: max-content;
+      max-width: 220px;
+      padding: 5px 8px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-sm);
+      background: var(--miira-bg-secondary);
+      box-shadow: var(--miira-shadow-elev);
+      color: var(--miira-text-primary);
+      font-size: var(--miira-font-size-xs);
+      font-weight: 500;
+      line-height: 1.35;
+      text-align: center;
+      white-space: normal;
+      opacity: 0;
+      transform: translate(var(--tip-dx), var(--tip-dy));
+      transform-origin: var(--tip-origin-x) var(--tip-origin-y);
+      pointer-events: none;
+      transition: opacity 0.07s ease, transform 0.07s ease;
+    }
+    .has-tip[data-tip-place='bottom'][data-tooltip]::after { bottom: auto; top: calc(100% + 8px); }
+    .has-tip[data-tip-align='left'][data-tooltip]::after { left: 0; }
+    .has-tip[data-tip-align='right'][data-tooltip]::after { left: auto; right: 0; }
+    .has-tip[data-tooltip]:hover:not(:disabled),
+    .has-tip[data-tooltip]:focus-visible { --tip-dy: 0; }
+    .has-tip[data-tooltip]:hover:not(:disabled)::after {
+      opacity: 1;
+      transition-delay: var(--tip-delay);
+    }
+    .has-tip[data-tooltip]:focus-visible::after { opacity: 1; transition-delay: 0s; }
+    /* `.icon-btn` grows 1.2× on hover — undo it on the label only,
+       pivoting on the corner the tooltip is anchored to. */
+    .icon-btn.has-tip[data-tooltip]:hover:not(:disabled):not(.icon-btn--round)::after {
+      scale: calc(1 / 1.2);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .has-tip[data-tooltip] { --tip-dy: 0; }
+      /* Keep a zero-length transition so the delay still gates the
+         reveal — that's timing, not motion. */
+      .has-tip[data-tooltip]::after { transition: opacity 0s ease; }
+    }
+
+    /* ---------- Reading toolbar (Tilgængelighedsværktøjer) ----------
+       The floating aid a reader can switch on under Konto → Indstillinger:
+       Diktér, Læs højt, Forklar ord. It follows them everywhere, so it is
+       fixed to the viewport, portalled to <body>, and draggable by its grip.
+
+       `right` / `bottom` are set inline from the stored offset — the panel
+       is anchored to the corner it was parked nearest rather than to x/y, so
+       a bigger monitor doesn't strand it mid-screen.
+
+       It stacks above ordinary content and below every gate: a reader must
+       never have to move it to reach the login dialog. */
+    .reading-toolbar {
+      position: fixed;
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      width: max-content;
+      max-width: min(320px, calc(100vw - 24px));
+    }
+    .reading-toolbar--dragging { user-select: none; }
+
+    .reading-toolbar__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--miira-bg-surface);
+      border: 1px solid var(--miira-border-color);
+      border-radius: 999px;
+      box-shadow: var(--miira-shadow-elev);
+    }
+
+    /* The only part of the bar that is a handle. Everything else is a
+       button, and a bar you can drag by its buttons is a bar whose buttons
+       fire when you meant to move it. */
+    .reading-toolbar__grip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2px;
+      color: var(--miira-text-muted);
+      cursor: grab;
+      touch-action: none;
+    }
+    .reading-toolbar--dragging .reading-toolbar__grip { cursor: grabbing; }
+
+    /* A tool this browser can't offer. Dimmed like `:disabled` but still a
+       real button, because a disabled one gets no hover tooltip and no
+       click — and then the dimming is the only thing the reader is told. */
+    .reading-toolbar__tool--unavailable { opacity: 0.4; }
+
+    /* Listening is the one state worth animating: the microphone is open
+       and nothing else on screen says so. */
+    .reading-toolbar__tool--listening {
+      animation: reading-listening 1.6s ease-in-out infinite;
+    }
+    @keyframes reading-listening {
+      0%, 100% { box-shadow: 0 1px 0 0 var(--miira-border-color); }
+      50% {
+        box-shadow: 0 0 0 5px color-mix(in srgb, var(--miira-accent) 22%, transparent);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reading-toolbar__tool--listening { animation: none; }
+    }
+
+    .reading-toolbar__panel {
+      padding: 12px;
+      background: var(--miira-bg-surface);
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      box-shadow: var(--miira-shadow-elev);
+      font-size: var(--miira-font-size-sm);
+      color: var(--miira-text-primary);
+    }
+      /* The answer's heading is also where it is played from, so the word and
+         its speaker share one row rather than the speaker becoming a fourth
+         control on the bar — it acts on this panel, not on the page. */
+      .reading-toolbar__term-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .reading-toolbar__term {
+        display: block;
+        color: var(--miira-text-primary);
+      }
+      .reading-toolbar__term-row .icon-btn { flex: none; }
+    .reading-toolbar__explanation { margin: 0; line-height: 1.45; }
+    .reading-toolbar__hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      color: var(--miira-text-muted);
+    }
+    /* The recogniser's provisional guess — not yet committed anywhere, so it
+       reads as a whisper rather than as text the reader has written. */
+    .reading-toolbar__interim {
+      margin: 0;
+      color: var(--miira-text-muted);
+      font-style: italic;
+    }
+    .reading-toolbar__spin {
+      animation: reading-spin 1s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes reading-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .reading-toolbar__spin { animation: none; }
+    }
+
+    /* ---------- Lucide icons ---------- */
+    .icons-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .icons-toolbar .field { max-width: 280px; margin: 0; }
+    .icons-count {
+      margin: 0;
+      font-size: var(--miira-font-size-sm);
+      color: var(--miira-text-secondary);
+    }
+    .icon-sizes {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 24px;
+    }
+    .icon-size-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 72px;
+    }
+    .icon-size-item__box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--miira-text-primary);
+    }
+    .icon-size-item__label {
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: center;
+    }
+    .icon-size-item svg { stroke: currentColor; }
+
+    .icons-catalog {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .icons-grid-shell {
+      position: relative;
+    }
+    .icons-grid-shell--collapsed .icons-grid {
+      overflow: hidden;
+      max-height: var(--icons-grid-max-height, 168px);
+    }
+    .icons-grid-fade {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 40px;
+      pointer-events: none;
+      background: linear-gradient(to bottom, transparent, var(--miira-bg-primary));
+    }
+    .icons-grid-shell--collapsed .icons-grid-fade {
+      display: block;
+    }
+    .icons-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+      gap: 8px;
+    }
+    .icon-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 6px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      background: var(--miira-bg-primary);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .icon-tile__glyph {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      color: var(--miira-text-primary);
+      transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .icon-tile:hover .icon-tile__glyph { transform: translateY(-1px) scale(1.2); }
+    .icon-tile:active .icon-tile__glyph { transform: translateY(1px) scale(0.92); }
+    .icon-tile__glyph svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+    .icon-tile__name {
+      font-size: 0.625rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--miira-text-muted);
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.25;
+      max-width: 100%;
+    }
+    .icon-tile[hidden] { display: none; }
+    .icon-tile--copied {
+      border-color: var(--miira-green);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--miira-green) 25%, transparent);
+    }
+
+    /* ---------- File-type sprites ---------- */
+    .ft-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+      gap: 10px;
+      width: 100%;
+    }
+    .ft-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 10px 12px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      background: var(--miira-bg-primary);
+    }
+    .ft-tile__art {
+      width: 72px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ft-tile__art .file-type-icon { width: 72px; height: 72px; }
+    .ft-tile__name {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      color: var(--miira-text-primary);
+      text-align: center;
+      line-height: 1.25;
+    }
+    .ft-tile__id {
+      margin: -4px 0 0;
+      font-size: 0.625rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--miira-text-muted);
+      text-align: center;
+      word-break: break-all;
+    }
+
+    /* ---------- Owls ---------- */
+    .owl-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+      gap: 12px;
+      width: 100%;
+    }
+    .owl-grid--mascot {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    .owl-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 12px 14px;
+      border: 1px solid var(--miira-border-color);
+      border-radius: var(--miira-radius-md);
+      background: var(--miira-bg-primary);
+    }
+    .owl-tile__stage {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      width: 100%;
+      min-height: 112px;
+    }
+    .owl-tile__stage--mascot {
+      min-height: 168px;
+      background:
+        linear-gradient(to top, var(--miira-bg-surface) 28%, transparent 28%);
+      border-radius: var(--miira-radius-sm);
+      overflow: hidden;
+    }
+    .owl-tile__img {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+      display: block;
+    }
+    .owl-tile__img--badge { width: 80px; height: 80px; }
+    .owl-tile__img--mascot {
+      width: 140px;
+      height: 168px;
+      object-fit: contain;
+      object-position: bottom center;
+    }
+    .owl-tile__name {
+      font-size: var(--miira-font-size-sm);
+      font-weight: 500;
+      color: var(--miira-text-primary);
+      text-align: center;
+      line-height: 1.25;
+    }
+    .owl-tile__meta {
+      margin: 0;
+      font-size: var(--miira-font-size-xs);
+      color: var(--miira-text-secondary);
+      text-align: center;
+      line-height: 1.35;
+    }
+    .owl-tile__id {
+      margin: 0;
+      font-size: 0.625rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--miira-text-muted);
+      text-align: center;
+      word-break: break-all;
+    }
+
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      .nav { display: none; }
+      .workspace { flex-direction: column; }
+      .colors-pane {
+        position: relative;
+        width: 100%;
+        height: min(42vh, 360px);
+        border-left: none;
+        border-top: 1px solid var(--miira-border-color);
+      }
+      .layout--pane-collapsed .colors-pane {
+        width: 100%;
+        height: auto;
+      }
+      .layout--pane-collapsed .colors-pane__body {
+        display: none;
+      }
+      .content { padding: 20px; }
+      .topbar { padding: 12px 20px; flex-direction: column; align-items: flex-start; }
+    }
+
+/* Scoped mockup styles — real impl reuses the app.css .ai-chat /
+               .wizard / .chat-composer classes; these mirror them with tokens. */
+            .sidepane-stage {
+              padding: 28px;
+              display: flex;
+              justify-content: center;
+              background:
+                radial-gradient(
+                  120% 120% at 50% 0%,
+                  var(--miira-bg-surface) 0%,
+                  var(--miira-bg-primary) 60%
+                );
+            }
+            .sidepane {
+              width: 380px;
+              max-width: 100%;
+              height: 620px;
+              display: grid;
+              grid-template-rows: auto auto 1fr auto;
+              /* The pane clips its overflow, so cap the column at the pane —
+                 otherwise a nowrap toolbar or tab row pushes the rows past the
+                 pane edge and is silently cropped. */
+              grid-template-columns: minmax(0, 1fr);
+              min-height: 0;
+              background: var(--miira-bg-secondary);
+              border: 1px solid var(--miira-border-color);
+              border-radius: var(--miira-radius-lg);
+              box-shadow: var(--miira-shadow-elev);
+              overflow: hidden;
+            }
+            .sidepane__header {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 12px 12px 12px 16px;
+              border-bottom: 1px solid var(--miira-border-color);
+            }
+            .sidepane__type-icon {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 28px;
+              height: 28px;
+              border-radius: var(--miira-radius-sm);
+              color: var(--miira-orange);
+              background: color-mix(in srgb, var(--miira-orange) 16%, transparent);
+            }
+            .sidepane__title {
+              display: flex;
+              flex-direction: column;
+              line-height: 1.2;
+              margin-right: auto;
+            }
+            .sidepane__title strong {
+              font-size: var(--miira-font-size-sm);
+              color: var(--miira-text-primary);
+            }
+            .sidepane__title span {
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-muted);
+            }
+            .sidepane__seg-wrap { padding: 10px 12px; display: flex; justify-content: center; }
+            /* Tabs never wrap, so a pane dragged narrow (or long labels in
+               another language) scrolls inside the pill rather than overflowing
+               the pane, which would crop the last tab away entirely. */
+            .sidepane .segmented { min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+            .sidepane .segmented::-webkit-scrollbar { display: none; }
+
+            .sidepane__body {
+              min-height: 0;
+              overflow-y: auto;
+              overflow-x: hidden;
+              padding: 6px 14px 14px;
+            }
+            .sidepane__panel { display: none; }
+            .sidepane__panel.is-active { display: block; }
+
+            .sidepane__field { margin-top: 14px; }
+            .sidepane__field-label {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              margin-bottom: 6px;
+              font-size: var(--miira-font-size-sm);
+              font-weight: 500;
+              color: var(--miira-text-secondary);
+            }
+            .sidepane__field-label svg { color: var(--miira-text-muted); }
+            .sidepane .field { width: 100%; }
+            .sidepane__field-hint {
+              margin-top: 6px;
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-muted);
+            }
+
+            /* Målgruppe dropdowns mirror SearchableSelect: a .field-styled
+               trigger that opens a .menu popover — never a native <select>,
+               whose option popup is browser chrome no token can reach. */
+            .sidepane__dropdown-wrap { position: relative; }
+            .sidepane__dropdown {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              text-align: left;
+              cursor: pointer;
+            }
+            .sidepane__dropdown svg { flex-shrink: 0; color: var(--miira-text-muted); }
+            .sidepane__dropdown-menu {
+              position: absolute;
+              top: calc(100% + 6px);
+              left: 0;
+              right: 0;
+              z-index: 6;
+              min-width: 0;
+            }
+            .sidepane__dropdown-menu[hidden] { display: none; }
+            .sidepane__dropdown-menu .menu__item[aria-selected='true'] {
+              color: var(--miira-text-primary);
+              font-weight: 600;
+            }
+
+            /* length / count radio row (mirrors .wizard__lengths) */
+            .sidepane__chips {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 8px;
+            }
+            .sidepane__chip {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 2px;
+              padding: 10px 6px;
+              border: 1px solid var(--miira-border-color);
+              border-radius: var(--miira-radius-md);
+              background: var(--miira-bg-input);
+              color: var(--miira-text-secondary);
+              font-size: var(--miira-font-size-sm);
+              font-weight: 500;
+              cursor: pointer;
+              transition:
+                transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                border-color 0.15s,
+                color 0.15s;
+              box-shadow: 0 1px 0 0 var(--miira-border-color);
+            }
+            .sidepane__chip:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 0 0 var(--miira-border-hover);
+              border-color: var(--miira-border-hover);
+            }
+            .sidepane__chip:active { transform: translateY(1px); box-shadow: none; }
+            .sidepane__chip small { font-size: var(--miira-font-size-xs); color: var(--miira-text-muted); font-weight: 400; }
+            .sidepane__chip.is-active {
+              border-color: var(--miira-accent);
+              color: var(--miira-text-primary);
+              background: color-mix(in srgb, var(--miira-accent) 14%, var(--miira-bg-input));
+              box-shadow: 0 2px 0 0 var(--miira-accent-shade);
+            }
+            .sidepane__chip.is-active small { color: var(--miira-text-secondary); }
+
+            /* theme picker — mirrors the presentation editor AI-chat
+               .theme-chip: compact 3-swatch preview + name, 3D shelf,
+               filled-accent active state. See .theme-chip in
+               presentation-editor/src/styles/app.css. */
+            .sidepane__themes {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 4px;
+            }
+            .sidepane__theme-chip {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              padding: 4px 10px 4px 4px;
+              border: 1px solid var(--miira-border-color);
+              border-radius: var(--miira-radius-sm);
+              background: var(--miira-bg-secondary);
+              color: var(--miira-text-primary);
+              font-family: inherit;
+              font-size: var(--miira-font-size-xs);
+              font-weight: 600;
+              cursor: pointer;
+              transition:
+                transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                border-color 0.15s;
+              box-shadow: 0 1px 0 0 var(--miira-border-color);
+              transform: translateY(0);
+            }
+            .sidepane__theme-chip:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 0 0 var(--miira-border-hover);
+              border-color: var(--miira-border-hover);
+            }
+            .sidepane__theme-chip:active { transform: translateY(1px); box-shadow: 0 0 0 0 transparent; }
+            /* preview: a tinted mini-canvas holding three theme colours */
+            .sidepane__theme-swatch {
+              display: inline-flex;
+              flex: 0 0 auto;
+              padding: 2px;
+              gap: 1px;
+              border-radius: var(--miira-radius-sm);
+            }
+            .sidepane__theme-swatch > span {
+              width: 8px;
+              height: 8px;
+              border-radius: 2px;
+              display: inline-block;
+            }
+            .sidepane__theme-name { white-space: nowrap; }
+            .sidepane__theme-chip.is-active {
+              border-color: var(--miira-accent-shade);
+              color: var(--miira-accent-text);
+              background: var(--miira-accent);
+              box-shadow: 0 1px 0 0 var(--miira-accent-shade);
+            }
+            .sidepane__theme-chip.is-active:hover {
+              box-shadow: 0 2px 0 0 var(--miira-accent-shade);
+              border-color: var(--miira-accent-shade);
+            }
+            .sidepane__theme-chip.is-active:active { box-shadow: 0 0 0 0 transparent; }
+
+            /* switch-row (mirrors .switch-row) */
+            .sidepane__switch-row {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+              margin-top: 16px;
+              padding: 12px;
+              border: 1px solid var(--miira-border-color);
+              border-radius: var(--miira-radius-md);
+              background: var(--miira-bg-surface);
+            }
+            .sidepane__switch-copy { margin-right: auto; }
+            .sidepane__switch-title {
+              font-size: var(--miira-font-size-sm);
+              font-weight: 500;
+              color: var(--miira-text-primary);
+            }
+            .sidepane__switch-desc {
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-muted);
+              margin-top: 2px;
+              max-width: 30ch;
+            }
+
+            .sidepane__subhead {
+              margin: 20px 0 8px;
+              font-size: var(--miira-font-size-xs);
+              text-transform: uppercase;
+              letter-spacing: 0.07em;
+              color: var(--miira-text-muted);
+              font-weight: 600;
+            }
+            .sidepane__subhead:first-child { margin-top: 6px; }
+
+            /* Kildefiler — reuse the drive .card design, two columns. */
+            .sidepane__sources-grid {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+              gap: 10px;
+              margin-top: 8px;
+            }
+            .sidepane .card { cursor: default; width: auto; min-width: 0; box-sizing: border-box; }
+            .sidepane .card .card__body { min-width: 0; }
+            .sidepane .card .card__title { min-width: 0; }
+            .sidepane .card .card__thumb { height: 84px; }
+            .sidepane .card .card__thumb-icon { width: 40px; height: 40px; border-radius: 10px; }
+            .sidepane .card .card__thumb-icon svg { width: 22px; height: 22px; }
+            .sidepane .card .card__thumb-icon:has(> .file-type-icon) {
+              background: transparent; border-color: transparent; border-radius: 0;
+            }
+            .sidepane__source-remove {
+              position: absolute;
+              top: 6px;
+              right: 6px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              padding: 0;
+              border: 1px solid var(--miira-border-color);
+              border-radius: var(--miira-radius-sm);
+              background: var(--miira-bg-primary);
+              color: var(--miira-text-secondary);
+              cursor: pointer;
+              opacity: 0;
+              transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+            }
+            .sidepane .card:hover .sidepane__source-remove,
+            .sidepane .card:focus-within .sidepane__source-remove { opacity: 1; }
+            .sidepane__source-remove:hover {
+              color: var(--miira-red);
+              border-color: var(--miira-red);
+            }
+            .sidepane__addfiles-wrap { position: relative; margin-top: 10px; }
+            .sidepane__addfiles { width: 100%; justify-content: center; }
+            .sidepane__addfiles-menu {
+              position: absolute;
+              left: 0;
+              right: 0;
+              bottom: calc(100% + 6px);
+              z-index: 5;
+              min-width: 0;
+            }
+            .sidepane__addfiles-menu[hidden] { display: none; }
+            .sidepane__weburl { display: flex; gap: 8px; margin-top: 8px; }
+            .sidepane__weburl .field { flex: 1; }
+
+            /* chat */
+            .sidepane__chat { display: flex; flex-direction: column; gap: 12px; }
+            .sidepane__chat-empty {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              gap: 8px;
+              padding: 40px 16px;
+              color: var(--miira-text-muted);
+            }
+            .sidepane__chat-empty svg { color: var(--miira-text-muted); }
+            .sidepane__chat-empty strong {
+              font-size: var(--miira-font-size-sm);
+              color: var(--miira-text-secondary);
+              font-weight: 500;
+            }
+            .sidepane__chat-empty p {
+              margin: 0;
+              font-size: var(--miira-font-size-xs);
+              max-width: 28ch;
+            }
+            .sidepane__msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+            .sidepane__msg-role {
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-muted);
+              padding: 0 4px;
+            }
+            .sidepane__msg-body {
+              padding: 10px 12px;
+              border-radius: var(--miira-radius-md);
+              font-size: var(--miira-font-size-sm);
+              line-height: 1.5;
+              color: var(--miira-text-primary);
+              white-space: pre-wrap;
+            }
+            .sidepane__msg--user { align-self: flex-end; align-items: flex-end; }
+            .sidepane__msg--user .sidepane__msg-body {
+              background: color-mix(in srgb, var(--miira-accent) 22%, var(--miira-bg-input));
+              border: 1px solid color-mix(in srgb, var(--miira-accent) 45%, transparent);
+              border-bottom-right-radius: var(--miira-radius-sm);
+            }
+            .sidepane__msg--assistant { align-self: flex-start; }
+            .sidepane__msg--assistant .sidepane__msg-body {
+              background: var(--miira-bg-surface);
+              border: 1px solid var(--miira-border-color);
+              border-bottom-left-radius: var(--miira-radius-sm);
+            }
+            .sidepane__msg-body .sidepane__loading-inline {
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              color: var(--miira-text-secondary);
+            }
+
+            /* footer */
+            .sidepane__footer {
+              border-top: 1px solid var(--miira-border-color);
+              padding: 12px;
+            }
+            .sidepane__footer-mode { display: none; }
+            .sidepane__footer-mode.is-active { display: block; }
+            .sidepane__generate { width: 100%; justify-content: center; }
+            /* Indhold is required before the first generation — neutralise the
+               3D hover lift while disabled so it reads as inert (colours come
+               from the shared .btn:disabled token rule). */
+            .sidepane__generate:disabled { pointer-events: none; }
+            /* Målgruppe is opt-in — when its master toggle is off the fields
+               are inert + dimmed (no colour change, just opacity). */
+            .sidepane__maalgruppe-fields { transition: opacity 140ms ease; }
+            .sidepane__maalgruppe-fields.is-disabled { opacity: 0.45; pointer-events: none; }
+            .sidepane__generate-split { display: flex; flex-direction: column; gap: 8px; }
+            .sidepane__generate-split .btn { width: 100%; justify-content: center; }
+            .sidepane__hint {
+              margin: 8px 2px 0;
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-muted);
+              text-align: center;
+            }
+
+            /* composer — mirrors the presentation editor's .chat-composer:
+               textarea on its own full-width row, then a control row with the
+               add button on the left and mic + send on the right. */
+            .sidepane__composer {
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              padding: 10px 10px 8px;
+              border: 1px solid var(--miira-border-color);
+              border-radius: 22px;
+              background: var(--miira-bg-input);
+              transition: border-color 120ms ease, box-shadow 120ms ease;
+            }
+            .sidepane__composer:focus-within {
+              border-color: color-mix(in srgb, var(--miira-yellow) 60%, var(--miira-border-color));
+              box-shadow: 0 0 0 3px color-mix(in srgb, var(--miira-yellow) 20%, transparent);
+            }
+            [data-theme='neutral'] .sidepane__composer:focus-within,
+            [data-theme='dark'] .sidepane__composer:focus-within {
+              border-color: color-mix(in srgb, var(--miira-accent) 60%, var(--miira-border-color));
+              box-shadow: 0 0 0 3px color-mix(in srgb, var(--miira-accent) 20%, transparent);
+            }
+            .sidepane__composer-input {
+              width: 100%;
+              min-height: 24px;
+              max-height: 96px;
+              resize: none;
+              border: none;
+              outline: none;
+              background: transparent;
+              font: inherit;
+              font-size: var(--miira-font-size-sm);
+              line-height: 1.5;
+              color: var(--miira-text-primary);
+              padding: 4px 6px 2px;
+            }
+            .sidepane__composer-input::placeholder { color: var(--miira-text-muted); }
+            .sidepane__composer-row {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              margin-top: 8px;
+            }
+            .sidepane__composer-side { display: flex; align-items: center; gap: 6px; }
+            .sidepane__composer-side--end { justify-content: flex-end; }
+            .sidepane__composer-icon-btn {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 34px;
+              height: 34px;
+              border-radius: 50%;
+              border: 1px solid color-mix(in srgb, var(--miira-border-color) 70%, transparent);
+              background: transparent;
+              color: var(--miira-text-secondary);
+              cursor: pointer;
+              box-shadow: 0 2px 0 0 var(--miira-border-color);
+              transform: translateY(0);
+              transition:
+                transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                background 120ms ease, color 120ms ease, border-color 120ms ease;
+            }
+            .sidepane__composer-icon-btn:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 3px 0 0 var(--miira-border-hover);
+              background: color-mix(in srgb, var(--miira-bg-hover) 70%, transparent);
+              color: var(--miira-text-primary);
+            }
+            .sidepane__composer-icon-btn:active {
+              transform: translateY(1px);
+              box-shadow: 0 1px 0 0 var(--miira-border-hover);
+            }
+            .sidepane__composer-send {
+              flex-shrink: 0;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 34px;
+              height: 34px;
+              border-radius: 50%;
+              border: 2px solid var(--miira-brown);
+              background: var(--miira-yellow);
+              color: var(--miira-brown);
+              cursor: pointer;
+              box-shadow: 0 2px 0 0 var(--miira-brown);
+              transform: translateY(0);
+              transition:
+                transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+                filter 0.12s ease;
+            }
+            [data-theme='neutral'] .sidepane__composer-send,
+            [data-theme='dark'] .sidepane__composer-send {
+              background: var(--miira-accent);
+              color: var(--miira-accent-text);
+              border-color: var(--miira-accent-shade);
+              box-shadow: 0 2px 0 0 var(--miira-accent-shade);
+            }
+            .sidepane__composer-send:hover {
+              filter: brightness(1.02);
+              transform: translateY(-1px);
+              box-shadow: 0 3px 0 0 var(--miira-brown);
+            }
+            [data-theme='neutral'] .sidepane__composer-send:hover,
+            [data-theme='dark'] .sidepane__composer-send:hover { box-shadow: 0 3px 0 0 var(--miira-accent-shade); }
+            .sidepane__composer-send:active {
+              transform: translateY(1px);
+              box-shadow: 0 1px 0 0 var(--miira-brown);
+              filter: brightness(0.98);
+            }
+            [data-theme='neutral'] .sidepane__composer-send:active,
+            [data-theme='dark'] .sidepane__composer-send:active { box-shadow: 0 1px 0 0 var(--miira-accent-shade); }
+
+            /* pending-settings context note above the composer */
+            .sidepane__ctx-note {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin: 0 2px 8px;
+              padding: 7px 10px;
+              border-radius: var(--miira-radius-md);
+              border: 1px solid color-mix(in srgb, var(--miira-accent) 45%, transparent);
+              background: color-mix(in srgb, var(--miira-accent) 12%, var(--miira-bg-input));
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-primary);
+            }
+            .sidepane__ctx-note[hidden] { display: none; }
+            .sidepane__ctx-note svg { flex: 0 0 auto; }
+
+            /* sent-message context block (message + attached new settings) */
+            .sidepane__msg-context {
+              margin-top: 8px;
+              padding-top: 8px;
+              border-top: 1px solid color-mix(in srgb, var(--miira-accent) 35%, transparent);
+              font-size: var(--miira-font-size-xs);
+              color: var(--miira-text-secondary);
+            }
+            .sidepane__msg-context-label {
+              display: block;
+              margin-bottom: 4px;
+              color: var(--miira-text-secondary);
+              font-weight: 500;
+            }
+
+            .sidepane__flash { animation: sidepane-flash 0.9s ease; }
+            @keyframes sidepane-flash {
+              0% { background: color-mix(in srgb, var(--miira-accent) 30%, var(--miira-bg-input)); }
+              100% { background: transparent; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .sidepane__chip, .sidepane__theme-chip, .sidepane__flash { transition: none; animation: none; }
+            }
+
+.wm-grid { display:flex; flex-wrap:wrap; gap:18px; }
+            .wm-card { flex:1 1 300px; min-width:280px; }
+            .wm-shot {
+              position:relative; height:190px; border-radius:var(--miira-radius-md);
+              overflow:hidden; box-shadow:var(--miira-shadow-elev);
+              background:linear-gradient(135deg,#3f6d8c 0%,#7a8b4f 55%,#c98a3b 100%);
+            }
+            .wm-shot--alt { background:linear-gradient(135deg,#2b2b30 0%,#4b4b52 60%,#6d6d77 100%); }
+            .wm-shot--light { background:linear-gradient(135deg,#e9e2d4 0%,#d7c9ae 55%,#c2a878 100%); }
+            .wm-pill {
+              position:absolute; right:12px; bottom:12px;
+              display:inline-flex; align-items:baseline; gap:8px;
+              padding:6px 12px; border-radius:5px;
+              background:rgba(0,0,0,0.35); backdrop-filter:blur(3px);
+            }
+            .wm-pill__logo { height:16px; width:auto; display:block; }
+            .wm-pill__text {
+              color:rgba(255,255,255,0.92); font-weight:700;
+              font-size:16px; line-height:1; white-space:nowrap;
+            }
+            .wm-pill__sep { width:1px; height:14px; background:rgba(255,255,255,0.38); }
+            .wm-cap { margin-top:8px; font-size:13px; color:var(--miira-text-secondary); }
+            .wm-cap strong { color:var(--miira-text-primary); }

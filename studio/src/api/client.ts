@@ -109,6 +109,8 @@ export const api = {
     req<Project>("POST", "/api/projects", { fileId, kind, title }),
   getProject: (pid: string) => req<Project>("GET", `/api/projects/${enc(pid)}`),
   renameProject: (pid: string, title: string) => req<Project>("PATCH", `/api/projects/${enc(pid)}`, { title }),
+  updateProject: (pid: string, patch: { description?: string; public?: boolean }) =>
+    req<Project>("PATCH", `/api/projects/${enc(pid)}`, patch),
   publish: (pid: string, sha: string) =>
     req<{ publishedSha: string; url: string }>("POST", `/api/projects/${enc(pid)}/publish`, { sha }),
   unpublish: (pid: string) => req<void>("POST", `/api/projects/${enc(pid)}/unpublish`),
