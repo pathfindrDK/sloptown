@@ -109,9 +109,12 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, cfg
 
     try:
         limiter.check_rate(caller.project_id)
+        limiter.check_host(caller.project_id, host)
         limiter.acquire(caller.project_id)
-    except Throttled:
-        return await _reply(writer, "429 Too Many Requests", "Retry-After: 1\r\n")
+    except Throttled as t:
+        log.info("egress throttled project=%s host=%s reason=%s", caller.project_id, host, t.reason)
+        retry = "60" if t.reason.startswith("host_rpm") else "1"
+        return await _reply(writer, "429 Too Many Requests", f"Retry-After: {retry}\r\n")
 
     try:
         try:

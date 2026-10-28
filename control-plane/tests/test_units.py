@@ -12,14 +12,14 @@ def test_container_env_points_vite_at_the_edge(monkeypatch):
     from sloptown.config import get_settings
     from sloptown.orchestrator import container_env
 
-    env = container_env(token="vt_x", mode="dev")
+    env = container_env(token="vt_x", seed="s1", mode="dev")
     assert env["VIBE_APPS_DOMAIN"] == get_settings().apps_domain
     assert env["VIBE_HMR_CLIENT_PORT"] == "8080"
     assert env["OPENAI_API_KEY"] == "vt_x" and "sk-" not in "".join(env.values())
     assert env["VIBE_AGENT_MODEL"] == get_settings().agent_model and env["VIBE_AI_MODEL"]
     monkeypatch.setattr(get_settings(), "apps_port", "")
     monkeypatch.setattr(get_settings(), "apps_scheme", "https")
-    assert container_env(token="vt_x", mode="dev")["VIBE_HMR_CLIENT_PORT"] == "443"
+    assert container_env(token="vt_x", seed="s1", mode="dev")["VIBE_HMR_CLIENT_PORT"] == "443"
 
 
 def test_reserved_labels_are_never_app_hosts():
@@ -45,3 +45,13 @@ def test_miira_backchannel_maps_the_issuer_origin(monkeypatch):
     monkeypatch.setattr(s, "miira_issuer", "http://miira.sloptown.localhost:8080")
     monkeypatch.setattr(s, "miira_api_base", "http://sloptown-fake-miira:8100")
     assert miira.backchannel("http://miira.sloptown.localhost:8080/oidc/token") == "http://sloptown-fake-miira:8100/oidc/token"
+
+
+def test_each_vibe_gets_its_own_edge_secret():
+    """A secret read out of one Vibe's environment must not vouch for another Vibe."""
+    from sloptown.orchestrator import container_env
+    from sloptown.tokens import edge_secret_for
+
+    a = container_env(token="vt_a", seed="seed-a", mode="runtime")["VIBE_EDGE_SECRET"]
+    b = container_env(token="vt_b", seed="seed-b", mode="runtime")["VIBE_EDGE_SECRET"]
+    assert a != b and a == edge_secret_for("seed-a")

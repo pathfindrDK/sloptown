@@ -162,6 +162,18 @@ async def test_platform_forwarding(setup):
 
 
 @respx.mock
+async def test_platform_paths_cannot_leave_platform(setup):
+    """httpx collapses dot segments, so a decoded `..` would reach /internal/* with the
+    internal secret attached. Such paths stop at the egress."""
+    route = respx.route(host="cp.test").respond(200)
+    for raw in ["/platform/..%2Finternal%2Fimages%2Frolled", "/platform/%2E%2E/internal/x",
+                "/platform/members/..%2F..%2Fadmin%2Fv1", "/platform/members%252F..", "/platform/a//b"]:
+        r = await setup.post(raw, headers=auth("run-tok"))
+        assert r.status_code == 404, raw
+    assert not route.called
+
+
+@respx.mock
 async def test_inference_rpm_and_body_limit(setup):
     egress.configure(EgressConfig(inference_rpm_per_project=2, max_body_bytes=200))
     respx.post(f"{OPENAI}/chat/completions").respond(json={"usage": {"prompt_tokens": 1, "completion_tokens": 1}})
@@ -181,6 +193,21 @@ async def test_rate_bucket():
         raise AssertionError("expected Throttled")
     except Exception as exc:
         assert exc.__class__.__name__ == "Throttled"
+
+
+async def test_per_host_minute_limits():
+    """One Vibe can't flood an external host, and all Vibes together can't either."""
+    lim = Limiter(EgressConfig(host_rpm_per_project=2, host_rpm_global=3))
+    lim.check_host("p1", "api.example.com")
+    lim.check_host("p1", "API.example.com.")
+    reasons = []
+    for project in ("p1", "p2", "p3"):
+        try:
+            lim.check_host(project, "api.example.com")
+        except Exception as exc:
+            reasons.append(exc.reason)
+    assert reasons == ["host_rpm", "host_rpm_global"]
+    lim.check_host("p3", "other.example.com")
 
 
 async def test_host_allowed_patterns():

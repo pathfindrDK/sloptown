@@ -36,7 +36,10 @@ class Settings(BaseSettings):
     dev_image: str = "vibe-dev:latest"
     runtime_image: str = "vibe-runtime:latest"
     userns_auto: bool = True  # per-container user namespaces; needs subuid/subgid for "containers"
-    oci_runtime: str = ""  # "runsc" for gVisor; empty = podman default
+    # "runsc" for gVisor. Over the libpod API podman ignores a per-container runtime and
+    # uses its service's, so the runtime really comes from the socket (deploy/harden-host.sh
+    # runs a runsc service); this value also marks the isolation in orchestrator.slot_tag.
+    oci_runtime: str = ""
     edge_container: str = "sloptown-edge"
     egress_container: str = "sloptown-egress"
     cp_container: str = "sloptown-cp"  # joins project networks to reach OpenCode/agentd

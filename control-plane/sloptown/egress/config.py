@@ -16,6 +16,8 @@ KEYS = (
     "EGRESS_MAX_BODY_BYTES",
     "EGRESS_TIMEOUT_SECONDS",
     "EGRESS_PROXY_PORT",
+    "EGRESS_HOST_RPM_PER_PROJECT",
+    "EGRESS_HOST_RPM_GLOBAL",
 )
 
 
@@ -49,6 +51,9 @@ class EgressConfig:
     max_body_bytes: int = 8 * 1024 * 1024
     timeout_seconds: float = 120
     proxy_port: int = 8201
+    # Per external host, so a Vibe (or all of them together) can't flood one service.
+    host_rpm_per_project: int = 60
+    host_rpm_global: int = 300
 
     @classmethod
     def load(cls) -> "EgressConfig":
@@ -66,6 +71,8 @@ class EgressConfig:
             "EGRESS_MAX_BODY_BYTES": ("max_body_bytes", int),
             "EGRESS_TIMEOUT_SECONDS": ("timeout_seconds", float),
             "EGRESS_PROXY_PORT": ("proxy_port", int),
+            "EGRESS_HOST_RPM_PER_PROJECT": ("host_rpm_per_project", int),
+            "EGRESS_HOST_RPM_GLOBAL": ("host_rpm_global", int),
         }
         for key, (attr, typ) in conv.items():
             if raw.get(key):
@@ -85,6 +92,8 @@ class EgressConfig:
             "maxBodyBytes": d["max_body_bytes"],
             "timeoutSeconds": d["timeout_seconds"],
             "proxyPort": d["proxy_port"],
+            "hostRpmPerProject": d["host_rpm_per_project"],
+            "hostRpmGlobal": d["host_rpm_global"],
             "source": "env",
             "editable": False,
         }

@@ -21,8 +21,9 @@ from urllib.parse import urlparse
 
 import httpx
 
+from . import peers
 from .config import get_settings
-from .tokens import dev_token, runtime_token
+from .tokens import dev_token, edge_secret_for, runtime_token
 
 log = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class Orchestrator(Protocol):
     async def stop(self, container: str) -> None: ...
     async def reconnect_platform(self) -> int: ...
     async def address(self, container: str, network: str) -> str: ...
+    async def container_ips(self, containers: list[str]) -> set[str]: ...
     async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes) -> str: ...
     async def unpublish(self, project_id: str) -> None: ...
     async def container_image(self, container: str) -> str | None: ...
@@ -66,18 +68,22 @@ class Orchestrator(Protocol):
     async def roll_runtime(self, project_id: str, network: str, volume: str, seed: str) -> bool: ...
 
 
-# Bump when the pool slot spec (container or network settings) changes: unclaimed
-# slots carrying an older spec are discarded and rebuilt, like on a new image.
+# Bump when the container spec (container or network settings) changes: unclaimed
+# slots are discarded and rebuilt, published apps rolled and idle editors replaced,
+# like on a new image.
 # v2: project networks get DNS (the libpod API defaults dns_enabled to false).
-SLOT_SPEC = 2
+# v3: a per-Vibe edge secret in the environment.
+SLOT_SPEC = 3
 
 
 def slot_tag(image_id: str) -> str:
-    """What a pool slot is compared on: the dev image, SLOT_SPEC and the model settings
-    baked into its environment (changing a model recycles unclaimed slots)."""
+    """What a Vibe container is compared on: its image, SLOT_SPEC, the model settings
+    baked into its environment and how it is isolated (user namespace, OCI runtime).
+    Any change recycles pool slots, rolls published apps and replaces idle editors."""
     s = get_settings()
     models = hashlib.sha256(f"{s.agent_model}|{s.agent_small_model}|{s.app_ai_model}".encode()).hexdigest()[:8]
-    return f"{image_id}#spec{SLOT_SPEC}#{models}"
+    isolation = f"{'userns' if s.userns_auto else 'hostns'}-{s.oci_runtime or 'default'}"
+    return f"{image_id}#spec{SLOT_SPEC}#{models}#{isolation}"
 
 
 def image_of(tag: str | None) -> str | None:
@@ -92,7 +98,7 @@ def runtime_container_name(project_id: str) -> str:
     return f"vibe-run-{project_id}"
 
 
-def container_env(*, token: str, mode: str, project_id: str = "") -> dict[str, str]:
+def container_env(*, token: str, seed: str, mode: str, project_id: str = "") -> dict[str, str]:
     s = get_settings()
     egress = s.egress_url_for_containers
     host = urlparse(egress).hostname or "sloptown-egress"
@@ -109,7 +115,7 @@ def container_env(*, token: str, mode: str, project_id: str = "") -> dict[str, s
         "VIBE_PROJECT_ID": project_id,
         "VIBE_PLATFORM_URL": egress,
         "VIBE_PROJECT_TOKEN": token,
-        "VIBE_EDGE_SECRET": s.edge_secret,
+        "VIBE_EDGE_SECRET": edge_secret_for(seed),
         "VIBE_MODE": mode,
         "OPENAI_BASE_URL": egress + "/v1",
         "OPENAI_API_KEY": token,
@@ -201,6 +207,7 @@ class PodmanOrchestrator:
             r = await self._client.post(f"{API}/networks/{network}/connect", json={"container": c})
             if r.status_code not in (200, 204):
                 log.warning("could not connect %s to %s: %s %s", c, network, r.status_code, r.text[:200])
+        peers.invalidate()  # edge and egress have new addresses on this network
 
     async def reconnect_platform(self) -> int:
         """Attach edge/egress/cp to every project network they're missing from. Returns connections made.
@@ -223,16 +230,17 @@ class PodmanOrchestrator:
                 cr = await self._client.post(f"{API}/networks/{net}/connect", json={"container": c})
                 if cr.status_code in (200, 204):
                     made += 1
+                    peers.invalidate()
                 elif cr.status_code != 404:  # 404: the slot was discarded meanwhile
                     log.warning("reconnect %s to %s: %s %s", c, net, cr.status_code, cr.text[:200])
         return made
 
-    async def _create_dev(self, name: str, network: str, volume: str, seed: str, project_id: str = "") -> None:
+    async def _create_dev(self, name: str, network: str, volume: str, seed: str, project_id: str = "", start: bool = True) -> None:
         s = get_settings()
         spec = hardened_spec(
             name,
             s.dev_image,
-            container_env(token=dev_token(seed), mode="dev", project_id=project_id),
+            container_env(token=dev_token(seed), seed=seed, mode="dev", project_id=project_id),
             {"sloptown": "1", "sloptown.kind": "dev"},
             network,
         )
@@ -243,7 +251,8 @@ class PodmanOrchestrator:
         # Editors are woken on access (ensure_running), so they only restart on a crash.
         spec["restart_policy"] = "on-failure"
         await self._req("POST", "/containers/create", json=spec)
-        await self._req("POST", f"/containers/{name}/start", ok=(204, 304))
+        if start:
+            await self._req("POST", f"/containers/{name}/start", ok=(204, 304))
 
     async def create_pool_slot(self) -> SlotSpec:
         s = get_settings()
@@ -313,6 +322,19 @@ class PodmanOrchestrator:
 
     async def stop(self, container: str) -> None:
         await self._req("POST", f"/containers/{container}/stop", params={"t": 10}, ok=(204, 304, 404))
+
+    async def container_ips(self, containers: list[str]) -> set[str]:
+        """Every address of the named containers, on all their networks (missing ones skipped)."""
+        ips: set[str] = set()
+        for c in containers:
+            r = await self._client.get(f"{API}/containers/{c}/json")
+            if r.status_code != 200:
+                continue
+            for net in (r.json().get("NetworkSettings", {}).get("Networks") or {}).values():
+                for key in ("IPAddress", "GlobalIPv6Address"):
+                    if net.get(key):
+                        ips.add(net[key])
+        return ips
 
     async def address(self, container: str, network: str) -> str:
         r = await self._req("GET", f"/containers/{container}/json")
@@ -389,8 +411,14 @@ class PodmanOrchestrator:
         spec = hardened_spec(
             name,
             s.runtime_image,
-            container_env(token=runtime_token(project_id, seed), mode="runtime", project_id=project_id),
-            {"sloptown": "1", "sloptown.kind": "runtime", "sloptown.project": project_id, "sloptown.sha": sha},
+            container_env(token=runtime_token(project_id, seed), seed=seed, mode="runtime", project_id=project_id),
+            {
+                "sloptown": "1",
+                "sloptown.kind": "runtime",
+                "sloptown.project": project_id,
+                "sloptown.sha": sha,
+                "sloptown.tag": slot_tag(await self.image_id(s.runtime_image)),
+            },
             network,
         )
         spec["volumes"] = [
@@ -408,12 +436,18 @@ class PodmanOrchestrator:
         return r.json().get("Image") if r.status_code == 200 else None
 
     async def replace_dev(self, project_id: str, container: str, network: str, volume: str, seed: str) -> str:
-        """Recreate an editor container on the current dev image, keeping its volume and network."""
+        """Recreate an editor container on the current dev image, keeping its volume and network.
+
+        A stopped editor stays stopped (ensure_running wakes it on access): starting every
+        idle-stopped editor during a rollover is how ~100 of them once filled the host's memory.
+        """
+        old = await self._client.get(f"{API}/containers/{container}/json")
+        running = old.status_code == 200 and bool((old.json().get("State") or {}).get("Running"))
         await self._client.delete(f"{API}/containers/{container}", params={"force": "true", "t": 10})
-        await self._create_dev(container, network, volume, seed, project_id)
-        if not await self._healthy(container, network, timeout=120, port=4097, path="/health"):
+        await self._create_dev(container, network, volume, seed, project_id, start=running)
+        if running and not await self._healthy(container, network, timeout=120, port=4097, path="/health"):
             log.warning("%s replaced but agentd is not healthy yet", container)
-        return await self.image_id(get_settings().dev_image)
+        return slot_tag(await self.image_id(get_settings().dev_image))
 
     async def roll_runtime(self, project_id: str, network: str, volume: str, seed: str) -> bool:
         """Start the published app on the current runtime image next to the old one; swap once healthy."""
@@ -423,7 +457,7 @@ class PodmanOrchestrator:
         if old.status_code != 200:
             return False
         info = old.json()
-        if info.get("Image") == await self.image_id(s.runtime_image):
+        if (info.get("Config", {}).get("Labels") or {}).get("sloptown.tag") == slot_tag(await self.image_id(s.runtime_image)):
             return False
         pub_vol = next((m["Name"] for m in info.get("Mounts", []) if m.get("Destination") == "/srv/app"), None)
         sha = (info.get("Config", {}).get("Labels") or {}).get("sloptown.sha", "")
@@ -463,6 +497,7 @@ class FakeOrchestrator:
     def __init__(self) -> None:
         self.containers: dict[str, dict[str, Any]] = {}
         self.published: dict[str, dict[str, Any]] = {}
+        self.platform_ips: dict[str, str] = {}
         self.image = "sha256:fake-image-1"
         self.runtime_image = "sha256:fake-runtime-1"
         self.build_error: str | None = None  # set to make the next publish fail its build
@@ -498,12 +533,15 @@ class FakeOrchestrator:
     async def address(self, container: str, network: str) -> str:
         return f"fake-{container}"
 
+    async def container_ips(self, containers: list[str]) -> set[str]:
+        return {self.platform_ips[c] for c in containers if c in self.platform_ips}
+
     async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes) -> str:
         if self.build_error is not None:
             raise BuildFailed(self.build_error)
         name = runtime_container_name(project_id)
         self.published[project_id] = {"sha": sha, "size": len(tar)}
-        self.containers[name] = {"running": True, "network": network, "image": self.runtime_image}
+        self.containers[name] = {"running": True, "network": network, "image": self.runtime_image, "tag": slot_tag(self.runtime_image)}
         return name
 
     async def unpublish(self, project_id: str) -> None:
@@ -516,13 +554,13 @@ class FakeOrchestrator:
 
     async def replace_dev(self, project_id: str, container: str, network: str, volume: str, seed: str) -> str:
         self.containers[container] = {"running": True, "network": network, "image": self.image}
-        return self.image
+        return slot_tag(self.image)
 
     async def roll_runtime(self, project_id: str, network: str, volume: str, seed: str) -> bool:
         c = self.containers.get(runtime_container_name(project_id))
-        if c is None or c.get("image") == self.runtime_image:
+        if c is None or c.get("tag") == slot_tag(self.runtime_image):
             return False
-        c["image"] = self.runtime_image
+        c["image"], c["tag"] = self.runtime_image, slot_tag(self.runtime_image)
         return True
 
 

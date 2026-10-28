@@ -44,7 +44,7 @@ class SlidingWindow:
 class Throttled(Exception):
     def __init__(self, reason: str):
         super().__init__(reason)
-        self.reason = reason  # rate|concurrency|inference_rpm|inference_rpm_global
+        self.reason = reason  # rate|concurrency|inference_rpm|inference_rpm_global|host_rpm|host_rpm_global
 
 
 class Limiter:
@@ -53,11 +53,21 @@ class Limiter:
         self._buckets: dict[str, TokenBucket] = defaultdict(lambda: TokenBucket(cfg.rps_per_project, cfg.burst_per_project))
         self._rpm: dict[str, SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.inference_rpm_per_project))
         self._rpm_global = SlidingWindow(cfg.inference_rpm_global)
+        self._host_rpm: dict[tuple[str, str], SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.host_rpm_per_project))
+        self._host_rpm_global: dict[str, SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.host_rpm_global))
         self._open: dict[str, int] = defaultdict(int)
 
     def check_rate(self, project_id: str) -> None:
         if not self._buckets[project_id].take():
             raise Throttled("rate")
+
+    def check_host(self, project_id: str, host: str) -> None:
+        """Requests (or tunnels) to one external host per minute: per Vibe, then across all."""
+        host = host.lower().rstrip(".")
+        if not self._host_rpm[(project_id, host)].take():
+            raise Throttled("host_rpm")
+        if not self._host_rpm_global[host].take():
+            raise Throttled("host_rpm_global")
 
     def check_inference(self, project_id: str) -> None:
         if not self._rpm[project_id].take():
