@@ -44,7 +44,7 @@ export function SettingsPanel({ project, onChange }: Props) {
             </div>
             <div className="settings__icon-copy">
               <p className="muted">{t(icon?.custom ? "settings.iconCustom" : "settings.iconBody")}</p>
-              <button className="btn" onClick={() => shell.requestIcon(project.id)}>
+              <button className="btn btn--3d" onClick={() => shell.requestIcon(project.id)}>
                 <ImagePlus size={16} /> {t("settings.iconButton")}
               </button>
             </div>

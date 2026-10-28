@@ -15,6 +15,7 @@ import {
   type Project,
   type ProjectEvent,
   type ProjectKind,
+  type QueueState,
   type Terms,
   type Thread,
 } from "./types";
@@ -139,6 +140,10 @@ export const api = {
   send: (tid: string, text: string, images?: ImageAttachment[]) =>
     req<{ turnId: string; queued: boolean }>("POST", `/api/threads/${enc(tid)}/messages`, { text, images }),
   stop: (tid: string) => req<void>("POST", `/api/threads/${enc(tid)}/stop`),
+  queue: (pid: string) => req<QueueState>("GET", `/api/projects/${enc(pid)}/queue`),
+  editQueued: (turnId: string, text: string) => req<QueueState>("PATCH", `/api/turns/${enc(turnId)}`, { text }),
+  deleteQueued: (turnId: string) => req<QueueState>("DELETE", `/api/turns/${enc(turnId)}`),
+  sendNow: (turnId: string) => req<QueueState>("POST", `/api/turns/${enc(turnId)}/send-now`),
   events: (pid: string, onEvent: (ev: ProjectEvent) => void, signal: AbortSignal) =>
     transport.subscribe(`/api/projects/${enc(pid)}/events`, onEvent, signal),
 

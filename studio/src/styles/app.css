@@ -87,17 +87,39 @@ textarea {
   opacity: 0.55;
   cursor: default;
 }
+/* Miira's 3D shelf (design guide §4 Buttons, motion): the lip grows 4px → 7px as the face
+   lifts 3px on hover and shrinks to 2px as it presses 2px down, on the shelf curve.
+   --btn-shelf is the lip colour, set per variant. */
 .btn--3d {
+  --btn-shelf: var(--miira-color-border-strong);
   background: var(--miira-color-surface);
-  border-color: var(--miira-color-border-strong);
-  box-shadow: var(--miira-shadow-3d);
+  border-color: var(--btn-shelf);
+  box-shadow: 0 4px 0 0 var(--btn-shelf);
+  transform: translateY(0);
+  transition:
+    transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 0.12s ease,
+    background 0.12s;
 }
 .btn--3d:not(:disabled):hover {
-  background: var(--miira-color-surface-2);
+  transform: translateY(-3px);
+  box-shadow: 0 7px 0 0 var(--btn-shelf);
 }
 .btn--3d:not(:disabled):active {
   transform: translateY(2px);
-  box-shadow: none;
+  box-shadow: 0 2px 0 0 var(--btn-shelf);
+}
+.btn--3d.btn--primary {
+  --btn-shelf: var(--miira-color-accent-shade);
+}
+.btn--3d.btn--primary:not(:disabled):hover,
+.btn--3d.btn--danger:not(:disabled):hover {
+  filter: brightness(1.02);
+}
+.btn--3d.btn--primary:not(:disabled):active,
+.btn--3d.btn--danger:not(:disabled):active {
+  filter: brightness(0.98);
 }
 .btn--primary {
   background: var(--miira-color-accent);
@@ -112,8 +134,8 @@ textarea {
   color: var(--miira-color-danger);
 }
 .btn--3d.btn--danger {
+  --btn-shelf: var(--miira-color-danger);
   background: var(--miira-color-danger-soft);
-  border-color: var(--miira-color-danger);
 }
 .btn--ghost {
   color: var(--miira-color-text-muted);
@@ -190,25 +212,6 @@ textarea {
   color: var(--miira-color-success);
 }
 
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--miira-color-border);
-  border-top-color: var(--miira-color-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  vertical-align: middle;
-}
-.spin {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ---------- Loading (Miira design guide: loading tiles) ---------- */
 
 .loading {
@@ -242,6 +245,12 @@ textarea {
   --loading-tile-lift: 2px;
   --loading-tile-size: 7px;
 }
+/* Inline beside 14px icons and text (thread list, tool steps). */
+.loading-tiles--xs {
+  --loading-tile-lift: 2px;
+  --loading-tile-stagger: 100ms;
+  --loading-tile-size: 6px;
+}
 .loading-tiles__tile {
   position: relative;
   display: block;
@@ -254,7 +263,7 @@ textarea {
   border-radius: 2px;
   background: var(--miira-color-accent);
   animation: loading-tile-wave 2.1s ease-in-out infinite;
-  animation-delay: calc(var(--tile-col) * 120ms);
+  animation-delay: calc(var(--tile-col) * var(--loading-tile-stagger, 120ms));
 }
 @keyframes loading-tile-wave {
   0%,
@@ -363,10 +372,8 @@ textarea {
   position: relative;
 }
 .menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 50;
+  position: fixed;
+  z-index: 1000;
   min-width: 180px;
   padding: var(--miira-space-1);
   background: var(--miira-color-surface);
@@ -928,6 +935,10 @@ textarea {
   display: inline-flex;
   justify-content: center;
 }
+.thread-list__busy {
+  display: inline-flex;
+  align-items: center;
+}
 .thread-list__dot::before {
   content: "";
   width: 6px;
@@ -1112,6 +1123,71 @@ textarea {
   margin-bottom: var(--miira-space-2);
   font-size: var(--miira-font-size-sm);
   color: var(--miira-color-text-muted);
+}
+/* Waiting messages, stacked on the composer like a pile of notes (Cursor-style). */
+.queue {
+  margin-bottom: var(--miira-space-2);
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-md);
+  background: var(--miira-color-surface);
+  box-shadow: 0 2px 0 0 var(--miira-color-border);
+}
+.queue__head {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-2);
+  padding: var(--miira-space-1) var(--miira-space-3);
+  border-bottom: 1px solid var(--miira-color-border);
+  font-size: var(--miira-font-size-xs);
+  font-weight: 600;
+  color: var(--miira-color-text-muted);
+}
+.queue__paused {
+  margin-left: auto;
+  font-weight: 400;
+}
+.queue__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.queue__item {
+  display: flex;
+  align-items: center;
+  gap: var(--miira-space-2);
+  padding: var(--miira-space-1) var(--miira-space-1) var(--miira-space-1) var(--miira-space-3);
+}
+.queue__item + .queue__item {
+  border-top: 1px solid var(--miira-color-border);
+}
+.queue__text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--miira-font-size-sm);
+  color: var(--miira-color-text);
+  overflow-wrap: anywhere;
+}
+.queue__text svg {
+  margin-right: var(--miira-space-1);
+  vertical-align: -2px;
+  color: var(--miira-color-text-muted);
+}
+.queue__edit {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font-size: var(--miira-font-size-sm);
+}
+.queue__actions {
+  display: flex;
+  align-items: center;
+  flex: none;
 }
 .composer__error {
   margin-top: var(--miira-space-2);

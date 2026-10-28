@@ -35,6 +35,8 @@ ADDED_COLUMNS = [
     "ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind varchar NOT NULL DEFAULT 'webapp'",
     "ALTER TABLE projects ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false",
     "ALTER TABLE projects ADD COLUMN IF NOT EXISTS description varchar NOT NULL DEFAULT ''",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS queue_paused boolean NOT NULL DEFAULT false",
+    "ALTER TABLE turns ADD COLUMN IF NOT EXISTS queued_at timestamptz NOT NULL DEFAULT now()",
 ]
 
 

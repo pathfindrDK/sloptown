@@ -81,6 +81,8 @@ class Project(Base):
     public: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     description: Mapped[str] = mapped_column(String, default="", server_default="")
     active_turn_sub: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Set by Stop while messages wait, so stopping never starts the next turn by itself.
+    queue_paused: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     last_active_at: Mapped[datetime] = _now()
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -119,6 +121,8 @@ class Turn(Base):
     text: Mapped[str] = mapped_column(Text, default="")
     images: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     status: Mapped[str] = mapped_column(String, default="queued")  # queued|running|done|stopped|error
+    # Queue order; "Send nu" moves a turn ahead of the others by giving it an earlier time.
+    queued_at: Mapped[datetime] = _now()
     commit_sha: Mapped[str | None] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

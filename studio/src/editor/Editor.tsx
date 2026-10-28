@@ -71,6 +71,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
       if (busy) setActiveThreadId((cur) => cur ?? busy.id);
     });
     api.budget(project.id).then((b) => dispatch({ event: "local.budget", data: b }));
+    api.queue(project.id).then((q) => dispatch({ event: "queue.changed", data: q }));
     api.events(project.id, dispatch, ac.signal);
     return () => ac.abort();
   }, [project.id]);

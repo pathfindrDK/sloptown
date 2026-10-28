@@ -29,7 +29,7 @@ Contracts (change them first, then the code):
 | `pool.py` | Warm pool: `claim` (`FOR UPDATE SKIP LOCKED`), `refill_once`/`refill_loop` (advisory lock), stale-image discard |
 | `orchestrator.py` | Podman libpod REST (hardened specs, networks, volumes, rename, publish via volume import, runtime roll, editor replace); `FakeOrchestrator` for tests |
 | `containers.py` | httpx clients for vibe-agentd (:4097, bearer) and opencode serve (:4096, basic) in `vibe-dev` |
-| `threads.py` | Threads (= OpenCode sessions) and `TurnManager`: one turn per project + one queued, event mapping, commit after turn |
+| `threads.py` | Threads (= OpenCode sessions) and `TurnManager`: one turn per project, a persistent queue (edit, delete, send now, paused by Stop), event mapping, commit after turn |
 | `files.py` | Files, history, diff, restore via agentd; `commit_turn`; agentd `files.changed` relay |
 | `events.py` | In-process pub/sub (`project:<pid>`, `members:<pid>`) and SSE helpers |
 | `edge.py` | Caddy `forward_auth` (`/edge/auth/app`, `/edge/auth/preview`), `/auth/app-login`, `/edge/session`, `/edge/tls-ask`, dev view-as |
@@ -82,8 +82,14 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
 ### Invariants and gotchas
 
 - **One turn per project.** All threads share one working tree. `TurnManager` holds a
-  per-project lock; submit, finish→start-next and restore all take it. At most one queued
-  turn (`409 queue_full`); budget is checked at submit *and* when a queued turn starts.
+  per-project lock; submit, finish→start-next, the queue edits (edit, delete, send now),
+  stop and restore all take it. Up to `MAX_QUEUED` queued turns (`409 queue_full`); budget
+  is checked at submit *and* when a queued turn starts.
+- **The queue is persistent and the project's.** Queued turns are rows, ordered by
+  `queued_at` ("Send nu" gives a turn an earlier one), and every change publishes the whole
+  queue as `queue.changed`. Stop sets `projects.queue_paused` instead of dropping waiting
+  messages; any send that starts a turn, or "Send nu", clears it. Never call the OpenCode
+  abort while holding the project lock: the aborted turn's `_finish` needs it.
 - **Idle editors are stopped, not removed.** `activity.idle_stop_loop` stops a `vibe-dev`
   after 30 min without activity, a running turn or an open project SSE stream; any later
   access (`containers.dev_host`, preview `forward_auth`) starts it again. Call
@@ -99,7 +105,7 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
   (`test_event_streams_do_not_hold_db_connections`). Otherwise the pool (5 + 10)
   runs dry and every request fails with 500.
 - **Single process.** Turn state and SSE fan-out are in memory: run one uvicorn worker.
-  On startup, turns left `running`/`queued` are marked `error`.
+  On startup, turns left `running` are marked `error`; queued turns stay and start.
 - **Pool claim locking.** `claim` uses `SELECT … FOR UPDATE SKIP LOCKED` and deletes the slot
   row in the caller's transaction; refill runs under a session advisory lock on a dedicated
   connection. An empty pool creates a container on demand (slow path).

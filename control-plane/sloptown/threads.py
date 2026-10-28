@@ -1,21 +1,27 @@
 """Chat threads and AI turns, proxied to `opencode serve` in the project's vibe-dev container.
 
 Each thread is one OpenCode session. All threads of a project share one working
-tree, so only ONE turn runs per project at a time and at most ONE more waits in
-the queue (`409 queue_full` beyond that). While a turn runs,
+tree, so only ONE turn runs per project at a time; messages sent meanwhile wait as
+queued turns (up to MAX_QUEUED, `409 queue_full` beyond). The queue is the
+project's, in the database, so it outlives the page and a control-plane restart:
+builders can edit or delete a waiting message, or send it now (ahead of the
+others, interrupting its own thread's turn). Stop pauses the queue rather than
+emptying it; the next message sent, or "Send nu", resumes it. Every change is
+published as `queue.changed` with the whole queue. While a turn runs,
 `projects.active_turn_sub` names its author so the egress proxy charges the
 build budget to the right teacher. When a turn ends, the tree is committed via
 vibe-agentd with `Vibe-Thread`/`Vibe-Author` trailers.
 
 The run state lives in this process (`TurnManager`); the `turns` table records
-it. On startup, turns left running/queued by a previous process are marked error.
+it. On startup, turns left running by a previous process are marked error and the
+queue carries on.
 """
 
 import asyncio
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -38,6 +44,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 TURN_TIMEOUT = 30 * 60
+MAX_QUEUED = 20
 MAX_OUTPUT = 4000
 
 
@@ -116,6 +123,35 @@ def thread_json(t: Thread, status: str = "idle") -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------- queue
+
+def queue_item(t: Turn) -> dict[str, Any]:
+    # Images stay on the server (they can be megabytes); the studio only marks that there are some.
+    return {
+        "id": t.id,
+        "threadId": t.thread_id,
+        "text": t.text,
+        "imageCount": len(t.images or []),
+        "authorSub": t.author_sub,
+        "queuedAt": t.queued_at.isoformat() if t.queued_at else None,
+    }
+
+
+async def queued_turns(db: Any, pid: str) -> list[Turn]:
+    q = select(Turn).where(Turn.project_id == pid, Turn.status == "queued").order_by(Turn.queued_at, Turn.created_at)
+    return list((await db.execute(q)).scalars().all())
+
+
+async def queue_json(db: Any, pid: str) -> dict[str, Any]:
+    project = await db.get(Project, pid)
+    items = await queued_turns(db, pid)
+    return {"items": [queue_item(t) for t in items], "paused": bool(items) and bool(project and project.queue_paused)}
+
+
+async def publish_queue(db: Any, pid: str) -> None:
+    hub.publish(f"project:{pid}", "queue.changed", await queue_json(db, pid))
+
+
 # ---------------------------------------------------------------- turn manager
 
 class TurnManager:
@@ -140,12 +176,10 @@ class TurnManager:
                     retryAt=retry_at.isoformat() if retry_at else None,
                 )
             busy = project.id in self._running
-            if busy:
-                queued = (
-                    await db.execute(select(Turn.id).where(Turn.project_id == project.id, Turn.status == "queued"))
-                ).first()
-                if queued:
-                    raise ApiError(409, "queue_full", "Der venter allerede en besked. Vent til den er færdig.")
+            if busy and len(await queued_turns(db, project.id)) >= MAX_QUEUED:
+                raise ApiError(409, "queue_full", f"Der venter allerede {MAX_QUEUED} beskeder. Vent til nogle er sendt.")
+            if not busy:
+                project.queue_paused = False
             turn = Turn(
                 id=uuid.uuid4().hex,
                 project_id=project.id,
@@ -161,6 +195,7 @@ class TurnManager:
                 hub.publish(f"project:{project.id}", "turn.queued", {"threadId": thread.id, "turnId": turn.id})
             else:
                 self._start(project.id, turn.id)
+            await publish_queue(db, project.id)
             return {"turnId": turn.id, "queued": busy}
 
     def _start(self, pid: str, turn_id: str) -> None:
@@ -168,27 +203,80 @@ class TurnManager:
         self._tasks[pid] = asyncio.create_task(self._run(pid, turn_id), name=f"turn-{turn_id}")
 
     async def stop(self, db: Any, thread: Thread) -> bool:
+        """Abort the thread's running turn and pause the queue; waiting messages are kept."""
         pid = thread.project_id
-        stopped = False
-        queued = (
-            await db.execute(select(Turn).where(Turn.thread_id == thread.id, Turn.status == "queued"))
-        ).scalars().all()
-        for t in queued:
-            t.status = "stopped"
-            t.finished_at = datetime.now(UTC)
-            hub.publish(f"project:{pid}", "turn.finished", {"threadId": thread.id, "turnId": t.id, "commitSha": None, "changedFiles": [], "status": "stopped"})
-            stopped = True
-        await db.commit()
-        turn_id = self._running.get(pid)
-        if turn_id:
-            turn = await db.get(Turn, turn_id)
-            if turn and turn.thread_id == thread.id:
-                self._stop.add(turn_id)
-                project = await db.get(Project, pid)
-                async with await opencode(project) as client:
-                    await client.post(f"/session/{thread.opencode_session_id}/abort")
-                stopped = True
-        return stopped
+        async with self.lock(pid):
+            turn_id = self._running.get(pid)
+            turn = await db.get(Turn, turn_id) if turn_id else None
+            if turn is None or turn.thread_id != thread.id:
+                return False
+            project = await db.get(Project, pid)
+            project.queue_paused = True
+            await db.commit()
+            self._stop.add(turn_id)
+        await publish_queue(db, pid)
+        await self._abort(project, thread)
+        return True
+
+    async def _abort(self, project: Project, thread: Thread) -> None:
+        async with await opencode(project) as client:
+            await client.post(f"/session/{thread.opencode_session_id}/abort")
+
+    async def _queued(self, db: Any, turn_id: str) -> Turn:
+        turn = await db.get(Turn, turn_id)
+        if turn is None or turn.status != "queued":
+            raise ApiError(409, "not_queued", "Beskeden er allerede sendt")
+        return turn
+
+    async def edit(self, db: Any, turn_id: str, text: str) -> None:
+        turn = await db.get(Turn, turn_id)
+        if turn is None:
+            raise not_found("Beskeden findes ikke")
+        async with self.lock(turn.project_id):
+            turn = await self._queued(db, turn_id)
+            turn.text = text
+            await db.commit()
+        await publish_queue(db, turn.project_id)
+
+    async def drop(self, db: Any, turn_id: str) -> None:
+        turn = await db.get(Turn, turn_id)
+        if turn is None:
+            raise not_found("Beskeden findes ikke")
+        pid = turn.project_id
+        async with self.lock(pid):
+            turn = await self._queued(db, turn_id)
+            await db.delete(turn)
+            await db.commit()
+        await publish_queue(db, pid)
+
+    async def send_now(self, db: Any, turn_id: str) -> None:
+        """Put a waiting message first and resume the queue. If its own thread is working,
+        that turn is aborted so the message runs next; another thread's turn (perhaps a
+        colleague's) is left to finish."""
+        turn = await db.get(Turn, turn_id)
+        if turn is None:
+            raise not_found("Beskeden findes ikke")
+        pid = turn.project_id
+        interrupt: Thread | None = None
+        async with self.lock(pid):
+            turn = await self._queued(db, turn_id)
+            first = await queued_turns(db, pid)
+            if first and first[0].id != turn.id:
+                turn.queued_at = first[0].queued_at - timedelta(milliseconds=1)
+            project = await db.get(Project, pid)
+            project.queue_paused = False
+            await db.commit()
+            running_id = self._running.get(pid)
+            if running_id is None:
+                await self._start_next(db, pid)
+            else:
+                running = await db.get(Turn, running_id)
+                if running and running.thread_id == turn.thread_id:
+                    self._stop.add(running_id)
+                    interrupt = await db.get(Thread, turn.thread_id)
+        await publish_queue(db, pid)
+        if interrupt is not None:
+            await self._abort(project, interrupt)
 
     async def wait_idle(self, pid: str) -> None:
         """Test helper: wait until the project has no running or queued turn."""
@@ -259,23 +347,27 @@ class TurnManager:
         async with self.lock(pid), sessionmaker()() as db:
             self._running.pop(pid, None)
             self._tasks.pop(pid, None)
-            nxt = (
-                await db.execute(
-                    select(Turn).where(Turn.project_id == pid, Turn.status == "queued").order_by(Turn.created_at).limit(1)
-                )
-            ).scalar_one_or_none()
-            if nxt is None:
-                return
+            await self._start_next(db, pid)
+            await publish_queue(db, pid)
+
+    async def _start_next(self, db: Any, pid: str) -> None:
+        """Start the first waiting turn unless the queue is paused. Caller holds the lock."""
+        project = await db.get(Project, pid)
+        if project is None or project.queue_paused:
+            return
+        while (waiting := await queued_turns(db, pid)):
+            nxt = waiting[0]
             allowed, retry_at = await budgets.check_build_allowed(db, nxt.author_sub)
-            if not allowed:
-                nxt.status = "error"
-                nxt.finished_at = datetime.now(UTC)
+            if allowed:
+                nxt.status = "running"
                 await db.commit()
-                hub.publish(f"project:{pid}", "turn.finished", {"threadId": nxt.thread_id, "turnId": nxt.id, "commitSha": None, "changedFiles": [], "status": "error", "error": "budget_blocked", "retryAt": retry_at.isoformat() if retry_at else None})
+                self._start(pid, nxt.id)
                 return
-            nxt.status = "running"
+            # The author is out of budget: their message fails, the next one may still run.
+            nxt.status = "error"
+            nxt.finished_at = datetime.now(UTC)
             await db.commit()
-            self._start(pid, nxt.id)
+            hub.publish(f"project:{pid}", "turn.finished", {"threadId": nxt.thread_id, "turnId": nxt.id, "commitSha": None, "changedFiles": [], "status": "error", "error": "budget_blocked", "retryAt": retry_at.isoformat() if retry_at else None})
 
     async def _converse(self, project: Project, thread: Thread, author: User, turn: Turn) -> str:
         """Send the prompt and relay OpenCode's events until the session goes idle."""
@@ -334,13 +426,18 @@ class TurnManager:
         return status
 
     async def recover(self) -> None:
-        """Mark turns orphaned by a previous process as errored."""
+        """Mark turns orphaned by a previous process as errored, then carry on with the queues."""
         async with sessionmaker()() as db:
             await db.execute(
-                update(Turn).where(Turn.status.in_(["running", "queued"])).values(status="error", finished_at=datetime.now(UTC))
+                update(Turn).where(Turn.status == "running").values(status="error", finished_at=datetime.now(UTC))
             )
             await db.execute(update(Project).values(active_turn_sub=None))
             await db.commit()
+            waiting = (await db.execute(select(Turn.project_id).where(Turn.status == "queued").distinct())).scalars().all()
+        for pid in waiting:
+            async with self.lock(pid), sessionmaker()() as db:
+                if pid not in self._running:
+                    await self._start_next(db, pid)
 
 
 turns = TurnManager()
@@ -447,6 +544,48 @@ async def post_message(tid: str, body: MessageIn, principal: CurrentPrincipal, d
         if not img.dataUrl.startswith(f"data:{img.mime};base64,"):
             raise ApiError(400, "bad_image", "Billedet skal være en data-URL")
     return await turns.submit(db, project, thread, principal.user, body.text, [i.model_dump() for i in body.images])
+
+
+@router.get("/api/projects/{pid}/queue")
+async def get_queue(pid: str, principal: CurrentPrincipal, db: Db) -> dict[str, Any]:
+    await require_project(db, principal, pid, "editor")
+    return await queue_json(db, pid)
+
+
+async def _load_turn(db: Any, principal: Any, turn_id: str) -> Turn:
+    turn = await db.get(Turn, turn_id)
+    if turn is None:
+        raise not_found("Beskeden findes ikke")
+    await require_project(db, principal, turn.project_id, "editor")
+    return turn
+
+
+class QueuedEdit(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+@router.patch("/api/turns/{turn_id}")
+async def edit_queued(turn_id: str, body: QueuedEdit, principal: CurrentPrincipal, db: Db) -> dict[str, Any]:
+    turn = await _load_turn(db, principal, turn_id)
+    await turns.edit(db, turn_id, body.text.strip())
+    return await queue_json(db, turn.project_id)
+
+
+@router.delete("/api/turns/{turn_id}")
+async def delete_queued(turn_id: str, principal: CurrentPrincipal, db: Db) -> dict[str, Any]:
+    turn = await _load_turn(db, principal, turn_id)
+    pid = turn.project_id
+    await turns.drop(db, turn_id)
+    return await queue_json(db, pid)
+
+
+@router.post("/api/turns/{turn_id}/send-now")
+async def send_queued_now(turn_id: str, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
+    turn = await _load_turn(db, principal, turn_id)
+    await turns.send_now(db, turn_id)
+    audit(db, "turn.send_now", actor_sub=principal.sub, project_id=turn.project_id, details={"turn": turn_id}, request=request)
+    await db.commit()
+    return await queue_json(db, turn.project_id)
 
 
 @router.post("/api/threads/{tid}/stop")

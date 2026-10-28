@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { AppWindow, Cpu } from "lucide-react";
 import { api } from "../api/client";
+import { LoadingTiles } from "../components/Loading";
 import type { Project, ProjectKind } from "../api/types";
 import { useT } from "../lib/i18n";
 
@@ -37,7 +38,7 @@ export function StartChooser({ pid, onCreated }: { pid: string; onCreated: (p: P
       onClick={() => start(kind)}
     >
       <span className="start__icon" aria-hidden>
-        {busy === kind ? <span className="spinner" /> : <Icon size={28} />}
+        {busy === kind ? <LoadingTiles /> : <Icon size={28} />}
       </span>
       <strong>{copy[kind][0]}</strong>
       <span className="muted">{copy[kind][1]}</span>

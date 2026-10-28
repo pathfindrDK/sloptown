@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Clock,
   FileText,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -16,7 +15,9 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../api/client";
-import { ApiError, type ImageAttachment, type Message, type Part, type Thread } from "../api/types";
+import { LoadingTiles } from "../components/Loading";
+import { QueuedMessages } from "./QueuedMessages";
+import { ApiError, type ImageAttachment, type Message, type Part, type QueueItem, type Thread } from "../api/types";
 import type { Action, ProjectState } from "../lib/projectState";
 import { useT } from "../lib/i18n";
 import { Menu } from "../components/Menu";
@@ -40,6 +41,8 @@ export function ChatPanel(props: Props) {
   const t = useT();
   const [showArchived, setShowArchived] = useState(false);
   const [renaming, setRenaming] = useState<Thread | null>(null);
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
 
   const threads = state.threads.filter((th) => showArchived || !th.archived);
   const active = state.threads.find((th) => th.id === activeThreadId) ?? null;
@@ -48,6 +51,21 @@ export function ChatPanel(props: Props) {
     if (!activeThreadId || state.messages[activeThreadId]) return;
     api.messages(activeThreadId).then((messages) => dispatch({ event: "local.messages", data: { threadId: activeThreadId, messages } }));
   }, [activeThreadId, state.messages, dispatch]);
+
+  // The queue is the control plane's; these only ask it to change and show what failed.
+  // The new queue arrives as queue.changed for every open tab, this one included.
+  const changeQueue = async (call: () => Promise<unknown>) => {
+    setQueueBusy(true);
+    setQueueError(null);
+    try {
+      await call();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "not_queued") return;
+      setQueueError(e instanceof Error ? e.message : t("common.error"));
+    } finally {
+      setQueueBusy(false);
+    }
+  };
 
   // Threads are created lazily on the first send, so "Ny tråd" just clears the view.
   const newThread = () => setActiveThreadId(null);
@@ -86,7 +104,11 @@ export function ChatPanel(props: Props) {
               className={`thread-list__item${th.id === activeThreadId ? " is-active" : ""}${th.archived ? " is-archived" : ""}`}
               onClick={() => setActiveThreadId(th.id)}
             >
-              <ThreadStatus status={th.status} />
+              <ThreadStatus
+                status={
+                  th.id === state.runningThreadId ? "running" : state.queue.some((q) => q.threadId === th.id) ? "queued" : "idle"
+                }
+              />
               <span className="thread-list__title">{th.title}</span>
               <Menu
                 label={th.title}
@@ -107,6 +129,14 @@ export function ChatPanel(props: Props) {
         thread={active}
         messages={active ? (state.messages[active.id] ?? []) : []}
         createThread={createThread}
+        queue={active ? state.queue.filter((m) => m.threadId === active.id) : []}
+        queueBusy={queueBusy}
+        queueError={queueError}
+        onSendNow={(m) => changeQueue(() => api.sendNow(m.id))}
+        onEditQueued={(m, text) =>
+          changeQueue(() => (text.trim() ? api.editQueued(m.id, text.trim()) : api.deleteQueued(m.id)))
+        }
+        onDeleteQueued={(m) => changeQueue(() => api.deleteQueued(m.id))}
       />
       {renaming && (
         <RenameModal
@@ -123,7 +153,12 @@ export function ChatPanel(props: Props) {
 }
 
 function ThreadStatus({ status }: { status: Thread["status"] }) {
-  if (status === "running") return <Loader2 size={14} className="spin accent" aria-label="running" />;
+  if (status === "running")
+    return (
+      <span className="thread-list__busy" role="img" aria-label="running">
+        <LoadingTiles size="xs" />
+      </span>
+    );
   if (status === "queued") return <Clock size={14} className="muted" aria-label="queued" />;
   return <span className="thread-list__dot" aria-hidden />;
 }
@@ -166,7 +201,23 @@ function Conversation({
   blocked,
   onBlocked,
   createThread,
-}: Props & { thread: Thread | null; messages: Message[]; createThread: (firstMessage: string) => Promise<Thread> }) {
+  queue,
+  queueBusy,
+  queueError,
+  onSendNow,
+  onEditQueued,
+  onDeleteQueued,
+}: Props & {
+  thread: Thread | null;
+  messages: Message[];
+  createThread: (firstMessage: string) => Promise<Thread>;
+  queue: QueueItem[];
+  queueBusy: boolean;
+  queueError: string | null;
+  onSendNow: (m: QueueItem) => void;
+  onEditQueued: (m: QueueItem, text: string) => void;
+  onDeleteQueued: (m: QueueItem) => void;
+}) {
   const t = useT();
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
@@ -198,7 +249,7 @@ function Conversation({
 
   const running = !!thread && state.runningThreadId === thread.id;
   const otherRunning = !!state.runningThreadId && !running;
-  const queuedHere = !!thread && state.queuedThreadId === thread.id;
+  const busy = !!state.runningThreadId;
 
   const addFiles = async (files: FileList | File[]) => {
     const imgs = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 4);
@@ -223,6 +274,7 @@ function Conversation({
     setError(null);
     try {
       const th = thread ?? (await createThread(text.trim()));
+      // While the AI works the control plane queues the message (and keeps it if the page closes).
       await api.send(th.id, text.trim(), images.length ? images : undefined);
       setText("");
       setImages([]);
@@ -244,12 +296,7 @@ function Conversation({
         ))}
         {running && (
           <div className="conversation__status">
-            <Loader2 size={14} className="spin" /> {t("chat.running")}
-          </div>
-        )}
-        {queuedHere && (
-          <div className="conversation__status">
-            <Clock size={14} /> {t("chat.queued")}
+            <LoadingTiles size="sm" /> {t("chat.running")}
           </div>
         )}
       </div>
@@ -261,7 +308,16 @@ function Conversation({
           void addFiles(e.dataTransfer.files);
         }}
       >
-        {otherRunning && !queuedHere && <div className="composer__note">{t("chat.otherRunning")}</div>}
+        {otherRunning && <div className="composer__note">{t("chat.otherRunning")}</div>}
+        <QueuedMessages
+          messages={queue}
+          paused={state.queuePaused}
+          busy={queueBusy}
+          onSendNow={onSendNow}
+          onEdit={onEditQueued}
+          onDelete={onDeleteQueued}
+        />
+        {queueError && <div className="composer__error">{queueError}</div>}
         <form
           className="composer__shell"
           onSubmit={(e) => {
@@ -292,7 +348,7 @@ function Conversation({
             value={text}
             rows={1}
             autoFocus
-            placeholder={t("chat.placeholder")}
+            placeholder={t(busy ? "chat.placeholderBusy" : "chat.placeholder")}
             onChange={(e) => setText(e.target.value)}
             onPaste={(e: ClipboardEvent) => {
               if (e.clipboardData.files.length) {
@@ -318,7 +374,7 @@ function Conversation({
             >
               <Plus size={20} />
             </button>
-            {running && thread ? (
+            {running && thread && !text.trim() ? (
               <button
                 type="button"
                 className="composer__send composer__send--stop"
@@ -333,8 +389,8 @@ function Conversation({
                 type="submit"
                 className="composer__send"
                 disabled={!text.trim() || sending}
-                title={t("chat.send")}
-                aria-label={t("chat.send")}
+                title={t(busy ? "chat.queue.add" : "chat.send")}
+                aria-label={t(busy ? "chat.queue.add" : "chat.send")}
               >
                 <ArrowUp size={18} />
               </button>
@@ -372,7 +428,7 @@ function PartView({ part }: { part: Part }) {
         <div className={`tool tool--${part.status}`}>
           <button className="tool__head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            {part.status === "running" ? <Loader2 size={14} className="spin" /> : <Icon size={14} />}
+            {part.status === "running" ? <LoadingTiles size="xs" /> : <Icon size={14} />}
             <span className="tool__title">{part.title || part.tool}</span>
           </button>
           {open && (

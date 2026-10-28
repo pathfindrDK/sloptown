@@ -1,6 +1,6 @@
 // Miira's loading pattern (design guide § Loading): three accent tiles on a 3D wave.
 
-export function LoadingTiles({ size = "md" }: { size?: "md" | "sm" }) {
+export function LoadingTiles({ size = "md" }: { size?: "md" | "sm" | "xs" }) {
   return (
     <span className={`loading-tiles loading-tiles--${size}`} aria-hidden>
       {[0, 1, 2].map((col) => (

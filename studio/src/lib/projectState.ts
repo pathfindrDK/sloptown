@@ -1,11 +1,13 @@
 // Reducer for the editor's live state, fed by the project SSE stream.
-import type { BudgetStatus, Message, Part, ProjectEvent, Thread } from "../api/types";
+import type { BudgetStatus, Message, Part, ProjectEvent, QueueItem, Thread } from "../api/types";
 
 export type ProjectState = {
   threads: Thread[];
   messages: Record<string, Message[]>; // by thread id
   runningThreadId: string | null;
   queuedThreadId: string | null;
+  queue: QueueItem[];
+  queuePaused: boolean;
   changedFiles: string[]; // changed by the last finished turn (or in progress)
   lastCommitSha: string | null;
   budget: BudgetStatus | null;
@@ -18,6 +20,8 @@ export const initialProjectState: ProjectState = {
   messages: {},
   runningThreadId: null,
   queuedThreadId: null,
+  queue: [],
+  queuePaused: false,
   changedFiles: [],
   lastCommitSha: null,
   budget: null,
@@ -69,7 +73,19 @@ const uniq = (xs: string[]) => Array.from(new Set(xs));
 export function projectReducer(state: ProjectState, action: Action): ProjectState {
   switch (action.event) {
     case "local.threads":
-      return { ...state, threads: action.data };
+      // Coming back to the page mid-turn: the thread list is what says a turn is under way.
+      return {
+        ...state,
+        threads: action.data,
+        runningThreadId: action.data.find((t) => t.status === "running")?.id ?? state.runningThreadId,
+      };
+    case "queue.changed":
+      return {
+        ...state,
+        queue: action.data.items,
+        queuePaused: action.data.paused,
+        queuedThreadId: action.data.items[0]?.threadId ?? null,
+      };
     case "local.messages":
       return { ...state, messages: { ...state.messages, [action.data.threadId]: action.data.messages } };
     case "local.budget":

@@ -1,4 +1,4 @@
-"""Threads and turns: OpenCode event mapping, one turn per project + one queued, commit, stop, budget block."""
+"""Threads and turns: OpenCode event mapping, one turn per project + a persistent queue, commit, stop, budget block."""
 
 import asyncio
 import json
@@ -85,7 +85,8 @@ async def setup(env, pid="t1"):
     return owner, oc, thread
 
 
-async def test_turn_queue_commit_and_events(env):
+async def test_turn_queue_commit_and_events(env, monkeypatch):
+    from sloptown import threads as threads_mod
     from sloptown.models import Project, Turn
     from sloptown.threads import turns
     from sqlalchemy import select
@@ -105,6 +106,7 @@ async def test_turn_queue_commit_and_events(env):
     assert r.json()["queued"] is True
     threads = (await env.client.get("/api/projects/t1/threads", headers=owner)).json()
     assert threads[0]["status"] == "running"
+    monkeypatch.setattr(threads_mod, "MAX_QUEUED", 1)
     r = await env.client.post(f"/api/threads/{tid}/messages", json={"text": "En til"}, headers=owner)
     assert r.status_code == 409 and r.json()["error"] == "queue_full"
 
@@ -196,3 +198,99 @@ async def test_restore_blocked_while_running(env):
     await turns.wait_idle("t1")
     r = await env.client.post("/api/projects/t1/restore", json={"sha": "abcdef1"}, headers=owner)
     assert r.status_code == 200 and r.json()["sha"] == "d00d"
+
+
+def prompt_texts(oc):
+    return [p["parts"][0]["text"] for p in oc.prompts]
+
+
+async def queue(env, owner, pid="t1"):
+    return (await env.client.get(f"/api/projects/{pid}/queue", headers=owner)).json()
+
+
+async def test_queue_edit_delete_and_send_now(env):
+    from sloptown.threads import turns
+
+    owner, oc, thread = await setup(env)
+    tid = thread["id"]
+    for text in ["Lav en quiz", "Gør den blå", "Tilføj point", "Tilføj lyd"]:
+        await env.client.post(f"/api/threads/{tid}/messages", json={"text": text}, headers=owner)
+    await until(lambda: len(oc.gates) == 1)
+    q = await queue(env, owner)
+    assert [i["text"] for i in q["items"]] == ["Gør den blå", "Tilføj point", "Tilføj lyd"] and q["paused"] is False
+    blue, points, sound = (i["id"] for i in q["items"])
+
+    r = await env.client.patch(f"/api/turns/{blue}", json={"text": "Gør den grøn"}, headers=owner)
+    assert [i["text"] for i in r.json()["items"]][0] == "Gør den grøn"
+    r = await env.client.delete(f"/api/turns/{points}", headers=owner)
+    assert [i["id"] for i in r.json()["items"]] == [blue, sound]
+    assert env.events("queue.changed")[-1]["items"][1]["id"] == sound
+
+    # Send nu jumps the queue and interrupts its own thread's turn.
+    r = await env.client.post(f"/api/turns/{sound}/send-now", headers=owner)
+    assert [i["id"] for i in r.json()["items"]] == [sound, blue]
+    await until(lambda: oc.aborted.is_set() and len(oc.gates) == 2)
+    assert prompt_texts(oc)[1] == "Tilføj lyd"
+    oc.aborted.clear()
+    oc.gates[1].set()
+    await until(lambda: len(oc.gates) == 3)
+    oc.gates[2].set()
+    await turns.wait_idle("t1")
+    assert prompt_texts(oc) == ["Lav en quiz", "Tilføj lyd", "Gør den grøn"]
+    assert [f["status"] for f in env.events("turn.finished")] == ["stopped", "done", "done"]
+
+    r = await env.client.patch(f"/api/turns/{blue}", json={"text": "for sent"}, headers=owner)
+    assert r.status_code == 409 and r.json()["error"] == "not_queued"
+
+
+async def test_stop_pauses_the_queue_and_the_next_send_resumes_it(env):
+    from sloptown.threads import turns
+
+    owner, oc, thread = await setup(env)
+    tid = thread["id"]
+    await env.client.post(f"/api/threads/{tid}/messages", json={"text": "Lav en quiz"}, headers=owner)
+    await until(lambda: len(oc.gates) == 1)
+    await env.client.post(f"/api/threads/{tid}/messages", json={"text": "Gør den blå"}, headers=owner)
+    r = await env.client.post(f"/api/threads/{tid}/stop", headers=owner)
+    assert r.json() == {"stopped": True}
+    await turns.wait_idle("t1")
+    q = await queue(env, owner)
+    assert [i["text"] for i in q["items"]] == ["Gør den blå"] and q["paused"] is True
+    assert prompt_texts(oc) == ["Lav en quiz"]
+
+    # A new message starts at once and lifts the pause; the waiting one follows it.
+    oc.aborted.clear()
+    await env.client.post(f"/api/threads/{tid}/messages", json={"text": "Lav den om"}, headers=owner)
+    await until(lambda: len(oc.gates) == 2)
+    assert (await queue(env, owner))["paused"] is False
+    oc.gates[1].set()
+    await until(lambda: len(oc.gates) == 3)
+    oc.gates[2].set()
+    await turns.wait_idle("t1")
+    assert prompt_texts(oc) == ["Lav en quiz", "Lav den om", "Gør den blå"]
+
+
+async def test_queue_survives_a_restart(env):
+    from sloptown.models import Turn
+    from sloptown.threads import turns
+
+    owner, oc, thread = await setup(env)
+    env.db.add(Turn(id="left", project_id="t1", thread_id=thread["id"], author_sub="s-t", text="Lav en quiz", images=[], status="running"))
+    env.db.add(Turn(id="waits", project_id="t1", thread_id=thread["id"], author_sub="s-t", text="Gør den blå", images=[], status="queued"))
+    await env.db.commit()
+
+    await turns.recover()
+    await until(lambda: len(oc.gates) == 1)
+    assert prompt_texts(oc) == ["Gør den blå"]
+    oc.gates[0].set()
+    await turns.wait_idle("t1")
+    left = await env.db.get(Turn, "left")
+    await env.db.refresh(left)
+    assert left.status == "error"
+
+
+async def test_queue_needs_an_editor(env):
+    owner, oc, thread = await setup(env)
+    stranger = await env.user("s-x")
+    assert (await env.client.get("/api/projects/t1/queue", headers=stranger)).status_code in (403, 404)
+    assert (await env.client.delete("/api/turns/nope", headers=owner)).status_code == 404

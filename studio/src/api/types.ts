@@ -84,6 +84,19 @@ export type LaunchResult = { token: string; user: Me["user"]; fileId: string; fi
 
 export type ImageAttachment = { mime: string; dataUrl: string };
 
+/** A message waiting for the project's AI (the control plane keeps the queue). */
+export type QueueItem = {
+  id: string;
+  threadId: string;
+  text: string;
+  imageCount: number;
+  authorSub: string;
+  queuedAt: string | null;
+};
+
+/** `paused`: Stop was pressed while messages waited; the next send resumes. */
+export type QueueState = { items: QueueItem[]; paused: boolean };
+
 export type ProjectEvent =
   | { event: "turn.started"; data: { threadId: string; turnId: string } }
   | { event: "message.part"; data: { threadId: string; messageId: string; index: number; part: Part } }
@@ -99,6 +112,7 @@ export type ProjectEvent =
       };
     }
   | { event: "turn.queued"; data: { threadId: string; turnId: string } }
+  | { event: "queue.changed"; data: QueueState }
   | { event: "files.changed"; data: { paths: string[] } }
   | { event: "budget"; data: BudgetStatus }
   | { event: "thread.updated"; data: Thread }

@@ -11,6 +11,8 @@ import {
   type Message,
   type Project,
   type ProjectEvent,
+  type QueueItem,
+  type QueueState,
   type Thread,
 } from "./types";
 
@@ -88,7 +90,8 @@ type ProjectData = {
   tree: Record<string, string>;
   changed: Set<string>;
   running: { threadId: string; abort: boolean } | null;
-  queued: { threadId: string; text: string } | null;
+  queue: QueueItem[];
+  queuePaused: boolean;
   usedTokens: number;
 };
 
@@ -97,6 +100,33 @@ const listeners = new Map<string, Set<(e: ProjectEvent) => void>>();
 
 function emit(pid: string, e: ProjectEvent) {
   listeners.get(pid)?.forEach((l) => l(e));
+}
+
+function queueState(d: ProjectData): QueueState {
+  return { items: d.queue, paused: d.queuePaused && d.queue.length > 0 };
+}
+
+function emitQueue(d: ProjectData): QueueState {
+  const q = queueState(d);
+  setTimeout(() => emit(d.project.id, { event: "queue.changed", data: q }));
+  return q;
+}
+
+function runNext(d: ProjectData) {
+  if (d.running || d.queuePaused || !d.queue.length) return;
+  const [q, ...rest] = d.queue;
+  d.queue = rest;
+  emitQueue(d);
+  const qth = d.threads.find((t) => t.id === q.threadId);
+  if (qth) void runTurn(d, qth, q.text);
+}
+
+function findQueued(turnId: string): [ProjectData, QueueItem] {
+  for (const d of projects.values()) {
+    const q = d.queue.find((x) => x.id === turnId);
+    if (q) return [d, q];
+  }
+  throw new ApiError(409, "not_queued", "Beskeden er allerede sendt");
 }
 
 function budgetFor(d: ProjectData): BudgetStatus {
@@ -145,7 +175,8 @@ function makeProject(pid: string, title: string, seeded: boolean): ProjectData {
     tree: { ...TEMPLATE },
     changed: new Set(),
     running: null,
-    queued: null,
+    queue: [],
+    queuePaused: false,
     usedTokens: 1_240_000,
   };
   if (seeded) {
@@ -276,12 +307,7 @@ async function runTurn(d: ProjectData, th: Thread, text: string) {
   emit(pid, { event: "turn.finished", data: { threadId: th.id, turnId, commitSha: commit.sha, changedFiles: [path], status: stopped ? "stopped" : "done" } });
   emit(pid, { event: "budget", data: budgetFor(d) });
 
-  if (d.queued) {
-    const q = d.queued;
-    d.queued = null;
-    const qth = d.threads.find((t) => t.id === q.threadId);
-    if (qth) void runTurn(d, qth, q.text);
-  }
+  runNext(d);
 }
 
 type Handler = (m: RegExpMatchArray, body: any) => unknown;
@@ -346,12 +372,13 @@ const routes: [string, RegExp, Handler][] = [
       if (budgetFor(d).build.state === "blocked") throw new ApiError(429, "budget_blocked", "Budget opbrugt", { retryAt: nextMonday() });
       const turnId = id();
       if (d.running) {
-        if (d.queued) throw new ApiError(409, "queue_full", "Der står allerede en besked i kø");
-        d.queued = { threadId: th.id, text: b.text };
-        th.status = "queued";
-        setTimeout(() => emit(d.project.id, { event: "turn.queued", data: { threadId: th.id, turnId } }));
+        if (d.queue.length >= 20) throw new ApiError(409, "queue_full", "Der står allerede 20 beskeder i kø");
+        d.queue.push({ id: turnId, threadId: th.id, text: b.text, imageCount: b.images?.length ?? 0, authorSub: me.user.sub, queuedAt: now() });
+        emitQueue(d);
         return { turnId, queued: true };
       }
+      d.queuePaused = false;
+      emitQueue(d);
       void runTurn(d, th, b.text);
       return { turnId, queued: false };
     },
@@ -361,8 +388,43 @@ const routes: [string, RegExp, Handler][] = [
     /^\/api\/threads\/([^/]+)\/stop$/,
     (m) => {
       const [d] = findThread(m[1]);
-      if (d.running) d.running.abort = true;
+      if (d.running?.threadId === m[1]) {
+        d.running.abort = true;
+        d.queuePaused = true;
+        emitQueue(d);
+      }
       return {};
+    },
+  ],
+  ["GET", /^\/api\/projects\/([^/]+)\/queue$/, (m) => queueState(get(m[1]))],
+  [
+    "PATCH",
+    /^\/api\/turns\/([^/]+)$/,
+    (m, b) => {
+      const [d, q] = findQueued(m[1]);
+      q.text = b.text;
+      return emitQueue(d);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/api\/turns\/([^/]+)$/,
+    (m) => {
+      const [d, q] = findQueued(m[1]);
+      d.queue = d.queue.filter((x) => x !== q);
+      return emitQueue(d);
+    },
+  ],
+  [
+    "POST",
+    /^\/api\/turns\/([^/]+)\/send-now$/,
+    (m) => {
+      const [d, q] = findQueued(m[1]);
+      d.queue = [q, ...d.queue.filter((x) => x !== q)];
+      d.queuePaused = false;
+      if (d.running?.threadId === q.threadId) d.running.abort = true;
+      else runNext(d);
+      return emitQueue(d);
     },
   ],
   ["GET", /^\/api\/projects\/([^/]+)\/files$/, (m) => ({ files: files(get(m[1])) })],
