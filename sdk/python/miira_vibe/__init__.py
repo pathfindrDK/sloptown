@@ -10,7 +10,7 @@ See sdk/AGENTS.md for the full reference and versioning rules.
 
 from . import ai, db, members
 from .ai import BudgetExceeded
-from .identity import ROLE_RANK, Role, User, current_user, require_role
+from .identity import ROLE_RANK, Role, User, current_user, optional_user, require_role
 from .members import Member, on_members_changed
 from .router import setup
 
@@ -27,6 +27,7 @@ __all__ = [
     "db",
     "members",
     "on_members_changed",
+    "optional_user",
     "require_role",
     "setup",
 ]

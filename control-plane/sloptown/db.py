@@ -33,6 +33,8 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 ADDED_COLUMNS = [
     "ALTER TABLE projects ADD COLUMN IF NOT EXISTS kind varchar NOT NULL DEFAULT 'webapp'",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS description varchar NOT NULL DEFAULT ''",
 ]
 
 

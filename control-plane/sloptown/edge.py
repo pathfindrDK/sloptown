@@ -113,14 +113,29 @@ def _identity_headers(member_id: str, name: str, role: str, classes: list[str], 
     }
 
 
+async def _app_upstream(project: Project) -> str:
+    try:
+        host = await get_orchestrator().address(runtime_container_name(project.id), project.network_name or "")
+    except OrchestratorError:
+        raise ApiError(503, "not_running", "Vibe starter op. Prøv igen om lidt.")
+    return f"{host}:{RUNTIME_PORT}"
+
+
 async def _forward_auth(request: Request, db: Db, kind: str) -> Response:
     project = await _project_for_host(db, request, kind)
     if kind == "app" and not project.published_sha:
         raise ApiError(404, "not_published", "Vibe er ikke udgivet")
     sub = await _host_session_sub(db, request, project, kind)
+    role = await role_for_sub(db, project, sub) if sub else None
+    # A public app lets everyone in. Without a member session the app gets no X-Vibe-User,
+    # so the SDK's current_user answers 401 and optional_user None: nobody is anyone.
+    if kind == "app" and project.public and role is None:
+        return Response(
+            status_code=200,
+            headers={"X-Vibe-Edge-Secret": get_settings().edge_secret, "X-Vibe-Upstream": await _app_upstream(project)},
+        )
     if sub is None:
         return _login_redirect(project, kind, request)
-    role = await role_for_sub(db, project, sub)
     if role is None or (kind == "preview" and ROLE_RANK[role] < ROLE_RANK["editor"]):
         raise ApiError(403, "forbidden", "Du har ikke adgang til denne Vibe")
 
@@ -138,17 +153,16 @@ async def _forward_auth(request: Request, db: Db, kind: str) -> Response:
         if view_as in VIEW_AS_NAMES and view_as != role:
             member_id, name, role, classes = f"dev-{view_as}", VIEW_AS_NAMES[view_as], view_as, ["Testklasse"]
 
+    if kind == "app":
+        upstream = await _app_upstream(project)
+        return Response(status_code=200, headers=_identity_headers(member_id, name, role, classes, upstream))
+    assert project.container_name and project.network_name
     orch = get_orchestrator()
     try:
-        if kind == "app":
-            host = await orch.address(runtime_container_name(project.id), project.network_name or "")
-            upstream = f"{host}:{RUNTIME_PORT}"
-        else:
-            assert project.container_name and project.network_name
-            touch(project.id)
-            await orch.ensure_running(project.container_name)
-            host = await orch.address(project.container_name, project.network_name)
-            upstream = f"{host}:{VITE_PORT}"
+        touch(project.id)
+        await orch.ensure_running(project.container_name)
+        host = await orch.address(project.container_name, project.network_name)
+        upstream = f"{host}:{VITE_PORT}"
     except OrchestratorError:
         raise ApiError(503, "not_running", "Vibe starter op. Prøv igen om lidt.")
     return Response(status_code=200, headers=_identity_headers(member_id, name, role, classes, upstream))

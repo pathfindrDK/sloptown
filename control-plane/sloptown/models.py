@@ -76,6 +76,10 @@ class Project(Base):
     runtime_token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     published_sha: Mapped[str | None] = mapped_column(String, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Public: the published app opens without a Miira login (edge.py answers anonymous
+    # visitors with no identity). Owner only; the teacher answers for what the app shows.
+    public: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    description: Mapped[str] = mapped_column(String, default="", server_default="")
     active_turn_sub: Mapped[str | None] = mapped_column(String, nullable=True)
     last_active_at: Mapped[datetime] = _now()
     created_at: Mapped[datetime] = _now()

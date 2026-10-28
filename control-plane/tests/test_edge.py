@@ -155,3 +155,31 @@ async def test_preview_session_binds_view_as(env):
     assert any(c.startswith("vibe_view_as=;") and "Max-Age=0" in c for c in r.headers.get_list("set-cookie"))
     env.client.cookies.clear()
     assert (await env.client.post("/api/projects/e5/preview-session", json={"viewAs": "admin"}, headers=owner)).status_code == 422
+
+
+async def test_public_app_lets_anonymous_visitors_in_without_identity(env):
+    p, owner = await published(env)
+    host = f"{p['slug']}.{APPS}"
+    r = await env.client.get("/edge/auth/app", headers=fwd(host))
+    assert r.status_code == 302  # private by default: Miira login first
+
+    r = await env.client.patch("/api/projects/e1", json={"public": True}, headers=owner)
+    assert r.status_code == 200 and r.json()["public"] is True
+    r = await env.client.get("/edge/auth/app", headers=fwd(host, "/quiz"))
+    assert r.status_code == 200, r.text
+    assert r.headers["x-vibe-edge-secret"] and r.headers["x-vibe-upstream"] == "fake-vibe-run-e1:8000"
+    assert "x-vibe-user" not in r.headers and "x-vibe-role" not in r.headers
+
+    # The preview stays for editors only, public or not.
+    r = await env.client.get("/edge/auth/preview", headers=fwd(f"preview-{host}"))
+    assert r.status_code == 302
+
+
+async def test_only_the_owner_can_make_an_app_public(env):
+    p, owner = await published(env)
+    await env.share("e1", "s-coed", "editor", name="Medlærer")
+    coed = await env.user("s-coed")
+    r = await env.client.patch("/api/projects/e1", json={"public": True}, headers=coed)
+    assert r.status_code == 403
+    r = await env.client.patch("/api/projects/e1", json={"description": "  Gloser til 1. A  "}, headers=coed)
+    assert r.status_code == 200 and r.json()["description"] == "Gloser til 1. A" and r.json()["public"] is False

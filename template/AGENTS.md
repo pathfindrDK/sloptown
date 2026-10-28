@@ -62,6 +62,7 @@ app = setup(FastAPI())          # required: mounts /_vibe/* routes for the front
 | API | Description |
 |---|---|
 | `current_user` | Dependency → `User(id, name, role, classes)`. 401 if not logged in. `user: User = Depends(current_user)` |
+| `optional_user` | Dependency → `User` or `None`. The teacher can make the published app **public** (anyone with the link, no login): visitors then have no identity. Use it for routes everyone may use, and never show members' data to `None`. |
 | `require_role("owner" \| "editor" \| "viewer")` | Dependency → `User`, 403 if the role is lower (`owner > editor > viewer`) |
 | `user.has_role("editor")` | Bool check |
 | `await members.list()` | Everyone with access → `[Member(id, name, role, classes, avatarHue)]`, students from shared classes included |

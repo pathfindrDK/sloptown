@@ -40,8 +40,12 @@ export class VibeClient {
     return res.json() as Promise<T>;
   }
 
-  me(): Promise<User> {
-    return this.json<User>("/me");
+  /** The logged-in user, or null for a visitor of a public app (the platform answers 401). */
+  async me(): Promise<User | null> {
+    const res = await fetch(this.url("/me"), { credentials: "same-origin" });
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error(`/me: HTTP ${res.status}`);
+    return res.json() as Promise<User>;
   }
 
   members(): Promise<{ version: string; members: Member[] }> {

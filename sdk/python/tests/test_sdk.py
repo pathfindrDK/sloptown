@@ -204,3 +204,17 @@ async def test_members_event_stream_closes_cleanly_on_disconnect():
         await waiting
     await it.aclose()
     assert not members._subscribers, "the subscription is released"
+
+
+async def test_optional_user_is_none_for_a_public_visitor(monkeypatch):
+    from starlette.requests import Request
+
+    from miira_vibe import identity
+
+    monkeypatch.setenv("VIBE_MODE", "runtime")
+    monkeypatch.setenv("VIBE_EDGE_SECRET", "s3cret")
+    anon = Request({"type": "http", "headers": [(b"x-vibe-edge-secret", b"s3cret")]})
+    assert await identity.optional_user(anon) is None
+    member = Request({"type": "http", "headers": [
+        (b"x-vibe-edge-secret", b"s3cret"), (b"x-vibe-user", b"m1"), (b"x-vibe-role", b"viewer"), (b"x-vibe-name", b"Ali")]})
+    assert (await identity.optional_user(member)).id == "m1"

@@ -69,6 +69,8 @@ def project_json(p: Project, role: str) -> dict[str, Any]:
         "previewUrl": host_url(p.slug, preview=True) + "/" if is_webapp(p) else None,
         "appUrl": host_url(p.slug) + "/" if p.published_sha else None,
         "publishedSha": p.published_sha,
+        "public": p.public,
+        "description": p.description,
         "createdAt": p.created_at.isoformat() if p.created_at else None,
         "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
     }
@@ -234,15 +236,27 @@ async def get_project(pid: str, principal: CurrentPrincipal, db: Db, request: Re
 
 
 class PatchBody(BaseModel):
-    title: str = Field(min_length=1, max_length=120)
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=500)
+    public: bool | None = None
 
 
 @router.patch("/api/projects/{pid}")
 async def patch_project(pid: str, body: PatchBody, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
     project, role = await require_project(db, principal, pid, "editor")
-    old = project.title
-    project.title = body.title.strip()
-    audit(db, "project.rename", actor_sub=principal.sub, project_id=pid, details={"from": old, "to": project.title}, request=request)
+    if body.public is not None and role != "owner":
+        raise ApiError(403, "owner_only", "Kun ejeren kan gøre appen offentlig eller lukke den igen")
+    if body.title is not None:
+        old = project.title
+        project.title = body.title.strip()
+        audit(db, "project.rename", actor_sub=principal.sub, project_id=pid, details={"from": old, "to": project.title}, request=request)
+    if body.description is not None and body.description.strip() != project.description:
+        project.description = body.description.strip()
+        audit(db, "project.describe", actor_sub=principal.sub, project_id=pid, details={"length": len(project.description)}, request=request)
+    if body.public is not None and body.public != project.public:
+        require_webapp(project)
+        project.public = body.public
+        audit(db, "project.visibility", actor_sub=principal.sub, project_id=pid, details={"public": project.public}, request=request)
     await db.commit()
     await db.refresh(project)
     return project_json(project, role)

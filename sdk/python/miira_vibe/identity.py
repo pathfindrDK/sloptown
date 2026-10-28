@@ -72,6 +72,17 @@ async def current_user(request: Request) -> User:
     raise HTTPException(status_code=401, detail="Du er ikke logget ind.")
 
 
+async def optional_user(request: Request) -> User | None:
+    """FastAPI dependency: the logged-in user, or None for a visitor of a public app.
+
+    Use it for routes a public app serves to everyone; keep current_user for the rest.
+    """
+    user = user_from_headers(request.headers)
+    if user:
+        return user
+    return dev_user() if _env.is_dev() else None
+
+
 def require_role(minimum: Role) -> Callable:
     """FastAPI dependency factory: `user: User = Depends(require_role("editor"))`."""
     if minimum not in ROLE_RANK:
