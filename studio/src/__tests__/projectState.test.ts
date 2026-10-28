@@ -48,3 +48,10 @@ describe("projectReducer", () => {
     expect(s.changedFiles).toEqual([]);
   });
 });
+
+describe("events the reducer does not handle", () => {
+  it("leave the state as it was (project.published after a publish)", () => {
+    const next = projectReducer(initialProjectState, { event: "project.published", data: { publishedSha: "a".repeat(40) } } as never);
+    expect(next).toBe(initialProjectState);
+  });
+});

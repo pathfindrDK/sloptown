@@ -130,5 +130,9 @@ export function projectReducer(state: ProjectState, action: Action): ProjectStat
       };
     case "ping":
       return state;
+    default:
+      // The stream carries events this reducer has no use for (project.published,
+      // and whatever the control plane adds later); they must not wipe the state.
+      return state;
   }
 }
