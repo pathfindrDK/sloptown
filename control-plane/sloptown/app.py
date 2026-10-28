@@ -25,6 +25,7 @@ from . import (
     files,
     hooks,
     internal,
+    peers,
     platform,
     projects,
     terms,
@@ -124,7 +125,7 @@ def create_app() -> FastAPI:
         if (
             request.method not in SAFE_METHODS
             and request.url.path.startswith(("/api/", "/auth/"))
-            and auth.SESSION_COOKIE in request.cookies
+            and auth.cookie_name(auth.SESSION_COOKIE) in request.cookies
             and not request.headers.get("authorization", "").lower().startswith("bearer ")
         ):
             origin = request.headers.get("origin") or ""
@@ -132,6 +133,13 @@ def create_app() -> FastAPI:
                 return JSONResponse(
                     {"error": "bad_origin", "message": "Forespørgslen kom ikke fra SlopTown studio"}, status_code=403
                 )
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def platform_peers_only(request: Request, call_next: Any) -> Response:
+        """Vibes share networks with the control plane but have no business here (peers.py)."""
+        if not await peers.allowed(request.client.host if request.client else None):
+            return JSONResponse({"error": "not_found", "message": "Ikke fundet"}, status_code=404)
         return await call_next(request)
 
     @app.get("/api/config")

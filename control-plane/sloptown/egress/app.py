@@ -18,6 +18,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, Request
@@ -39,6 +40,22 @@ METERED_PATHS = {"chat/completions", "responses", "embeddings"}
 PASS_REQUEST_HEADERS = {"content-type", "accept", "openai-beta"}
 PASS_RESPONSE_HEADERS = {"content-type", "x-request-id", "openai-processing-ms", "cache-control", "retry-after"}
 PLATFORM_REQUEST_HEADERS = {"content-type", "accept", "last-event-id", "x-vibe-user", "cache-control"}
+
+
+def platform_path(path: str) -> str | None:
+    """The path below /platform/ as the control plane must see it, or None.
+
+    The route parameter is already percent-decoded, and httpx collapses dot segments,
+    so `/platform/..%2Finternal/x` would otherwise reach `/internal/x` carrying the
+    internal secret. Only plain segments pass; a `%` left after decoding means the
+    caller encoded twice, which no SDK call does.
+    """
+    if not path or "%" in path or "\\" in path:
+        return None
+    segments = path.split("/")
+    if any(seg in ("", ".", "..") for seg in segments):
+        return None
+    return "/".join(quote(seg, safe="") for seg in segments)
 
 
 class State:
@@ -325,6 +342,9 @@ async def platform(path: str, request: Request) -> Response:
     caller = await _authenticate(request)
     if caller is None:
         return _error(401, "invalid_token", "Ugyldig projekt-token.")
+    safe = platform_path(path)
+    if safe is None:
+        return _error(404, "not_found", "Ukendt platform-adresse.")
     try:
         body = await _read_body(request)
         state.limiter.check_rate(caller.project_id)
@@ -342,7 +362,7 @@ async def platform(path: str, request: Request) -> Response:
             "x-sloptown-internal": settings.internal_secret,
         }
     )
-    url = settings.control_plane_url.rstrip("/") + "/platform/" + path
+    url = settings.control_plane_url.rstrip("/") + "/platform/" + safe
     req = client().build_request(request.method, url, params=request.query_params, content=body or None, headers=headers)
 
     # Long-lived event streams don't count against the concurrency cap.

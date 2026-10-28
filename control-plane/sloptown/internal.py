@@ -22,7 +22,7 @@ from .config import get_settings
 from .db import sessionmaker
 from .errors import ApiError
 from .models import Project
-from .orchestrator import OrchestratorError, get_orchestrator, image_of
+from .orchestrator import OrchestratorError, get_orchestrator, slot_tag
 from .pool import discard_stale
 from .tokens import consteq
 
@@ -37,6 +37,10 @@ def require_internal(request: Request) -> None:
     secret = request.headers.get("x-sloptown-internal", "")
     if not secret or not consteq(secret, get_settings().internal_secret):
         raise ApiError(403, "forbidden", "Kun internt")
+    # The egress proxy adds the same secret to a Vibe's /platform/* calls (with
+    # X-Vibe-Project); those must never reach an internal endpoint, whatever the path.
+    if "x-vibe-project" in request.headers:
+        raise ApiError(403, "forbidden", "Kun internt")
 
 
 class Rolled(BaseModel):
@@ -48,7 +52,8 @@ class Rolled(BaseModel):
 async def editors_on_old_image(db: Any) -> list[Project]:
     current = await get_orchestrator().image_id(get_settings().dev_image)
     rows = (await db.execute(select(Project).where(Project.container_name.is_not(None)))).scalars().all()
-    return [p for p in rows if image_of(p.image_tag) != current]
+    # Image *and* spec: a new edge secret or isolation setting replaces editors too.
+    return [p for p in rows if p.image_tag != slot_tag(current)]
 
 
 @router.post("/images/rolled")

@@ -25,4 +25,7 @@ ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1
 USER sloptown
 EXPOSE 8000 8200 8201
 LABEL io.containers.autoupdate=registry
-CMD ["uvicorn", "sloptown.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# No proxy headers: the peer address must stay the real one, because sloptown.peers lets in
+# only the edge and egress and audit.client_ip believes X-Forwarded-For only from them.
+# With --forwarded-allow-ips "*" any Vibe could claim to be the edge.
+CMD ["uvicorn", "sloptown.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

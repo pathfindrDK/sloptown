@@ -14,10 +14,14 @@ from .models import AuditLog
 def client_ip(request: Request | None) -> str | None:
     if request is None:
         return None
+    from . import peers
+
+    peer = request.client.host if request.client else None
     fwd = request.headers.get("x-forwarded-for")
-    if fwd:
+    # Anyone can send the header; only the edge's (or loopback's) is the visitor's address.
+    if fwd and peers.trusted(peer):
         return fwd.split(",")[0].strip()
-    return request.client.host if request.client else None
+    return peer
 
 
 def audit(
