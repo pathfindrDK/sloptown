@@ -1,0 +1,15 @@
+# Podman API for the SlopTown control plane, with gVisor as the runtime. The libpod
+# REST API ignores a per-container runtime (the service's own is used), so Vibes get
+# runsc by being created through this service, while the stock podman.socket, the
+# platform containers and other projects on the host keep crun. Installed by
+# deploy/harden-host.sh; dev-up.sh mounts it into sloptown-cp.
+[Unit]
+Description=Podman API socket for SlopTown Vibes (gVisor)
+Documentation=man:podman-system-service(1)
+
+[Socket]
+ListenStream=/run/sloptown/podman-runsc.sock
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

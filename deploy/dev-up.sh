@@ -49,6 +49,10 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$(id -u)" = 0 ]; then SOCK=/run/podman/podman.sock; else SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/podman/podman.sock"; fi
+# The control plane creates the Vibes; with deploy/harden-host.sh verified it does that
+# through the gVisor service, so every Vibe runs on runsc.
+CP_SOCK=$SOCK
+[ "$(id -u)" = 0 ] && [ -f /etc/sloptown/isolation-verified ] && [ -S /run/sloptown/podman-runsc.sock ] && CP_SOCK=/run/sloptown/podman-runsc.sock
 [ -S "$SOCK" ] || { echo "podman socket $SOCK missing: systemctl ${SUDO_USER:+--user }start podman.socket" >&2; exit 1; }
 
 if [ -n "$PUBLIC" ]; then
@@ -125,8 +129,11 @@ CP_ENV=(
   -e SLOPTOWN_PODMAN_URL=unix:///run/podman/podman.sock
   -e SLOPTOWN_DEV_IMAGE=$T/vibe-dev:dev -e SLOPTOWN_RUNTIME_IMAGE=$T/vibe-runtime:dev
   -e SLOPTOWN_POOL_SIZE="${SLOPTOWN_POOL_SIZE:-2}"
-  # This host has no `containers` subuid range (bootstrap.sh adds one).
-  -e SLOPTOWN_USERNS_AUTO="${SLOPTOWN_USERNS_AUTO:-false}"
+  # Isolation from deploy/harden-host.sh, on once that script has seen a container start
+  # with it (its marker file): half-applied, it would stop every new Vibe from starting.
+  -e SLOPTOWN_USERNS_AUTO="${SLOPTOWN_USERNS_AUTO:-$([ -f /etc/sloptown/isolation-verified ] && echo true || echo false)}"
+  # Only a label in the container tag: the runtime comes from the socket below.
+  -e SLOPTOWN_OCI_RUNTIME="${SLOPTOWN_OCI_RUNTIME-$([ -f /etc/sloptown/isolation-verified ] && echo runsc || true)}"
   -e SLOPTOWN_CONTROL_PLANE_URL=http://sloptown-cp:8000
   -e SLOPTOWN_OPENAI_API_KEY="${SLOPTOWN_OPENAI_API_KEY:-}"
   -e SLOPTOWN_OPENAI_BASE_URL="${SLOPTOWN_OPENAI_BASE_URL:-https://api.openai.com/v1}"
@@ -160,7 +167,7 @@ echo "-- sloptown-cp"
 # can open it (dev only). Rootless: keep-id maps the caller to the image's uid 1000.
 if [ "$(id -u)" = 0 ]; then CP_USER=(--user 0:0); else CP_USER=(--userns keep-id:uid=1000,gid=1000); fi
 podman run -d --name sloptown-cp --network $NET --label sloptown=1 "${CP_ENV[@]}" "${CP_USER[@]}" \
-  --security-opt label=disable -v "$SOCK:/run/podman/podman.sock" \
+  --security-opt label=disable -v "$CP_SOCK:/run/podman/podman.sock" \
   $T/control-plane:dev >/dev/null
 
 echo "-- sloptown-egress"

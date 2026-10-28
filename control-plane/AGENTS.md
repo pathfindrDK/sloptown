@@ -104,6 +104,24 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
   call `await db.close()` after the access check and before returning the stream
   (`test_event_streams_do_not_hold_db_connections`). Otherwise the pool (5 + 10)
   runs dry and every request fails with 500.
+- **Only the edge and egress may talk to the control plane.** It joins every project
+  network, so Vibes can reach its port; `app.platform_peers_only` answers anything but the
+  edge, egress and loopback with 404 (`peers.py`, addresses from Podman). uvicorn runs with
+  `--no-proxy-headers` so that check sees the real peer; `X-Forwarded-For` is read only in
+  `audit.client_ip`, and only from those peers.
+- **Platform paths never leave `/platform/`.** Egress adds the internal secret to a Vibe's
+  `/platform/*` calls and httpx collapses dot segments, so `egress.app.platform_path` refuses
+  any path with `.`/`..`/empty segments or a `%` left after decoding, and
+  `internal.require_internal` refuses requests carrying `X-Vibe-Project`. Keep both.
+- **One edge secret per Vibe.** `tokens.edge_secret_for(seed)` (HMAC of `edge_secret` and the
+  token seed) is the container's `VIBE_EDGE_SECRET` and the edge's `X-Vibe-Edge-Secret`. A
+  secret read out of one container is worthless for another.
+- **The container tag covers spec and isolation.** `orchestrator.slot_tag` includes the image,
+  `SLOT_SPEC`, the models and the isolation (userns, OCI runtime); pool slots, published apps
+  (`sloptown.tag` label) and editors (`projects.image_tag`) are rolled when it changes. Bump
+  `SLOT_SPEC` when the container environment or spec changes.
+- **Cookies are `__Host-` on HTTPS** (`auth.cookie_name`): apps on sibling subdomains can set
+  parent-domain cookies, which `__Host-` ones ignore.
 - **Single process.** Turn state and SSE fan-out are in memory: run one uvicorn worker.
   On startup, turns left `running` are marked `error`; queued turns stay and start.
 - **Pool claim locking.** `claim` uses `SELECT … FOR UPDATE SKIP LOCKED` and deletes the slot
@@ -210,8 +228,10 @@ local echo server.
 are always allowed), `EGRESS_RPS_PER_PROJECT` + `EGRESS_BURST_PER_PROJECT` (token bucket over
 all egress), `EGRESS_MAX_CONCURRENT_PER_PROJECT` (open requests/tunnels; `/platform/*events`
 streams exempt), `INFERENCE_RPM_PER_PROJECT` + `INFERENCE_RPM_GLOBAL` (sliding 60 s window),
-`EGRESS_MAX_BODY_BYTES` (413 above), `EGRESS_TIMEOUT_SECONDS` (connect and idle-read timeout,
-not total), `EGRESS_PROXY_PORT` (0 disables the CONNECT server). The file is found at
+`EGRESS_HOST_RPM_PER_PROJECT` + `EGRESS_HOST_RPM_GLOBAL` (requests or tunnels to one external
+host per minute, per Vibe and across all; 429 with `Retry-After: 60`), `EGRESS_MAX_BODY_BYTES`
+(413 above), `EGRESS_TIMEOUT_SECONDS` (connect and idle-read timeout, not total),
+`EGRESS_PROXY_PORT` (0 disables the CONNECT server). The file is found at
 `SLOPTOWN_EGRESS_ENV_FILE` or `<repo>/edge/egress.env`; real environment variables override it.
 `GET /admin/v1/egress-settings` returns the loaded values (read-only for now).
 
@@ -219,7 +239,8 @@ not total), `EGRESS_PROXY_PORT` (0 disables the CONNECT server). The file is fou
 
 Bearer JWT from Miira: RS256 via Miira's JWKS (`sloptown.miira.miira.verify`), `aud=sloptown-admin`,
 `role=system-admin`, `jti` required and single-use (stored in `launch_jti` as `admin:<jti>`).
-`settings.admin_allowed_ips` (CIDRs) is checked against the first `X-Forwarded-For` hop. Every
+`settings.admin_allowed_ips` (CIDRs) is checked against `audit.client_ip`: the first
+`X-Forwarded-For` hop when the edge (or loopback) sent the request, the peer otherwise. Every
 write calls `audit(...)` with `actor_kind="admin"` and the admin's `sub`. Reset/grant only
 accept `user+build` or `project+app`.
 

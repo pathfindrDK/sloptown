@@ -10,6 +10,8 @@ Its home, and therefore all container storage, is on the LUKS vault
 | Path | |
 |---|---|
 | `bootstrap.sh` | idempotent host setup (Debian 12+/Ubuntu 24.04+). `--dry-run` prints every change; `--dev` also installs fake-miira. Steps are listed in its header |
+| `harden-host.sh` | isolation for a host that runs the stack rootful through `dev-up.sh`: SlopTown's nftables table and unit, a `containers` subuid range (userns=auto, plus search permission on podman's temp dir), gVisor and `sloptown-podman-runsc.socket`. Writes `/etc/sloptown/isolation-verified` only when a container created over that socket runs on runsc with root mapped to a host id > 0 and deletes cleanly; only then does `dev-up.sh` give the control plane that socket and set userns=auto. `--dry-run` prints every change |
+| `systemd/sloptown-podman-runsc.{socket,service}` | a second podman API (`/run/sloptown/podman-runsc.sock`) whose runtime is runsc with `overlay2=root:memory`; the control plane creates Vibes through it |
 | `sloptown.env.example` | every setting for `/etc/sloptown/sloptown.env` (secrets `CHANGE_ME`) |
 | `quadlet/` | podman quadlet units for the `sloptown` user: network `sloptown`, `sloptown-{db,registry,cp,egress,edge,fake-miira}` (+ volumes). All `AutoUpdate=registry`, the long-running ones `Notify=healthy` so `podman auto-update` can roll back |
 | `containers/` | Containerfiles: `control-plane` (also the egress, `python -m sloptown.egress`), `fake-miira`, `studio` (data-only image with `/srv/studio`); `healthcheck.py` → `/usr/local/bin/sloptown-healthcheck <url>` in the control-plane image |
@@ -125,6 +127,25 @@ containers are named `vibe-pool-*` until claimed.
 the stock `nftables.service` must not be used here.
 
 ## Invariants
+
+- **A Vibe must reach no host service.** On a rootful host, project bridges are host
+  interfaces and an internal network still reaches the gateway IP (sshd, smtp, ...). Load
+  `edge/nftables/sloptown.nft` (`harden-host.sh` or bootstrap) before running real Vibes, and
+  check from inside one that only aardvark-dns answers on the gateway.
+- **userns=auto needs podman's temp dir to be traversable** by the mapped ids: podman makes an
+  intermediate rootfs mount in `image_copy_tmp_dir`. On this host another project's
+  `/etc/containers/containers.conf.d/10-pathfindr.conf` points that at
+  `/mnt/encrypted-at-rest/containers/tmp` (0700); `harden-host.sh` adds `o+x` (search only)
+  to it and its parents, agreed with the host's owner, and leaves that config alone.
+- **Over the libpod API the runtime is the service's.** A per-container `oci_runtime` in the
+  create spec is accepted and ignored (podman 5.7), so gVisor comes from the socket the
+  control plane uses, not from `SLOPTOWN_OCI_RUNTIME` (which only marks the container tag).
+- **runsc needs `overlay2=root:memory` here.** With the default `root:self` gVisor keeps the
+  rootfs overlay in a filestore file inside podman's intermediate mount, which is gone by
+  `runsc delete`: every container delete then fails with HTTP 500 though the record goes.
+- **Never force editor rollovers on a host full of idle editors.** Before
+  `orchestrator.replace_dev` kept stopped editors stopped, a forced rollover started ~100
+  idle test editors one after another and the host ran out of memory (2026-10-28).
 
 - The host is shared (Docker, Falco, logitor run here). Bootstrap touches only
   its own files: `/etc/sloptown`, `/etc/sysctl.d/60-sloptown.conf`,

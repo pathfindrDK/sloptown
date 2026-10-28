@@ -1,0 +1,21 @@
+# See sloptown-podman-runsc.socket.
+[Unit]
+Description=Podman API service for SlopTown Vibes (gVisor)
+Documentation=man:podman-system-service(1)
+Requires=sloptown-podman-runsc.socket
+After=sloptown-podman-runsc.socket
+StartLimitIntervalSec=0
+# Container storage lives on the vault, like the stock podman.service on this host.
+ConditionPathIsMountPoint=/mnt/encrypted-at-rest
+
+[Service]
+Delegate=true
+Type=exec
+KillMode=process
+# overlay2=root:memory: gVisor otherwise keeps the rootfs overlay in a filestore file
+# inside podman's intermediate mount, which is gone by `runsc delete`, so every delete
+# failed (HTTP 500). Vibes run with a read-only root, so the overlay stays tiny.
+ExecStart=/usr/bin/podman --log-level=info --runtime runsc --runtime-flag overlay2=root:memory system service
+
+[Install]
+WantedBy=default.target
