@@ -131,7 +131,7 @@ async function createMenuHasVibe(page) {
     await scratchFrame.getByRole("button", { name: /Hent filer/ }).waitFor({ timeout: 60000 });
     await scratchFrame.getByText("Mit projekt").first().waitFor({ timeout: 60000 });
     if (await scratchFrame.getByRole("button", { name: /Udgiv/ }).count()) throw new Error("scratch project offers Udgiv");
-    if (await scratchFrame.getByText("Forhåndsvisning").count()) throw new Error("scratch project shows a preview");
+    if (await scratchFrame.getByText("Forhåndsvisning", { exact: true }).count()) throw new Error("scratch project shows a preview");
     const download = page.waitForEvent("download", { timeout: 30000 });
     await scratchFrame.getByRole("button", { name: /Hent filer/ }).click();
     if (!(await download).suggestedFilename().endsWith(".zip")) throw new Error("download is not a .zip");

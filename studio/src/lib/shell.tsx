@@ -15,6 +15,8 @@ export type Shell = {
   share(fileId: string): void;
   close(): void;
   titleChanged(fileId: string, title: string): void;
+  /** Miira renamed the file in its own top bar (chrome=none); returns an unsubscribe. */
+  onTitle(listener: (fileId: string, title: string) => void): () => void;
 };
 
 export function standaloneShell(navigateBack: () => void): Shell {
@@ -28,6 +30,7 @@ export function standaloneShell(navigateBack: () => void): Shell {
     titleChanged() {
       /* standalone: the control plane renames; Miira picks it up on next sync */
     },
+    onTitle: () => () => {},
   };
 }
 
@@ -38,6 +41,14 @@ export function embeddedShell(bridge: EmbedBridge, chromeHidden: boolean): Shell
     share: (fileId) => bridge.send({ type: "drive:share", fileId }),
     close: () => bridge.send({ type: "drive:close" }),
     titleChanged: (fileId, title) => bridge.send({ type: "drive:title", fileId, title }),
+    onTitle: (listener) => {
+      const off = bridge.on((m) => {
+        if (m.type === "drive:title") listener(m.fileId, m.title);
+      });
+      return () => {
+        off();
+      };
+    },
   };
 }
 

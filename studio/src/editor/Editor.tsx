@@ -128,6 +128,17 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     shell.titleChanged(project.id, title);
   };
 
+  // Miira renamed the file: follow it, without echoing drive:title back.
+  const projectTitle = project.title;
+  useEffect(
+    () =>
+      shell.onTitle((fileId, title) => {
+        if (fileId !== project.id || !canEdit || title === projectTitle) return;
+        api.renameProject(project.id, title).then(setProject, () => {});
+      }),
+    [shell, project.id, canEdit, projectTitle],
+  );
+
   const onPreviewCommit = (c: Commit, parent: string | null) => {
     const path = c.files[0];
     if (path) openTab({ kind: "file", path, sha: c.sha, compareSha: parent, highlight: true });

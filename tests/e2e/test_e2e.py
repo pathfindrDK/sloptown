@@ -104,7 +104,9 @@ def client() -> httpx.Client:
     if not DOMAIN:
         return httpx.Client(transport=EdgeTransport(), timeout=60, follow_redirects=False)
     c = httpx.Client(timeout=60, follow_redirects=False)
-    c.cookies.set("sloptown_gate", _gate_cookie(), domain=f".{DOMAIN}")
+    # With a real Miira the public stack runs without the gate (docs/miira-integration.md §11).
+    if os.environ.get("E2E_GATE_PASSWORD"):
+        c.cookies.set("sloptown_gate", _gate_cookie(), domain=f".{DOMAIN}")
     return c
 
 
@@ -252,7 +254,7 @@ def test_03_files_and_history_from_agentd():
     assert "web/src/App.tsx" in paths and "api/main.py" in paths
     assert paths["AGENTS.md"]["locked"] and not paths["web/src/App.tsx"]["locked"]
     assert not any(p.startswith((".git/", "node_modules/", ".data/")) for p in paths)
-    src = ok(st.get(f"{STUDIO}/api/projects/{pid}/files/web/src/App.tsx"))
+    src = ok(st.get(f"{STUDIO}/api/projects/{pid}/files/web/src/main.tsx"))  # App.tsx starts empty
     assert "@miira/vibe" in src["content"]
     hist = ok(st.get(f"{STUDIO}/api/projects/{pid}/history"))
     assert hist["commits"], "template seeding should leave an initial commit"

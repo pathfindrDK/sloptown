@@ -10,7 +10,11 @@ export type DriveInit = {
 export type InboundMessage =
   | ({ type: "drive:init" } & DriveInit)
   | { type: "drive:theme"; theme: "light" | "dark" }
-  | { type: "drive:access-changed"; fileId: string };
+  | { type: "drive:access-changed"; fileId: string }
+  | { type: "drive:title"; fileId: string; title: string };
+
+// The control plane's limit on a project title (projects.py).
+const TITLE_MAX = 120;
 
 export type OutboundMessage =
   | { type: "drive:ready" }
@@ -48,6 +52,11 @@ export function parseInbound(data: unknown): InboundMessage | null {
       return { type: "drive:theme", theme: m.theme === "dark" ? "dark" : "light" };
     case "drive:access-changed":
       return typeof m.fileId === "string" ? { type: "drive:access-changed", fileId: m.fileId } : null;
+    case "drive:title": {
+      if (typeof m.fileId !== "string" || typeof m.title !== "string") return null;
+      const title = m.title.trim().slice(0, TITLE_MAX).trim();
+      return title ? { type: "drive:title", fileId: m.fileId, title } : null;
+    }
     default:
       return null;
   }

@@ -34,6 +34,18 @@ describe("origin allowlist", () => {
 });
 
 describe("parseInbound", () => {
+  it("validates drive:title from Miira's top bar, trimmed to the project title limit", () => {
+    expect(parseInbound({ type: "drive:title", fileId: "f", title: "  Gloser 1. A " })).toEqual({
+      type: "drive:title",
+      fileId: "f",
+      title: "Gloser 1. A",
+    });
+    expect(parseInbound({ type: "drive:title", fileId: "f", title: "   " })).toBeNull();
+    expect(parseInbound({ type: "drive:title", fileId: "f" })).toBeNull();
+    expect(parseInbound({ type: "drive:title", title: "x" })).toBeNull();
+    const long = parseInbound({ type: "drive:title", fileId: "f", title: "a".repeat(300) });
+    expect(long && long.type === "drive:title" && long.title.length).toBe(120);
+  });
   it("validates drive:init", () => {
     expect(parseInbound({ type: "drive:init", fileId: "f" })).toBeNull();
     expect(parseInbound({ type: "drive:init", fileId: "f", launchToken: "t", theme: "dark", locale: "xx" })).toEqual({

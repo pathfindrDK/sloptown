@@ -73,6 +73,7 @@ check `event.origin` against an allowlist.
 | Miira → SlopTown| `drive:theme`        | `{ theme }`                                          | theme switched |
 | SlopTown → Miira| `drive:share`        | `{ fileId }`                                         | open Miira's share dialog |
 | SlopTown → Miira| `drive:title`        | `{ fileId, title }`                                  | rename the file |
+| Miira → SlopTown| `drive:title`        | `{ fileId, title }`                                  | the file was renamed in Miira's top bar; the studio renames the project (owner/editor, trimmed to 120 characters) |
 | SlopTown → Miira| `drive:close`        | `{}`                                                 | user pressed back |
 | Miira → SlopTown| `drive:access-changed`| `{ fileId }`                                        | optional fast path after the share dialog closes |
 
@@ -80,6 +81,11 @@ Miira answers exactly these from the studio frame (`VibeView`, not its editor
 iframe path): the studio is a third-party origin and gets none of the services the
 drive offers its own editors. On `drive:ready` Miira mints a fresh launch token and
 answers with `drive:init`; on `drive:title` it renames the file.
+
+With `?chrome=none` (what Miira sends) Miira draws the top bar every Miira editor has
+above the frame: back, file icon, editable name and Support. The studio then shows only
+its own actions (budget, open app, download, share, publish), and a rename in Miira's bar
+reaches the studio as `drive:title`.
 
 ## 4. OIDC provider
 
