@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { Project, Role } from "../api/types";
 import { useT } from "../lib/i18n";
 import { Loading } from "../components/Loading";
+import { Select } from "../components/Select";
 import { useSegmentedIndicator } from "../lib/useSegmentedIndicator";
 
 type Viewport = "desktop" | "tablet" | "mobile";
@@ -157,14 +158,21 @@ export function Preview({ project, reloadSignal, empty, onFixError }: Props) {
         <a className="icon-btn" href={project.previewUrl ?? undefined} target="_blank" rel="noopener" title={t("preview.open")} aria-label={t("preview.open")}>
           <ExternalLink size={16} />
         </a>
-        <label className="preview__viewas">
-          <span className="muted">{t("preview.viewAs")}</span>
-          <select className="select" value={viewAs} onChange={(e) => setViewAs(e.target.value as Role)}>
-            <option value="owner">{t("role.owner")}</option>
-            <option value="editor">{t("role.editor")}</option>
-            <option value="viewer">{t("role.viewer")}</option>
-          </select>
-        </label>
+        <div className="preview__viewas">
+          <span className="muted" aria-hidden>
+            {t("preview.viewAs")}
+          </span>
+          <Select<Role>
+            label={t("preview.viewAs")}
+            value={viewAs}
+            onChange={setViewAs}
+            options={[
+              { value: "owner", label: t("role.owner") },
+              { value: "editor", label: t("role.editor") },
+              { value: "viewer", label: t("role.viewer") },
+            ]}
+          />
+        </div>
         <div className="topbar__spacer" />
         {errors.length > 0 && (
           <div className="preview__errors">
