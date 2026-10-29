@@ -60,7 +60,7 @@ export function ProjectList() {
     );
   }
 
-  const isTeacher = me?.user.role === "laerer" || me?.user.isSystemAdmin;
+  const isTeacher = me?.user.role === "laerer" || me?.user.role === "admin" || me?.user.isSystemAdmin;
   const mine = projects?.filter((p) => p.myRole === "owner") ?? [];
   const shared = projects?.filter((p) => p.myRole !== "owner") ?? [];
   const fmt = new Intl.DateTimeFormat(locale === "da" ? "da-DK" : "en-GB", { dateStyle: "medium" });

@@ -12,6 +12,10 @@ async def test_create_requires_teacher_terms_and_ownership(env):
     r = await env.client.post("/api/projects", json={"fileId": "f1"}, headers=elev)
     assert r.status_code == 403 and r.json()["error"] == "teachers_only"
 
+    for sub, role in (("s-sysadm", "system-admin"), ("s-adm", "admin")):
+        r = await env.client.post("/api/projects", json={"fileId": "f1"}, headers=await env.user(sub, role=role))
+        assert r.json()["error"] != "teachers_only"
+
     no_terms = await env.user("s-nt", terms=False)
     r = await env.client.post("/api/projects", json={"fileId": "f1"}, headers=no_terms)
     assert r.json()["error"] == "terms_required"

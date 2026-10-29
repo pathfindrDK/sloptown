@@ -36,7 +36,7 @@ SESSION_COOKIE = "st_session"
 OIDC_COOKIE = "st_oidc"
 SESSION_TTL = timedelta(hours=12)
 LAUNCH_AUDIENCE = "sloptown-launch"
-ROLES_THAT_CREATE = {"laerer"}
+ROLES_THAT_CREATE = {"laerer", "admin", "system-admin"}
 
 
 @dataclass

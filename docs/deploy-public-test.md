@@ -98,6 +98,11 @@ SLOPTOWN_OPENAI_API_KEY=sk-... \
 - In miira3's `secrets.env` on staging: `VIBE_STUDIO_ORIGIN=https://studio.miira-apps.dk`,
   `VIBE_CLIENT_SECRET` and `VIBE_WEBHOOK_SECRET` copied from `CLIENT_SECRET` and
   `WEBHOOK_SECRET` in `deploy/.public.env`, plus a `VIBE_PAIRWISE_SECRET` of its own.
-  Then System → Vibe → Adgang to switch Vibe on for the testers.
+  On production (`hej.miira.dk`) also `VIBE_SIGNING_KEY`, an RSA private key (PEM inline
+  with `\n`, or a path): the API refuses to boot without it there; elsewhere it generates
+  one into `system_settings`. Then System → Vibe → Adgang to switch Vibe on for the testers.
 - Back to fake-miira: run `dev-up.sh --public miira-apps.dk --no-build` without
   `SLOPTOWN_MIIRA_ORIGIN`.
+- To make the choice stick across restarts, put `SLOPTOWN_MIIRA_ORIGIN` and
+  `SLOPTOWN_ADMIN_ALLOWED_IPS` in `deploy/.public.env` (it is sourced after the
+  environment, so it wins). Since 2026-10-29 it points at production, `https://hej.miira.dk`.

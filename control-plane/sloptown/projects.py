@@ -98,7 +98,7 @@ def normalize_id(file_id: str) -> str:
 
 async def _assert_can_create(db: Db, principal: Principal, pid: str) -> None:
     if principal.user.role not in ROLES_THAT_CREATE:
-        raise ApiError(403, "teachers_only", "Kun lærere kan oprette en Vibe")
+        raise ApiError(403, "teachers_only", "Kun lærere og administratorer kan oprette en Vibe")
     if not terms_accepted(principal.user):
         raise ApiError(403, "terms_required", "Du skal acceptere vilkårene først", version=get_settings().terms_version)
     sess = principal.session

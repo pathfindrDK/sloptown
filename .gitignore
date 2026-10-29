@@ -5,4 +5,4 @@ dist/
 .env
 *.egg-info/
 .pytest_cache/
-deploy/.public.env
+deploy/.public.env*

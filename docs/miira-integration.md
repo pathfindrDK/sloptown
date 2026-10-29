@@ -38,7 +38,7 @@ SlopTown never forwards the service-level id into an app.
 - New drive file type `vibe`. File content (JSON): `{ "projectId": "<file_id>" }`.
   In v1 the project id **is** the Miira file id; SlopTown creates the project
   lazily the first time the owner opens it. The value is opaque to Miira.
-- Only users with Miira role `laerer` (teacher) may create Vibe files (v1).
+- Only users with Miira role `laerer` (teacher), `admin` or `system-admin` may create Vibe files.
 - The first time the owner opens a new Vibe, the studio asks what it is: an app
   (preview, publish, students use it) or "fra bunden", an empty project for code
   that is never published (Arduino, scripts), downloaded as a .zip; if it gets a
@@ -167,7 +167,7 @@ Standard OpenID Connect, authorization code + PKCE (S256), confidential client.
   returns a bearer access token (JWT or opaque, ≤ 10 min) for the members API.
 - Miira maps its roles as: student → `elev`, teacher and school admin → `laerer`
   (administering a school is a capability on top of teaching), platform operator →
-  `system-admin`. Only `laerer` creates projects.
+  `system-admin`. `laerer`, `admin` and `system-admin` create projects; `elev` never does.
 
 ## 5. Launch token (iframe sign-in)
 
@@ -326,8 +326,10 @@ real Miira every request is authenticated by Miira anyway. `/hooks/*` and
 
 Miira side (API `secrets.env`): `VIBE_STUDIO_ORIGIN=https://studio.miira-apps.dk`,
 `VIBE_CLIENT_SECRET` = `CLIENT_SECRET` and `VIBE_WEBHOOK_SECRET` = `WEBHOOK_SECRET`
-from `deploy/.public.env`, and a `VIBE_PAIRWISE_SECRET` of its own. Then switch Vibe
-on for the testers in System → Vibe → Adgang.
+from `deploy/.public.env`, and a `VIBE_PAIRWISE_SECRET` of its own. In production also
+`VIBE_SIGNING_KEY` (RSA private key, PEM inline with `\n` or a path; the API will not
+boot without it, elsewhere it generates one). Then switch Vibe on for the testers in
+System → Vibe → Adgang.
 
 Tests against it: `E2E_MIIRA_ORIGIN=<miira origin>` runs `tests/e2e/test_e2e.py`
 (all 10 steps, with miira3's seeded accounts) and `tests/e2e/browser.sh`

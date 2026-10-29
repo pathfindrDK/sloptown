@@ -215,6 +215,7 @@ Miira's API needs, in its secrets.env:
   VIBE_STUDIO_ORIGIN=$STUDIO_ORIGIN
   VIBE_CLIENT_SECRET / VIBE_WEBHOOK_SECRET = $FROM
   VIBE_PAIRWISE_SECRET = any long random value, set once on the Miira side
+  VIBE_SIGNING_KEY     = RSA private key PEM (required in production only)
 EOF
 fi
 if [ -n "$PUBLIC" ]; then

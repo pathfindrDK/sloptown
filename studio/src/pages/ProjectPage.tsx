@@ -66,7 +66,14 @@ export function ProjectPage({ pid, mode, basePath }: { pid: string; mode: Mode; 
     return (
       <div className="page page--center">
         <div className="card">
-          <p>{error.status === 403 || error.status === 404 ? t("embed.denied") : t("common.error")}</p>
+          <p>
+            {/* A refused create (teachers_only, not_owner) says why; anything else stays generic. */}
+            {error.status === 403 && error.code !== "forbidden" && error.message
+              ? error.message
+              : error.status === 403 || error.status === 404
+                ? t("embed.denied")
+                : t("common.error")}
+          </p>
           <button className="btn btn--3d" onClick={load}>
             {t("common.retry")}
           </button>
