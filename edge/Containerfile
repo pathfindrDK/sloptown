@@ -15,7 +15,8 @@ FROM ${CADDY_IMAGE}
 RUN apk upgrade --no-cache
 COPY --from=build /usr/bin/caddy /usr/bin/caddy
 COPY --from=studio /srv/studio /srv/studio
-COPY edge/Caddyfile edge/Caddyfile.dev edge/Caddyfile.public edge/common.caddy edge/gate-on.caddy edge/gate-off.caddy /etc/caddy/
+COPY edge/Caddyfile edge/Caddyfile.dev edge/Caddyfile.public edge/common.caddy edge/gate-on.caddy edge/gate-off.caddy \
+     edge/tls-acme.caddy edge/tls-file.caddy /etc/caddy/
 ENV CP_UPSTREAM=sloptown-cp:8000 FAKE_MIIRA_UPSTREAM=sloptown-fake-miira:8100 \
     ADMIN_ALLOWED_IPS=127.0.0.1/32 MIIRA_ORIGINS=https://miira.dk
 LABEL io.containers.autoupdate=registry

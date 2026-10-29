@@ -31,6 +31,11 @@ deploy/dev-up.sh --down                              # stop (data volumes are ke
 - Volumes: `sloptown-public-db` (Postgres), `sloptown-public-fake-miira` (fake Miira's
   files, shares and signing key), `sloptown-public-caddy` (certificates; keep it, Let's
   Encrypt allows 50 new certificates per week for the domain).
+- TLS: when `/etc/sloptown/tls` holds `fullchain.pem` (certificate, then chain) and
+  `priv.pem`, `dev-up.sh` mounts it into the edge and every host uses that wildcard
+  certificate (`TLS_MODE=file`); nothing is requested from Let's Encrypt. Without it
+  (or with `SLOPTOWN_TLS_DIR=`), Caddy gets one Let's Encrypt certificate per host.
+  Renew by replacing both files and running `dev-up.sh --public <domain> --no-build`.
 - Inference: by default the egress has no OpenAI key, so the agent can't answer. Either
   pass a real key (`SLOPTOWN_OPENAI_API_KEY=sk-... deploy/dev-up.sh --public ...`), or run
   the scripted fake model the tests use:
@@ -60,7 +65,7 @@ deploy/dev-up.sh --down                              # stop (data volumes are ke
 | Miira | fake-miira on `miira.<domain>` | the real Miira (OIDC, members API, webhooks) |
 | Studio host | `studio.miira-apps.dk` (same site as the apps) | a separate registered domain |
 | Access | password gate on every host | Miira login only |
-| TLS | on-demand per host (Caddy, HTTP-01) | DNS-01 wildcard for the apps domain |
+| TLS | wildcard from `/etc/sloptown/tls` if present, else on-demand per host (HTTP-01) | `TLS_MODE=file` wildcard for the apps domain; studio on its own domain via ACME |
 | Stack | `dev-up.sh` containers, rootful, `SLOPTOWN_DEV_MODE=true` | quadlets, rootless, gVisor (`bootstrap.sh`) |
 
 Because the studio shares the apps' site here, the control plane refuses state-changing

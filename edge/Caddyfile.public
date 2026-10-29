@@ -3,10 +3,10 @@
 # fake Miira and puts the studio on the apps domain (see docs/deploy-public-test.md).
 # Env: GATE_DOMAIN (e.g. miira-apps.dk), APPS_DOMAIN (= GATE_DOMAIN), STUDIO_HOST,
 #      STUDIO_ORIGIN, MIIRA_ORIGINS, CP_UPSTREAM, FAKE_MIIRA_UPSTREAM, GATE_UPSTREAM,
-#      ADMIN_ALLOWED_IPS, GATE_MODE (on|off, default on)
+#      ADMIN_ALLOWED_IPS, GATE_MODE (on|off, default on), TLS_MODE (acme|file, default acme)
 {
 	order rate_limit before basic_auth
-	# Per-app certificates, issued only for hosts the control plane knows.
+	# TLS_MODE=acme: per-host certificates, issued only for hosts the control plane knows.
 	on_demand_tls {
 		ask http://{$CP_UPSTREAM}/edge/tls-ask
 	}
@@ -20,7 +20,12 @@ import /etc/caddy/common.caddy
 # and the gate cookie would never reach a studio framed by Miira's own site.
 import /etc/caddy/gate-{$GATE_MODE:on}.caddy
 
+# The `apps_tls` and `apex_tls` snippets: tls-acme.caddy (Let's Encrypt, on demand)
+# or tls-file.caddy (the wildcard certificate in /etc/caddy/tls), picked by TLS_MODE.
+import /etc/caddy/tls-{$TLS_MODE:acme}.caddy
+
 {$GATE_DOMAIN} {
+	import apex_tls
 	import security_headers
 	handle /_gate* {
 		reverse_proxy {$GATE_UPSTREAM}
@@ -31,30 +36,24 @@ import /etc/caddy/gate-{$GATE_MODE:on}.caddy
 }
 
 {$STUDIO_HOST} {
-	# On demand like the *.{$APPS_DOMAIN} site: Caddy treats this name as covered by
-	# that wildcard and would otherwise never obtain a certificate for it.
-	tls {
-		on_demand
-	}
+	# Same certificates as the *.{$APPS_DOMAIN} site: Caddy treats this name as covered
+	# by that wildcard and would otherwise never obtain a certificate for it.
+	import apps_tls
 	import gate
 	import studio
 }
 
 miira.{$GATE_DOMAIN} {
-	# On demand like the *.{$APPS_DOMAIN} site: Caddy treats this name as covered by
-	# that wildcard and would otherwise never obtain a certificate for it.
-	tls {
-		on_demand
-	}
+	# Same certificates as the *.{$APPS_DOMAIN} site: Caddy treats this name as covered
+	# by that wildcard and would otherwise never obtain a certificate for it.
+	import apps_tls
 	import security_headers
 	import gate
 	reverse_proxy {$FAKE_MIIRA_UPSTREAM}
 }
 
 *.{$APPS_DOMAIN} {
-	tls {
-		on_demand
-	}
+	import apps_tls
 	import gate
 	import apps
 }

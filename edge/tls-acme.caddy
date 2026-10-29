@@ -1,0 +1,11 @@
+# Certificates from Let's Encrypt (TLS_MODE=acme, the default): one per host,
+# issued on demand for hosts the control plane knows (/edge/tls-ask). The apex
+# gets an ordinary managed certificate. Let's Encrypt allows 50 new
+# certificates per week per registered domain; past that, use tls-file.caddy.
+(apps_tls) {
+	tls {
+		on_demand
+	}
+}
+(apex_tls) {
+}

@@ -15,6 +15,10 @@
 #   everything behind the password gate (edge/gate.py, container sloptown-gate).
 #   Needs DNS: <domain> and *.<domain> -> this host. Secrets and the gate password are
 #   generated once into deploy/.public.env (gitignored, mode 600). See docs/deploy-public-test.md.
+#   TLS: if $SLOPTOWN_TLS_DIR (default /etc/sloptown/tls) holds fullchain.pem and priv.pem,
+#   that wildcard certificate (*.<domain> and <domain>) is mounted into the edge and used for
+#   every host (TLS_MODE=file); otherwise Caddy gets one Let's Encrypt certificate per host.
+#   SLOPTOWN_TLS_DIR= (empty) forces Let's Encrypt.
 #
 # Real Miira instead of fake-miira (either mode): set SLOPTOWN_MIIRA_ORIGIN to Miira's
 #   public origin (e.g. https://staging.miira.dk). Its OIDC issuer is <origin>/api/vibe/oidc.
@@ -185,6 +189,11 @@ if [ -n "$PUBLIC" ] && [ "$GATE_MODE" = on ]; then
   EDGE_ENV=(-e GATE_DOMAIN="$PUBLIC" -e GATE_UPSTREAM=sloptown-gate:9100 -v sloptown-public-caddy:/data)
 elif [ -n "$PUBLIC" ]; then
   EDGE_ENV=(-e GATE_DOMAIN="$PUBLIC" -e GATE_MODE=off -v sloptown-public-caddy:/data)
+fi
+TLS_DIR="${SLOPTOWN_TLS_DIR-/etc/sloptown/tls}"
+if [ -n "$PUBLIC" ] && [ -n "$TLS_DIR" ] && [ -r "$TLS_DIR/fullchain.pem" ] && [ -r "$TLS_DIR/priv.pem" ]; then
+  echo "-- edge uses the wildcard certificate in $TLS_DIR"
+  EDGE_ENV+=(-e TLS_MODE=file -v "$TLS_DIR:/etc/caddy/tls:ro,z")
 fi
 
 echo "-- sloptown-edge (${EDGE_PORTS[*]})"

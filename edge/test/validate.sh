@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Edge test: build the edge image, `caddy validate` both configs, then run the
-# dev config against a mock control plane and mock app and check routing,
-# header stripping, forward_auth, admin IP restriction and CSP.
+# Edge test: build the edge image, `caddy validate` every config (TLS_MODE acme
+# and file), then run the dev config against a mock control plane and mock app
+# and check routing, header stripping, forward_auth, admin IP restriction and
+# CSP, and the public config with a test wildcard certificate (TLS_MODE=file).
 #   edge/test/validate.sh                      (builds edge:test with a placeholder studio)
 #   EDGE_IMAGE=<image> edge/test/validate.sh   (tests an already built image; used by the pipeline)
 set -euo pipefail
@@ -14,8 +15,9 @@ ok()  { echo "  ok   $*"; pass=$((pass+1)); }
 bad() { echo "  FAIL $*"; fail=$((fail+1)); }
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 
-cleanup() { podman rm -f edgetest-edge edgetest-cp edgetest-app >/dev/null 2>&1 || true; podman network rm -f $NET >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+TLSDIR="$(mktemp -d)"
+cleanup() { podman rm -f edgetest-edge edgetest-tls edgetest-cp edgetest-app >/dev/null 2>&1 || true; podman network rm -f $NET >/dev/null 2>&1 || true; }
+trap 'cleanup; rm -rf "$TLSDIR"' EXIT
 cleanup
 
 if [ -n "${EDGE_IMAGE:-}" ]; then
@@ -49,6 +51,20 @@ if podman run --rm "${ENVS[@]}" -e GATE_MODE=off "$IMG" caddy validate --adapter
 else
   bad "validate Caddyfile.public with GATE_MODE=off"
 fi
+
+# Self-signed stand-in for the real wildcard certificate (TLS_MODE=file).
+podman run --rm -v "$TLSDIR:/out:z" docker.io/alpine/openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
+  -subj '/CN=*.example.test' -addext 'subjectAltName=DNS:*.example.test,DNS:example.test' \
+  -keyout /out/priv.pem -out /out/fullchain.pem >/dev/null 2>&1
+chmod 644 "$TLSDIR"/*.pem
+TLSV=(-e TLS_MODE=file -v "$TLSDIR:/etc/caddy/tls:ro,z")
+for f in Caddyfile Caddyfile.public; do
+  if podman run --rm "${ENVS[@]}" "${TLSV[@]}" "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/$f >/dev/null 2>&1; then
+    ok "validate $f with TLS_MODE=file"
+  else
+    bad "validate $f with TLS_MODE=file"; podman run --rm "${ENVS[@]}" "${TLSV[@]}" "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/$f 2>&1 | tail -5
+  fi
+done
 
 echo "== behaviour (Caddyfile.dev against mocks)"
 podman network create $NET >/dev/null
@@ -94,6 +110,18 @@ check "WebSocket upgrade (Vite HMR) passes forward_auth" '[[ "$r" == *"\"upgrade
 r=$(c -H 'Host: myapp.apps.sloptown.localhost:8080' -H 'Cookie: sloptown_gate=123.abc; vibe_app=ok; theme=dark' $E/)
 check "public-test gate cookie never reaches the app" '[[ "$r" != *"sloptown_gate"* && "$r" == *"vibe_app=ok"* && "$r" == *"theme=dark"* ]]'
 check "X-Vibe-View-As not leaked to app" '[[ "$r" != *"x-vibe-view-as"* ]]'
+
+echo "== wildcard certificate (Caddyfile.public, TLS_MODE=file)"
+podman run -d --name edgetest-tls --network $NET "${ENVS[@]}" "${TLSV[@]}" -e GATE_MODE=off \
+  -e APPS_DOMAIN=example.test -e STUDIO_HOST=studio.example.test \
+  "$IMG" caddy run --adapter caddyfile --config /etc/caddy/Caddyfile.public >/dev/null
+sleep 2
+for h in myapp.example.test preview-myapp.example.test studio.example.test miira.example.test example.test; do
+  r=$(c -k -v -o /dev/null --connect-to "$h:443:edgetest-tls:443" "https://$h/" 2>&1 || true)
+  check "$h served the wildcard certificate" '[[ "$r" == *"subject: CN=*.example.test"* ]]'
+done
+r=$(podman logs edgetest-tls 2>&1)
+check "no ACME issuance attempted" '[[ "$r" != *"obtaining certificate"* && "$r" != *"acme"*"challenge"* ]]'
 
 echo "== $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

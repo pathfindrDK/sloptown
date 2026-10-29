@@ -1,0 +1,10 @@
+# One wildcard certificate for *.APPS_DOMAIN and APPS_DOMAIN (TLS_MODE=file),
+# mounted read-only at /etc/caddy/tls: fullchain.pem (certificate first, then
+# the chain) and priv.pem. Nothing is requested from Let's Encrypt for these
+# hosts. Renewal is manual: replace both files, then restart the edge.
+(apps_tls) {
+	tls /etc/caddy/tls/fullchain.pem /etc/caddy/tls/priv.pem
+}
+(apex_tls) {
+	tls /etc/caddy/tls/fullchain.pem /etc/caddy/tls/priv.pem
+}

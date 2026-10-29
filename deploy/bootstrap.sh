@@ -10,7 +10,7 @@
 #   3. user `sloptown` with home on the LUKS volume, big subuid/subgid range, linger
 #   4. user@<uid> waits for the LUKS mount (like docker/podman units on this host)
 #   5. sysctl so rootless Caddy can bind :80/:443
-#   6. /etc/sloptown/{sloptown.env,egress.env,sloptown.nft} and the nft loader unit
+#   6. /etc/sloptown/{sloptown.env,egress.env,sloptown.nft,tls/} and the nft loader unit
 #   7. rootless podman config (runsc runtime, insecure localhost:5000 registry)
 #   8. repo checkout for the sloptown user, quadlet units, nightly pipeline timer
 #   9. unattended-upgrades WITHOUT automatic reboot (the LUKS volume needs a human)
@@ -136,6 +136,9 @@ say "6. /etc/sloptown and nftables"
 run install -d -m 0750 -o root -g "$SVC_USER" "$ETC"
 [ -f "$ETC/sloptown.env" ] || run install -m 0640 -o root -g "$SVC_USER" "$REPO_SRC/deploy/sloptown.env.example" "$ETC/sloptown.env"
 [ -f "$ETC/egress.env" ] || run install -m 0640 -o root -g "$SVC_USER" "$REPO_SRC/edge/egress.env" "$ETC/egress.env"
+# Wildcard certificate for TLS_MODE=file; the edge unit mounts it (empty is fine).
+# Rootless edge: the service user must own the key.
+[ -d "$ETC/tls" ] || run install -d -m 0700 -o "$SVC_USER" -g "$SVC_USER" "$ETC/tls"
 run install -m 0644 "$REPO_SRC/edge/nftables/sloptown.nft" "$ETC/sloptown.nft"
 run nft -c -f "$ETC/sloptown.nft"
 # Own unit, not nftables.service: the stock /etc/nftables.conf flushes the whole

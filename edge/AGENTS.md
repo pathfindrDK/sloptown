@@ -8,20 +8,22 @@ in this directory belongs to the egress proxy (see `control-plane/AGENTS.md`).
 | Path | |
 |---|---|
 | `common.caddy` | snippets `(studio)` and `(apps)`, imported by both Caddyfiles. All routing lives here |
-| `Caddyfile` | production: `{$STUDIO_HOST}` and `*.{$APPS_DOMAIN}` with on-demand TLS (`ask` → cp `/edge/tls-ask`) |
+| `Caddyfile` | production: `{$STUDIO_HOST}` and `*.{$APPS_DOMAIN}`; the apps site takes its certificate from the `apps_tls` snippet (`TLS_MODE`) |
 | `Caddyfile.dev` | plain http on :8080 for `studio.sloptown.localhost`, `miira.sloptown.localhost` (→ fake-miira), `*.apps.sloptown.localhost` |
-| `Caddyfile.public` | public *test* on a real domain (`dev-up.sh --public`): Let's Encrypt, fake Miira on `miira.<domain>`, every host behind `gate.py`. Studio and miira hosts are on-demand too, because Caddy treats them as covered by the `*.<domain>` site (cp `/edge/tls-ask` approves them) |
+| `Caddyfile.public` | public *test* on a real domain (`dev-up.sh --public`): Let's Encrypt, fake Miira on `miira.<domain>`, every host behind `gate.py`. Studio and miira hosts use `apps_tls` too, because Caddy treats them as covered by the `*.<domain>` site (in acme mode cp `/edge/tls-ask` approves them); the apex uses `apex_tls` |
 | `gate-on.caddy` / `gate-off.caddy` | the `gate` snippet `Caddyfile.public` imports per `GATE_MODE` (default `on`). On: `forward_auth` to `gate.py` for everything but `/hooks/*` and `/admin/v1/*` (Miira's server calls, which carry their own HMAC/JWT auth). Off: nothing, for a real Miira as IdP (`dev-up.sh` with `SLOPTOWN_MIIRA_ORIGIN`), where a gate cookie would never reach a studio framed by Miira's site |
+| `tls-acme.caddy` / `tls-file.caddy` | the `apps_tls` and `apex_tls` snippets both Caddyfiles import per `TLS_MODE` (default `acme`). Acme: `tls { on_demand }` for app hosts, Let's Encrypt (50 new certificates per week per domain). File: one wildcard certificate for `*.APPS_DOMAIN` and `APPS_DOMAIN` from `/etc/caddy/tls/{fullchain.pem,priv.pem}` (mounted read-only from `/etc/sloptown/tls`), nothing requested from Let's Encrypt |
 | `gate.py` | stdlib password gate for the public test: one login sets a `Domain=<domain>` cookie checked by `forward_auth` on every host (basic auth can't work across subdomains and iframes). `common.caddy` strips its cookie before requests reach apps |
 | `Containerfile` | xcaddy build with `caddy-ratelimit`, the studio SPA from `STUDIO_IMAGE`, the Caddyfiles |
 | `nftables/sloptown.nft` | table `inet sloptown_vibe`: project bridges (`vb*`) may reach only aardvark-dns on the host |
-| `test/validate.sh` | builds the image, `caddy validate`s all three configs, runs the dev config against mocks (21 checks) |
+| `test/validate.sh` | builds the image, `caddy validate`s all three configs (and both with `TLS_MODE=file`), runs the dev config against mocks, and the public config with a self-signed `*.example.test` certificate: every host serves it and no ACME issuance starts (30 checks) |
 | `test/test_gate.py` | pytest for `gate.py` (tokens, open-redirect guard, login and check flow) |
 | `test/mock.py` | mock control plane (`forward_auth` answers) and echo app |
 
 Env used by the Caddyfiles: `STUDIO_HOST`, `APPS_DOMAIN`, `STUDIO_ORIGIN`,
 `MIIRA_ORIGINS` (space separated), `CP_UPSTREAM` (`sloptown-cp:8000`),
-`ADMIN_ALLOWED_IPS` (space separated CIDRs), `ACME_EMAIL`, `FAKE_MIIRA_UPSTREAM` (dev).
+`ADMIN_ALLOWED_IPS` (space separated CIDRs), `ACME_EMAIL`, `TLS_MODE` (`acme`|`file`),
+`FAKE_MIIRA_UPSTREAM` (dev).
 
 ## Routing
 
@@ -62,9 +64,15 @@ nft -c -f edge/nftables/sloptown.nft                # syntax check only, applies
   instead (that is why `/_vibe/session` is written that way).
 - Rate limiting needs the `caddy-ratelimit` plugin, hence the xcaddy build.
   `order rate_limit before basic_auth` must stay in both global blocks.
-- On-demand TLS issues one certificate per app host. Fine for tens of apps; for
-  more, switch to a DNS-01 wildcard (`*.APPS`) with the DNS provider's
-  caddy-dns plugin in the `Containerfile`, and drop `on_demand`.
+- `TLS_MODE=acme` issues one certificate per app host and hits Let's Encrypt's
+  50-per-week limit with a few dozen Vibes. `TLS_MODE=file` serves one
+  wildcard certificate (Sectigo `*.miira-apps.dk` + `miira-apps.dk`, valid to
+  2027-05-15; renewal is manual: replace both files, restart the edge).
+  `fullchain.pem` must start with the leaf certificate, then the chain.
+  The private key is never in the repo or an image: it lives only in
+  `/etc/sloptown/tls` and is mounted read-only.
+- A wildcard covers one label: `x.miira-apps.dk`, not `a.b.miira-apps.dk`.
+  App hosts are `<slug>.APPS` and `preview-<slug>.APPS`, so keep them single-label.
 - nftables: measured on this host (podman 5.7 / netavark 1.16, rootful), an
   `--internal` network still reaches every host service on its gateway IP
   (sshd :5700, smtp :25 were open). The input chain closes that. Rootless

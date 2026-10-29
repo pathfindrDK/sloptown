@@ -15,6 +15,9 @@ PublishPort=80:80
 PublishPort=443:443
 PublishPort=443:443/udp
 Volume=sloptown-caddy.volume:/data
+# Wildcard certificate for *.APPS_DOMAIN (fullchain.pem, priv.pem), used when
+# sloptown.env sets TLS_MODE=file. The directory must exist even when unused.
+Volume=/etc/sloptown/tls:/etc/caddy/tls:ro
 Exec=caddy run --adapter caddyfile --config /etc/caddy/Caddyfile
 NoNewPrivileges=true
 HealthCmd=wget -q -O /dev/null http://127.0.0.1:2019/config/

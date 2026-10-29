@@ -17,7 +17,7 @@ Its home, and therefore all container storage, is on the LUKS vault
 | `containers/` | Containerfiles: `control-plane` (also the egress, `python -m sloptown.egress`), `fake-miira`, `studio` (data-only image with `/srv/studio`); `healthcheck.py` → `/usr/local/bin/sloptown-healthcheck <url>` in the control-plane image |
 | `systemd/` | `sloptown-nft.service` (system; loads `edge/nftables/sloptown.nft`), `sloptown-nightly.{service,timer}` (user; 02:30 Europe/Copenhagen) |
 | `pipeline/nightly.sh` | build → Trivy gate → smoke tests → push → `podman auto-update` → tell the control plane |
-| `dev-up.sh` | whole stack locally on 127.0.0.1:8080 (dev, uses the caller's podman socket); `--public <domain>` runs it on a real domain behind the password gate (see `../docs/deploy-public-test.md`; secrets in `deploy/.public.env`, gitignored). `SLOPTOWN_MIIRA_ORIGIN=<origin>` uses a real Miira (miira3) instead of fake-miira, in either mode; see `../docs/miira-integration.md` §11 |
+| `dev-up.sh` | whole stack locally on 127.0.0.1:8080 (dev, uses the caller's podman socket); `--public <domain>` runs it on a real domain behind the password gate (see `../docs/deploy-public-test.md`; secrets in `deploy/.public.env`, gitignored); it uses the wildcard certificate in `/etc/sloptown/tls` (`SLOPTOWN_TLS_DIR`) when present. `SLOPTOWN_MIIRA_ORIGIN=<origin>` uses a real Miira (miira3) instead of fake-miira, in either mode; see `../docs/miira-integration.md` §11 |
 | `test/platform-smoke.sh` | quadlet dry-run + boots db/cp/egress/fake-miira from images and probes them |
 | `test/wait-healthy.sh` | waits for cp/egress/fake-miira health |
 
@@ -38,7 +38,9 @@ PIPELINE_GIT_PULL=0 deploy/pipeline/nightly.sh --no-push       # everything, no 
    fake-miira). It clones the repo to `/mnt/encrypted-at-rest/sloptown-home/sloptown`;
    everything below runs from that clone.
 3. Fill `/etc/sloptown/sloptown.env` (every `CHANGE_ME`; `openssl rand -hex 32`
-   for secrets) and review `/etc/sloptown/egress.env`.
+   for secrets) and review `/etc/sloptown/egress.env`. For the wildcard
+   certificate, put `fullchain.pem` and `priv.pem` in `/etc/sloptown/tls`
+   (owned by `sloptown`, key mode 600) and set `TLS_MODE=file`.
 4. Read the bootstrap's gVisor line. If rootless `runsc` failed, set
    `SLOPTOWN_OCI_RUNTIME=` (empty = crun) until it's fixed. That is a weaker
    sandbox; record the decision.
@@ -180,3 +182,5 @@ the stock `nftables.service` must not be used here.
 - `podman auto-update` rollback and the user-level quadlet units at runtime
   (`platform-smoke.sh` only dry-runs the quadlet generator).
 - On-demand TLS issuance (needs real DNS).
+- `TLS_MODE=file` under the rootless quadlet unit (tested rootful through
+  `dev-up.sh` and `edge/test/validate.sh` only).
