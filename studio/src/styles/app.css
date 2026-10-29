@@ -1450,13 +1450,13 @@ textarea.field {
   align-items: flex-start;
   gap: var(--miira-space-2);
 }
-.settings__choices {
+.choice-cards {
   display: flex;
   flex-direction: column;
   gap: var(--miira-space-2);
   width: 100%;
 }
-.settings__choice {
+.choice-card {
   display: flex;
   align-items: flex-start;
   gap: var(--miira-space-3);
@@ -1475,38 +1475,38 @@ textarea.field {
     box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
     border-color 0.15s;
 }
-.settings__choice > svg {
+.choice-card > svg {
   flex: none;
   margin-top: 2px;
 }
-.settings__choice > span {
+.choice-card > span:not(.swatch) {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.settings__choice .muted {
+.choice-card .muted {
   font-size: var(--miira-font-size-sm);
 }
-.settings__choice:hover:not(:disabled) {
+.choice-card:hover:not(:disabled) {
   border-color: var(--miira-border-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 0 0 var(--miira-border-hover);
 }
 /* The chosen card: accent edge and the guide's checked-row tint (switch-row[aria-checked]).
    It lifts on hover like the others but keeps its accent (chip.is-active:hover). */
-.settings__choice.is-active,
-.settings__choice.is-active:hover:not(:disabled) {
+.choice-card.is-active,
+.choice-card.is-active:hover:not(:disabled) {
   border-color: var(--miira-accent);
   background: color-mix(in srgb, var(--miira-bg-hover) 35%, var(--miira-bg-primary));
   box-shadow: 0 3px 0 0 var(--miira-accent);
 }
-.settings__choice.is-active:hover:not(:disabled) {
+.choice-card.is-active:hover:not(:disabled) {
   box-shadow: 0 5px 0 0 var(--miira-accent);
 }
-.settings__choice:disabled {
+.choice-card:disabled {
   cursor: default;
 }
-.settings__choice:disabled:not(.is-active) {
+.choice-card:disabled:not(.is-active) {
   opacity: 0.6;
 }
 .settings__error {
@@ -1674,4 +1674,66 @@ textarea.field {
   place-items: center;
   width: 48px;
   height: 48px;
+}
+
+/* Design step of the start screen: style and palette cards (.choice-card). */
+.start--design {
+  width: 100%;
+}
+.start h2 {
+  align-self: flex-start;
+  margin: var(--miira-space-2) 0 0;
+  font-size: var(--miira-font-size-md);
+}
+.start__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--miira-space-2);
+  width: 100%;
+}
+.start__grid--palettes {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.start__grid .choice-card {
+  align-items: center;
+}
+.start__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--miira-space-2);
+  width: 100%;
+}
+
+/* A palette as three dots; the colours are catalog data (components/Swatch.tsx). */
+.swatch {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-full);
+  background: var(--miira-color-surface);
+}
+.swatch > span {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--miira-radius-full);
+  /* A light dot (surface) stays visible on a light background. */
+  box-shadow: inset 0 0 0 1px var(--miira-color-border);
+}
+
+.settings__design {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--miira-space-3);
+}
+.settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-1);
+}
+.settings__label {
+  font-size: var(--miira-font-size-sm);
+  font-weight: 500;
+  color: var(--miira-color-text-muted);
 }

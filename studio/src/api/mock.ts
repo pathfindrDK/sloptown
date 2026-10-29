@@ -2,6 +2,7 @@
 // and screenshot every screen without containers: streaming turns, queueing,
 // files, history, publish, restore and budgets.
 import type { Transport } from "./client";
+import { MOCK_DESIGN } from "./mockDesign";
 import {
   ApiError,
   type BudgetStatus,
@@ -166,6 +167,8 @@ function makeProject(pid: string, title: string, seeded: boolean): ProjectData {
       publishedSha: null,
       public: false,
       description: "",
+      style: "miira",
+      palette: "hav",
       createdAt: created,
       updatedAt: now(),
     },
@@ -323,7 +326,11 @@ const routes: [string, RegExp, Handler][] = [
     (_m, b) => {
       const d = makeProject(b.fileId, b.title ?? "Ny Vibe", false);
       d.usedTokens = 0;
+      const palettes = MOCK_DESIGN.palettes.map((p) => p.id);
+      d.project.style = b.style ?? "miira";
+      d.project.palette = b.palette ?? palettes[Math.floor(Math.random() * palettes.length)];
       if (b.kind === "scratch") {
+        d.project.style = d.project.palette = null;
         const readme = "# Mit projekt\n\nEt tomt projekt. Intet herfra bliver lagt på nettet.\n";
         d.project.kind = "scratch";
         d.project.previewUrl = null;
@@ -334,9 +341,17 @@ const routes: [string, RegExp, Handler][] = [
       return d.project;
     },
   ],
-  ["GET", /^\/api\/projects\/([^/]+)$/, (m) => get(m[1]).project],
+  ["GET", /^\/api\/design$/, () => MOCK_DESIGN],
+  // Like the control plane for the file's owner: an unknown Vibe is one to start.
+  ["GET", /^\/api\/projects\/([^/]+)$/, (m) => {
+    if (!projects.has(m[1])) throw new ApiError(404, "not_started", "Vibe'en er ikke startet", { canStart: true });
+    return get(m[1]).project;
+  }],
   ["PATCH", /^\/api\/projects\/([^/]+)$/, (m, b) => {
-    const patch = Object.fromEntries(["title", "description", "public"].filter((k) => b[k] !== undefined).map((k) => [k, b[k]]));
+    const keys = ["title", "description", "public", "style", "palette"];
+    const patch = Object.fromEntries(keys.filter((k) => b[k] !== undefined).map((k) => [k, b[k]]));
+    // Like agentd: a palette alone on an older Vibe gives it the Miira style.
+    if (patch.palette && !get(m[1]).project.style && !patch.style) patch.style = "miira";
     return Object.assign(get(m[1]).project, patch, { updatedAt: now() });
   }],
   [

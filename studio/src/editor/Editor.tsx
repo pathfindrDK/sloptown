@@ -343,7 +343,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                   onPublish={webapp ? publish : undefined}
                 />
               )}
-              {sideTab === "settings" && canEdit && <SettingsPanel project={project} onChange={setProject} />}
+              {sideTab === "settings" && canEdit && <SettingsPanel project={project} onChange={setProject} onAskAi={askAiToFix} />}
             </div>
           </aside>
         )}

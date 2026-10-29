@@ -1,8 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 
-export type SelectOption<T extends string> = { value: T; label: string };
+export type SelectOption<T extends string> = { value: T; label: string; icon?: ReactNode };
 
 const GAP = 4;
 
@@ -118,6 +118,7 @@ export function Select<T extends string>({
         onClick={() => (open ? setOpen(false) : show(selectedIndex))}
         onKeyDown={onTriggerKey}
       >
+        {current?.icon}
         <span>{current?.label}</span>
         <ChevronDown size={14} aria-hidden />
       </button>
@@ -144,6 +145,7 @@ export function Select<T extends string>({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => pick(i)}
               >
+                {o.icon}
                 {o.label}
               </div>
             ))}

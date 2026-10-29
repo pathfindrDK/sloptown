@@ -27,9 +27,28 @@ export type Project = {
   /** The published app opens without a Miira login. */
   public: boolean;
   description: string;
+  /** Design system and colour palette ids (GET /api/design). null: a "fra bunden"
+   *  project, or a webapp from before design systems (Miira look, no palette yet). */
+  style: string | null;
+  palette: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export type Localized = { da: string; en: string };
+export type PaletteColours = {
+  primary: string;
+  onPrimary: string;
+  bg: string;
+  surface: string;
+  text: string;
+  muted: string;
+  border: string;
+};
+export type DesignStyle = { id: string; name: Localized; description: Localized; package?: string };
+export type DesignPalette = { id: string; name: Localized; light: PaletteColours; dark: PaletteColours };
+/** GET /api/design: template-design/catalog.json. */
+export type DesignCatalog = { styles: DesignStyle[]; palettes: DesignPalette[] };
 
 export type BudgetState = "ok" | "warning" | "nerfed" | "blocked";
 export type BucketStatus = {

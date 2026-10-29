@@ -4,6 +4,7 @@ import {
   ApiError,
   type BudgetStatus,
   type Commit,
+  type DesignCatalog,
   type Diff,
   type FileContent,
   type FileEntry,
@@ -106,11 +107,12 @@ export const api = {
 
   // Projects
   listProjects: () => req<Project[]>("GET", "/api/projects"),
-  createProject: (fileId: string, kind: ProjectKind = "webapp", title?: string) =>
-    req<Project>("POST", "/api/projects", { fileId, kind, title }),
+  createProject: (fileId: string, kind: ProjectKind = "webapp", title?: string, design?: { style?: string; palette?: string }) =>
+    req<Project>("POST", "/api/projects", { fileId, kind, title, ...design }),
+  design: () => req<DesignCatalog>("GET", "/api/design"),
   getProject: (pid: string) => req<Project>("GET", `/api/projects/${enc(pid)}`),
   renameProject: (pid: string, title: string) => req<Project>("PATCH", `/api/projects/${enc(pid)}`, { title }),
-  updateProject: (pid: string, patch: { description?: string; public?: boolean }) =>
+  updateProject: (pid: string, patch: { description?: string; public?: boolean; style?: string; palette?: string }) =>
     req<Project>("PATCH", `/api/projects/${enc(pid)}`, patch),
   publish: (pid: string, sha: string) =>
     req<{ publishedSha: string; url: string }>("POST", `/api/projects/${enc(pid)}/publish`, { sha }),

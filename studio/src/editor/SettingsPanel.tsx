@@ -1,36 +1,61 @@
-// "Indstillinger" in the side pane: the Vibe's icon (kept by Miira), who can open the
-// published app, and its description. More settings land here later.
+// "Indstillinger" in the side pane: the Vibe's icon (kept by Miira), its design
+// system and colours, who can open the published app, and its description.
 import { useEffect, useState } from "react";
 import type { IconState } from "../lib/embedBridge";
 import { Globe, ImagePlus, Lock } from "lucide-react";
 import { api } from "../api/client";
-import type { Project } from "../api/types";
-import { useT } from "../lib/i18n";
+import { ApiError, type Project } from "../api/types";
+import { ConfirmModal } from "../components/Modal";
+import { Select } from "../components/Select";
+import { Swatch } from "../components/Swatch";
+import { useDesign } from "../lib/design";
+import { useLocale, useT } from "../lib/i18n";
 import { useShell } from "../lib/shell";
 
-type Props = { project: Project; onChange: (project: Project) => void };
+type Props = {
+  project: Project;
+  onChange: (project: Project) => void;
+  /** Put a prompt in the chat composer for the teacher to send (Editor.askAiToFix). */
+  onAskAi: (prompt: string) => void;
+};
 
-export function SettingsPanel({ project, onChange }: Props) {
+type Patch = { description?: string; public?: boolean; style?: string; palette?: string };
+
+export function SettingsPanel({ project, onChange, onAskAi }: Props) {
   const t = useT();
+  const locale = useLocale();
   const shell = useShell();
+  const catalog = useDesign();
   const owner = project.myRole === "owner";
   const [description, setDescription] = useState(project.description);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [pendingStyle, setPendingStyle] = useState<string | null>(null);
   useEffect(() => setDescription(project.description), [project.description]);
   const [icon, setIcon] = useState<IconState | null>(null);
   useEffect(() => shell.onIcon((fileId, next) => fileId === project.id && setIcon(next)), [shell, project.id]);
 
-  const save = async (patch: { description?: string; public?: boolean }) => {
+  const save = async (patch: Patch): Promise<boolean> => {
     setSaving(true);
-    setFailed(false);
+    setFailed(null);
     try {
       onChange(await api.updateProject(project.id, patch));
-    } catch {
-      setFailed(true);
+      return true;
+    } catch (e) {
+      setFailed(e instanceof ApiError && e.code === "turn_running" ? t("settings.turnRunning") : t("common.error"));
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const styleName = (id: string) => catalog?.styles.find((s) => s.id === id)?.name[locale] ?? id;
+
+  // A new design system needs the AI to rebuild the UI: confirm, switch, then
+  // hand the teacher a prompt to send (a normal turn on their budget).
+  const changeStyle = async (style: string) => {
+    setPendingStyle(null);
+    if (await save({ style })) onAskAi(t("settings.stylePrompt").replace("{style}", styleName(style)));
   };
 
   return (
@@ -52,17 +77,58 @@ export function SettingsPanel({ project, onChange }: Props) {
         </section>
       )}
 
+      {project.kind !== "scratch" && catalog && (
+        <section className="settings__section">
+          <h3>{t("settings.design")}</h3>
+          <p className="muted">{t("settings.designBody")}</p>
+          <div className="settings__design">
+            <div className="settings__field">
+              <span className="settings__label">{t("settings.style")}</span>
+              <Select
+                label={t("settings.style")}
+                value={project.style ?? "miira"}
+                options={catalog.styles.map((s) => ({ value: s.id, label: s.name[locale] }))}
+                onChange={(style) => style !== (project.style ?? "miira") && setPendingStyle(style)}
+              />
+            </div>
+            <div className="settings__field">
+              <span className="settings__label">{t("settings.palette")}</span>
+              <Select
+                label={t("settings.palette")}
+                value={project.palette ?? ""}
+                options={[
+                  ...(project.palette ? [] : [{ value: "", label: t("settings.paletteNone") }]),
+                  ...catalog.palettes.map((p) => ({ value: p.id, label: p.name[locale], icon: <Swatch colours={p.light} /> })),
+                ]}
+                onChange={(palette) => palette && palette !== project.palette && save({ palette })}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {pendingStyle && (
+        <ConfirmModal
+          title={t("settings.styleConfirmTitle")}
+          body={t("settings.styleConfirmBody").replace("{style}", styleName(pendingStyle))}
+          confirmLabel={t("settings.styleConfirm")}
+          busy={saving}
+          onConfirm={() => changeStyle(pendingStyle)}
+          onCancel={() => setPendingStyle(null)}
+        />
+      )}
+
       {project.kind !== "scratch" && (
         <section className="settings__section">
           <h3 id="settings-access">{t("settings.access")}</h3>
-          <div className="settings__choices" role="radiogroup" aria-labelledby="settings-access">
+          <div className="choice-cards" role="radiogroup" aria-labelledby="settings-access">
             {([false, true] as const).map((pub) => (
               <button
                 key={String(pub)}
                 role="radio"
                 aria-checked={project.public === pub}
                 disabled={!owner || saving}
-                className={`settings__choice${project.public === pub ? " is-active" : ""}`}
+                className={`choice-card${project.public === pub ? " is-active" : ""}`}
                 onClick={() => project.public !== pub && save({ public: pub })}
               >
                 {pub ? <Globe size={18} aria-hidden /> : <Lock size={18} aria-hidden />}
@@ -93,7 +159,7 @@ export function SettingsPanel({ project, onChange }: Props) {
         />
       </section>
 
-      {failed && <p className="settings__error">{t("common.error")}</p>}
+      {failed && <p className="settings__error">{failed}</p>}
     </div>
   );
 }

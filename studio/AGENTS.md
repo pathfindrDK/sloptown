@@ -48,11 +48,12 @@ Screenshots: build mock, `vite preview --outDir dist-mock`, drive it with
 | `src/lib/embedBridge.ts` | `drive:*` bridge with origin allowlist |
 | `src/lib/shell.tsx` | `Shell`: share / close / titleChanged, standalone vs embedded |
 | `src/lib/budget.ts` | meter maths and Copenhagen reset formatting |
+| `src/lib/design.ts` | `useDesign()`: the design catalog (`GET /api/design`), fetched once |
 | `src/lib/i18n.tsx` | Danish + English dictionaries, `useT()` |
 | `src/lib/lineDiff.ts`, `fileTree.ts` | changed-line highlight, flat list → tree |
-| `src/pages/` | `ProjectList`, `ProjectPage` (+ `Viewer`), `StartChooser` (the owner's first open: "En app" or "Fra bunden", on `not_started`), `EmbedGate` |
-| `src/editor/` | `Editor` layout, `Preview`, `CodeView` (lazy, CodeMirror 6), `ChatPanel`, `FilesPanel`, `HistoryPanel` |
-| `src/components/` | `TopBar`, `Budget` (meter + modal), `Modal`/`ConfirmModal`, `Menu`, `TermsModal`, `PublishError` (build log → "Ret fejlen" in chat) |
+| `src/pages/` | `ProjectList`, `ProjectPage` (+ `Viewer`), `StartChooser` (the owner's first open: "En app" or "Fra bunden", on `not_started`; "En app" then asks for a design system and a palette, "Overrask mig" leaves the palette to the control plane's random pick), `EmbedGate` |
+| `src/editor/` | `Editor` layout, `Preview`, `CodeView` (lazy, CodeMirror 6), `ChatPanel`, `FilesPanel`, `HistoryPanel`, `SettingsPanel` (icon, design system and palette, who can open the app, description). A new palette is saved at once; a new design system is confirmed, saved, and then a prompt is put in the chat composer for the teacher to send (`askAiToFix`), since the AI must rebuild the UI on their budget |
+| `src/components/` | `TopBar`, `Budget` (meter + modal), `Modal`/`ConfirmModal`, `Menu`, `Select` (Miira dropdown; options may carry an `icon`), `Swatch` (a palette as dots), `TermsModal`, `PublishError` (build log → "Ret fejlen" in chat) |
 | `src/styles/tokens.css` | **placeholder** Miira tokens; overwritten by `design/sync-from-miira.mjs` |
 | `src/styles/app.css` | all component CSS |
 | `public/mock-preview.html` | stand-in Vibe app used by mock mode |
@@ -111,14 +112,16 @@ the viewer says there is nothing to open. "Hent filer" (`api.download`, a fetche
 ## Design rules
 
 - Only `--miira-*` variables for colours, type, spacing, radius, shadow. No hex
-  values outside `tokens.css`.
+  values outside `tokens.css`. One exception: `Swatch` paints a palette's own
+  colours from the catalog (data, not styling).
 - Patterns: `.btn .btn--3d [.btn--primary|.btn--danger]`, `.modal`, `.menu`,
   `.chip`, `.icon-btn`, `.field` (text inputs and textareas), `.select-field`.
   Icons from `lucide-react`.
 - The design guide's `components.css` (vendored) is **not** loaded, only its
   tokens. A guide component the studio uses is re-created in `app.css` from the
   guide's rules (`.field`, `.select-field`); copy them rather than inventing a
-  look. Selected cards (`.settings__choice.is-active`) use the accent edge and
+  look. Selectable cards are `.choice-card` in a `role="radiogroup"` (Indstillinger,
+  the start screen's design step). Selected ones (`.choice-card.is-active`) use the accent edge and
   the guide's checked-row tint, and still lift on hover.
 - Theme via `data-theme` on `<html>` (`applyTheme`); embedded follows
   `drive:init` / `drive:theme`, standalone follows the OS.
