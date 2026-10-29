@@ -229,3 +229,127 @@ async def test_refill_discards_slots_when_the_agent_model_changes(env, monkeypat
     env.db.expire_all()
     after = set((await env.db.execute(select(PoolSlot.container_name))).scalars().all())
     assert after and not (before & after), "slots carry the model in their environment"
+
+
+async def test_design_catalog_matches_template_design(env):
+    import json
+    from pathlib import Path
+
+    h = await env.user("s-t")
+    r = await env.client.get("/api/design", headers=h)
+    repo = json.loads((Path(__file__).resolve().parents[2] / "template-design" / "catalog.json").read_text())
+    assert r.status_code == 200 and r.json() == repo
+    assert {s["id"] for s in r.json()["styles"]} >= {"miira", "bootstrap", "tailwind", "bulma", "materialize"}
+
+
+async def test_new_webapp_gets_its_design_from_agentd(env):
+    import json
+
+    from sloptown import design
+    from sloptown.models import AuditLog
+
+    h = await env.user("s-t", file_id="fd", file_role="owner")
+    route = env.mock.routes["agentd-design"]
+    r = await env.client.post("/api/projects", json={"fileId": "fd", "style": "bulma", "palette": "hav"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["style"] == "bulma" and r.json()["palette"] == "hav"
+    sent = json.loads(route.calls.last.request.content)
+    assert sent == {"style": "bulma", "palette": "hav", "starter": True}
+
+    # Skipping the choice: Miira's look and a random palette, kept from then on.
+    h2 = await env.user("s-t", file_id="fr", file_role="owner")
+    p = (await env.client.post("/api/projects", json={"fileId": "fr"}, headers=h2)).json()
+    assert p["style"] == "miira" and p["palette"] in design.palette_ids()
+    assert json.loads(route.calls.last.request.content)["palette"] == p["palette"]
+    details = (await env.db.execute(select(AuditLog.details).where(AuditLog.project_id == "fr"))).scalars().all()
+    assert {"style": "miira", "palette": p["palette"]}.items() <= details[0].items()
+
+    # A scratch project has no design, and agentd is not asked for one.
+    calls = route.call_count
+    env.mock.post(f"{dev_base('fz', 4097)}/reset-scratch").respond(200, json={"kind": "scratch"})
+    h3 = await env.user("s-t", file_id="fz", file_role="owner")
+    p = (await env.client.post("/api/projects", json={"fileId": "fz", "kind": "scratch", "style": "bulma"}, headers=h3)).json()
+    assert p["style"] is None and p["palette"] is None and route.call_count == calls
+
+
+async def test_unknown_design_is_refused_before_a_container_is_claimed(env):
+    from sloptown.models import Project
+
+    h = await env.user("s-t", file_id="fu", file_role="owner")
+    for body, err in (({"style": "foundation"}, "bad_style"), ({"palette": "lilla"}, "bad_palette")):
+        r = await env.client.post("/api/projects", json={"fileId": "fu", **body}, headers=h)
+        assert r.status_code == 400 and r.json()["error"] == err
+    assert await env.db.get(Project, "fu") is None
+
+
+async def test_design_failure_marks_the_project(env):
+    import httpx
+
+    from sloptown.models import Project
+
+    env.mock.routes["agentd-design"].side_effect = lambda req: httpx.Response(500, json={"detail": "boom"})
+    h = await env.user("s-t", file_id="ff", file_role="owner")
+    r = await env.client.post("/api/projects", json={"fileId": "ff"}, headers=h)
+    assert r.status_code == 502
+    row = await env.db.get(Project, "ff")
+    await env.db.refresh(row)
+    assert row.status == "error"
+
+
+async def test_change_design_later(env):
+    import json
+
+    from sloptown.models import AuditLog, Project
+    from sloptown.threads import turns
+
+    from sloptown import design
+
+    owner = await env.user("s-t")
+    start = (await env.project("fc", "s-t", owner))["palette"]  # random
+    other = next(p for p in design.palette_ids() if p != start)
+    route = env.mock.routes["agentd-design"]
+
+    r = await env.client.patch("/api/projects/fc", json={"palette": other}, headers=owner)
+    assert r.status_code == 200, r.text
+    assert r.json()["palette"] == other
+    assert json.loads(route.calls.last.request.content) == {"style": None, "palette": other}
+    assert env.events("files.changed")[-1] == {"paths": ["web/src/palette.css"]}
+
+    calls = route.call_count
+    r = await env.client.patch("/api/projects/fc", json={"palette": other, "title": "Ny titel"}, headers=owner)
+    assert r.status_code == 200 and route.call_count == calls, "an unchanged design is not re-applied"
+
+    turns._running["fc"] = "turn-1"
+    try:
+        r = await env.client.patch("/api/projects/fc", json={"style": "tailwind"}, headers=owner)
+        assert r.status_code == 409 and r.json()["error"] == "turn_running"
+    finally:
+        turns._running.pop("fc", None)
+    r = await env.client.patch("/api/projects/fc", json={"style": "tailwind"}, headers=owner)
+    assert r.json()["style"] == "tailwind" and r.json()["palette"] == other
+    row = await env.db.get(Project, "fc")
+    await env.db.refresh(row)
+    assert (row.style, row.palette) == ("tailwind", other)
+    audits = (await env.db.execute(select(AuditLog.details).where(AuditLog.action == "project.design"))).scalars().all()
+    assert audits[-1]["from"]["style"] == "miira" and audits[-1]["to"] == {"style": "tailwind", "palette": other}
+
+    r = await env.client.patch("/api/projects/fc", json={"palette": "lilla"}, headers=owner)
+    assert r.status_code == 400 and r.json()["error"] == "bad_palette"
+    await env.share("fc", "s-v", "viewer")
+    viewer = await env.user("s-v", role="elev")
+    r = await env.client.patch("/api/projects/fc", json={"palette": "hav"}, headers=viewer)
+    assert r.status_code == 403, "students can't restyle the app"
+
+
+async def test_older_webapp_without_design_gets_one_on_first_change(env):
+    from sloptown.models import Project
+
+    owner = await env.user("s-t")
+    await env.project("fo", "s-t", owner)
+    row = await env.db.get(Project, "fo")
+    row.style = row.palette = None  # created before design systems existed
+    await env.db.commit()
+    p = (await env.client.get("/api/projects/fo", headers=owner)).json()
+    assert p["style"] is None and p["palette"] is None
+    p = (await env.client.patch("/api/projects/fo", json={"palette": "hav"}, headers=owner)).json()
+    assert p["style"] == "miira" and p["palette"] == "hav", "agentd answers with the style it kept"

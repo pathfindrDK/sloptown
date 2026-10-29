@@ -139,9 +139,10 @@ launch token) **or** `Authorization: Bearer <session token>`. Errors:
 | Method | Path | |
 |---|---|---|
 | GET | `/api/projects` | projects the user owns or has been shared (cached members) |
-| POST | `/api/projects` | `{ fileId, title?, kind?: "webapp"\|"scratch" }` → `Project` (teachers, terms accepted; claims from warm pool; `scratch` converts the claimed container with agentd `/reset-scratch`, and leaves the project in `status: "error"` if that fails) |
+| POST | `/api/projects` | `{ fileId, title?, kind?: "webapp"\|"scratch", style?, palette? }` → `Project` (teachers, terms accepted; claims from warm pool; a webapp gets its design with agentd `POST /design { style, palette, starter: true }`: `style` defaults to `"miira"`, `palette` to a random one; `scratch` converts the claimed container with agentd `/reset-scratch` and ignores style/palette; either leaves the project in `status: "error"` if it fails. Unknown ids: `400 bad_style` / `bad_palette`, before anything is claimed) |
 | GET | `/api/projects/{pid}` | `Project`. The owner (per launch `file_role`) of a Vibe with no project yet gets `404 { error: "not_started", canStart: true }`: the studio asks webapp or "fra bunden" and POSTs. `403 { error: "terms_required" }` comes first if that owner has not accepted the current terms (the studio shows the terms modal and retries) |
-| PATCH | `/api/projects/{pid}` | `{ title }` |
+| PATCH | `/api/projects/{pid}` | `{ title?, description?, public?, style?, palette? }` → `Project` (editor+; `public` owner only). A changed `style`/`palette` (webapp only, else `409 not_a_webapp`) goes through agentd `POST /design`, which commits the design files as the platform; `409 turn_running` while an AI turn runs; audit `project.design { from, to, commit }`; SSE `files.changed`. A new style changes only `DESIGN.md` and `design.css`: the studio then sends the AI a chat message to rebuild the UI, a normal budgeted turn |
+| GET | `/api/design` | the catalog of design systems and palettes, `template-design/catalog.json` verbatim: `{ styles: [{ id, name: {da,en}, description: {da,en}, package? }], palettes: [{ id, name: {da,en}, light: Colours, dark: Colours }] }`, `Colours = { primary, onPrimary, bg, surface, text, muted, border }` (hex) |
 | POST | `/api/projects/{pid}/publish` | `{ sha }` → `{ publishedSha, url }` |
 | POST | `/api/projects/{pid}/unpublish` | |
 | GET | `/api/projects/{pid}/budget` | `BudgetStatus` for the caller's build bucket and the project's app bucket |
@@ -160,6 +161,10 @@ type Project = {
   myRole: "owner" | "editor" | "viewer";
   status: "starting" | "ready" | "stopped" | "error";
   previewUrl: string | null; appUrl: string | null; publishedSha: string | null;
+  public: boolean; description: string;
+  // Design system and palette ids from GET /api/design. null: a scratch project, or a
+  // webapp from before design systems (Miira look, no palette until one is picked).
+  style: string | null; palette: string | null;
   createdAt: string; updatedAt: string;
 };
 type BudgetState = "ok" | "warning" | "nerfed" | "blocked";
@@ -248,7 +253,20 @@ freshly claimed workspace into a "fra bunden" project (scratch template from
 `/opt/template-scratch`, a new history with one "Start fra bunden" commit, the
 untracked marker `.vibe-kind` that the entrypoint and supervisor read); `409`
 once anything but the platform has committed or the tree has changes;
-idempotent. `GET /events` (SSE `files.changed`), `GET /health`.
+idempotent. `GET /design` → `{ style, palette }` (both `null` without a design).
+`POST /design { style?, palette?, starter? }` → `{ style, palette, ...Commit }`:
+writes the platform's design files from `/opt/template-design` (`DESIGN.md`,
+`web/src/design.css` for the style, `web/src/palette.css` for the palette, all
+read-only and locked) and the untracked marker `.vibe-design` (`"<style> <palette>"`,
+read by the entrypoint too), then commits as `Vibe-Author: SlopTown`. An omitted
+field keeps the current one (no design yet: `miira` / `miira`). `starter: true`
+also lays the style's starter `main.tsx`, `App.tsx` and `styles.css` over the
+template, only while nothing but the platform has committed (`409` otherwise).
+Without `starter`, the agent's code is untouched, except that a Vibe with no
+design yet gets `./palette.css` and `./design.css` imported in `main.tsx`. `400`
+for ids the catalog doesn't know, `409` in a scratch project. `/export` then also
+checks the three design files against the marker's style and palette.
+`GET /events` (SSE `files.changed`), `GET /health`.
 
 ### Edge endpoints
 

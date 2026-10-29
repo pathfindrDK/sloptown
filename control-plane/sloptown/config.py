@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     internal_secret: str = "dev-internal-secret"  # egress -> control plane
     edge_secret: str = "dev-edge-secret"  # edge -> apps (X-Vibe-Edge-Secret)
 
+    # Copy of template-design/catalog.json in the image (sloptown.design).
+    design_catalog: str = "/opt/sloptown/design-catalog.json"
+
     # Podman
     podman_url: str = "unix:///run/podman/podman.sock"
     registry: str = "localhost:5000/sloptown"

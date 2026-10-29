@@ -7,6 +7,7 @@ FakeOrchestrator, whose addresses are `fake-<container>`.
 """
 
 import hashlib
+import json
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -91,10 +92,29 @@ async def env(db):
     app = create_app()
     with respx.mock(assert_all_called=False) as mock:
         fm = FakeMiira(mock)
+        # Every new webapp gets its design from agentd /design; echo it like agentd.
+        # Tests replace the side effect via mock.routes["agentd-design"].
+        _designs.clear()
+        mock.post(url__regex=r"^http://fake-vibe-dev-[^/]+:4097/design$", name="agentd-design").mock(
+            side_effect=_design_echo
+        )
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://studio.test") as c:
             yield Env(c, db, fm, orch, mock, published)
     events.hub.publish = original  # type: ignore[method-assign]
     set_orchestrator(None)
+
+
+def _design_echo(request: httpx.Request) -> httpx.Response:
+    """Like agentd: an omitted style or palette keeps the Vibe's current one
+    (Miira's for a Vibe that has none yet)."""
+    body = json.loads(request.content or b"{}")
+    current = _designs.get(request.url.host, {"style": "miira", "palette": "miira"})
+    out = {k: body.get(k) or current[k] for k in ("style", "palette")}
+    _designs[request.url.host] = out
+    return httpx.Response(200, json={**out, "sha": "d" * 40, "files": ["web/src/palette.css"]})
+
+
+_designs: dict[str, dict[str, str]] = {}
 
 
 class Env:

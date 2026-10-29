@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 
-from . import budgets
+from . import budgets, design
 from .access import require_project
 from .audit import audit
 from .auth import ROLES_THAT_CREATE, CurrentPrincipal, Db, Principal
@@ -71,6 +71,8 @@ def project_json(p: Project, role: str) -> dict[str, Any]:
         "publishedSha": p.published_sha,
         "public": p.public,
         "description": p.description,
+        "style": p.style,
+        "palette": p.palette,
         "createdAt": p.created_at.isoformat() if p.created_at else None,
         "updatedAt": p.updated_at.isoformat() if p.updated_at else None,
     }
@@ -112,11 +114,25 @@ async def _assert_can_create(db: Db, principal: Principal, pid: str) -> None:
         raise ApiError(403, "not_owner", "Kun ejeren af filen kan oprette Vibe'en")
 
 
+def check_design(style: str | None, palette: str | None) -> None:
+    if style is not None and style not in design.style_ids():
+        raise ApiError(400, "bad_style", "Ukendt designsystem")
+    if palette is not None and palette not in design.palette_ids():
+        raise ApiError(400, "bad_palette", "Ukendt farvepalet")
+
+
 async def create_project(
-    db: Db, principal: Principal, pid: str, title: str | None, request: Request, kind: str = "webapp"
+    db: Db, principal: Principal, pid: str, title: str | None, request: Request, kind: str = "webapp",
+    style: str | None = None, palette: str | None = None,
 ) -> Project:
     if kind not in KINDS:
         raise ApiError(400, "bad_kind", "Ukendt projekttype")
+    check_design(style, palette)
+    if kind == "webapp":
+        # Skipping the choice gives Miira's look and a random palette.
+        style, palette = style or "miira", palette or design.random_palette()
+    else:
+        style = palette = None
     await _assert_can_create(db, principal, pid)
     if await db.get(Project, pid) is not None:
         raise ApiError(409, "exists", "Vibe findes allerede")
@@ -136,27 +152,34 @@ async def create_project(
         dev_token_hash=hash_token(dev_token(slot.token_seed)),
         runtime_token_hash=hash_token(runtime_token(pid, slot.token_seed)),
         status="ready",
+        style=style,
+        palette=palette,
     )
     db.add(project)
     audit(db, "project.create", actor_sub=principal.sub, project_id=pid,
-          details={"title": title, "kind": kind, "container": slot.container_name}, request=request)
+          details={"title": title, "kind": kind, "container": slot.container_name, "style": style, "palette": palette},
+          request=request)
     try:
         await db.commit()
     except IntegrityError:
         await db.rollback()
         raise ApiError(409, "exists", "Vibe findes allerede")
     await db.refresh(project)
-    if kind == "scratch":
-        # The warm pool only holds webapp containers; convert the claimed one. Its
-        # workspace holds nothing but the platform's seed, so nothing is lost. A
-        # failure leaves the project in "error" rather than as a webapp in disguise.
-        try:
-            async with await agentd(project, timeout=60) as client:
+    # The warm pool only holds plain webapp containers: lay the chosen design over
+    # the claimed one, or convert it to "fra bunden". Its workspace holds nothing
+    # but the platform's seed, so nothing is lost. A failure leaves the project in
+    # "error" rather than half set up.
+    try:
+        async with await agentd(project, timeout=60) as client:
+            if kind == "scratch":
                 raise_for(await client.post("/reset-scratch"), "Start fra bunden")
-        except Exception:
-            project.status = "error"
-            await db.commit()
-            raise
+            else:
+                raise_for(await client.post("/design", json={"style": style, "palette": palette, "starter": True}),
+                          "Design")
+    except Exception:
+        project.status = "error"
+        await db.commit()
+        raise
     return project
 
 
@@ -214,12 +237,22 @@ class CreateBody(BaseModel):
     fileId: str
     title: str | None = None
     kind: Literal["webapp", "scratch"] = "webapp"
+    style: str | None = None
+    palette: str | None = None
 
 
 @router.post("/api/projects", status_code=201)
 async def post_project(body: CreateBody, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
-    project = await create_project(db, principal, normalize_id(body.fileId), body.title, request, body.kind)
+    project = await create_project(
+        db, principal, normalize_id(body.fileId), body.title, request, body.kind, body.style, body.palette
+    )
     return project_json(project, "owner")
+
+
+@router.get("/api/design")
+async def get_design(principal: CurrentPrincipal) -> dict[str, Any]:
+    """The design systems and palettes a webapp can have (template-design/catalog.json)."""
+    return design.catalog()
 
 
 @router.get("/api/projects/{pid}")
@@ -239,6 +272,8 @@ class PatchBody(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=500)
     public: bool | None = None
+    style: str | None = None
+    palette: str | None = None
 
 
 @router.patch("/api/projects/{pid}")
@@ -257,9 +292,36 @@ async def patch_project(pid: str, body: PatchBody, principal: CurrentPrincipal, 
         require_webapp(project)
         project.public = body.public
         audit(db, "project.visibility", actor_sub=principal.sub, project_id=pid, details={"public": project.public}, request=request)
+    if (body.style is not None and body.style != project.style) or (
+        body.palette is not None and body.palette != project.palette
+    ):
+        await change_design(db, project, principal, request, body.style, body.palette)
     await db.commit()
     await db.refresh(project)
     return project_json(project, role)
+
+
+async def change_design(
+    db: Db, project: Project, principal: Principal, request: Request, style: str | None, palette: str | None
+) -> None:
+    """Write the new design files into the Vibe (agentd commits them as the
+    platform). A new style changes only DESIGN.md and design.css: the studio asks
+    the AI to rebuild the UI with it, so that is a normal, budgeted turn."""
+    from .threads import turns
+
+    require_webapp(project)
+    check_design(style, palette)
+    async with turns.lock(project.id):
+        if turns.running_turn(project.id):
+            raise ApiError(409, "turn_running", "Vent til AI'en er færdig, før du skifter design")
+        async with await agentd(project, timeout=60) as client:
+            out = raise_for(await client.post("/design", json={"style": style, "palette": palette}), "Design")
+    before = {"style": project.style, "palette": project.palette}
+    project.style, project.palette = out["style"], out["palette"]
+    audit(db, "project.design", actor_sub=principal.sub, project_id=project.id,
+          details={"from": before, "to": {"style": project.style, "palette": project.palette}, "commit": out.get("sha")},
+          request=request)
+    hub.publish(f"project:{project.id}", "files.changed", {"paths": out.get("files", [])})
 
 
 class PublishBody(BaseModel):

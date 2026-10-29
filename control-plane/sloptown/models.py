@@ -80,6 +80,11 @@ class Project(Base):
     # visitors with no identity). Owner only; the teacher answers for what the app shows.
     public: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     description: Mapped[str] = mapped_column(String, default="", server_default="")
+    # Design system and colour palette (sloptown.design), mirrored from the Vibe's
+    # agentd marker. None: a "fra bunden" project, or a webapp from before design
+    # systems existed (Miira look, no palette until someone picks one).
+    style: Mapped[str | None] = mapped_column(String, nullable=True)
+    palette: Mapped[str | None] = mapped_column(String, nullable=True)
     active_turn_sub: Mapped[str | None] = mapped_column(String, nullable=True)
     # Set by Stop while messages wait, so stopping never starts the next turn by itself.
     queue_paused: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

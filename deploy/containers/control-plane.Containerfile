@@ -21,6 +21,8 @@ RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
  && useradd --uid 1000 --create-home sloptown
 COPY --from=build /opt/venv /opt/venv
 COPY --chmod=0755 deploy/containers/healthcheck.py /usr/local/bin/sloptown-healthcheck
+# Design systems and palettes a webapp can have (sloptown.design, GET /api/design).
+COPY template-design/catalog.json /opt/sloptown/design-catalog.json
 ENV PATH=/opt/venv/bin:$PATH PYTHONUNBUFFERED=1
 USER sloptown
 EXPOSE 8000 8200 8201
