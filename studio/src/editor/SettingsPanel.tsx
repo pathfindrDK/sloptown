@@ -83,7 +83,7 @@ export function SettingsPanel({ project, onChange }: Props) {
         </h3>
         <textarea
           id="settings-description"
-          className="input settings__description"
+          className="field"
           rows={4}
           maxLength={500}
           value={description}

@@ -49,8 +49,11 @@ export function HistoryPanel({ projectId, history, failed, onRetry, canEdit, onC
                 )}
               </div>
               <div className="history__meta muted">
-                {fmt.format(new Date(c.createdAt))} · {c.authorName}
-                {c.threadTitle && <> · {c.threadTitle}</>} · {c.files.length} {t("history.files")}
+                {[fmt.format(new Date(c.createdAt)), c.authorName, c.threadTitle, `${c.files.length} ${t("history.files")}`]
+                  .filter(Boolean)
+                  .map((part, i) => (
+                    <span key={i}>{part}</span>
+                  ))}
               </div>
               <div className="history__actions">
                 <button className="btn btn--ghost btn--small" onClick={() => onPreview(c, parent)}>

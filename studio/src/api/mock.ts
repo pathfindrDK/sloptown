@@ -335,7 +335,10 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   ["GET", /^\/api\/projects\/([^/]+)$/, (m) => get(m[1]).project],
-  ["PATCH", /^\/api\/projects\/([^/]+)$/, (m, b) => Object.assign(get(m[1]).project, { title: b.title, updatedAt: now() })],
+  ["PATCH", /^\/api\/projects\/([^/]+)$/, (m, b) => {
+    const patch = Object.fromEntries(["title", "description", "public"].filter((k) => b[k] !== undefined).map((k) => [k, b[k]]));
+    return Object.assign(get(m[1]).project, patch, { updatedAt: now() });
+  }],
   [
     "POST",
     /^\/api\/projects\/([^/]+)\/publish$/,

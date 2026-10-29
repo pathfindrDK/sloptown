@@ -113,7 +113,13 @@ the viewer says there is nothing to open. "Hent filer" (`api.download`, a fetche
 - Only `--miira-*` variables for colours, type, spacing, radius, shadow. No hex
   values outside `tokens.css`.
 - Patterns: `.btn .btn--3d [.btn--primary|.btn--danger]`, `.modal`, `.menu`,
-  `.chip`, `.icon-btn`. Icons from `lucide-react`.
+  `.chip`, `.icon-btn`, `.field` (text inputs and textareas), `.select-field`.
+  Icons from `lucide-react`.
+- The design guide's `components.css` (vendored) is **not** loaded, only its
+  tokens. A guide component the studio uses is re-created in `app.css` from the
+  guide's rules (`.field`, `.select-field`); copy them rather than inventing a
+  look. Selected cards (`.settings__choice.is-active`) use the accent edge and
+  the guide's checked-row tint, and still lift on hover.
 - Theme via `data-theme` on `<html>` (`applyTheme`); embedded follows
   `drive:init` / `drive:theme`, standalone follows the OS.
 - Copy: add every string to both `da` and `en` in `i18n.tsx`; Danish is the

@@ -174,6 +174,36 @@ textarea {
 .input {
   width: 100%;
 }
+/* Miira's text field (design guide §4 Inputs, `.field`); components.css isn't loaded. */
+.field {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: var(--miira-font-size-body);
+  color: var(--miira-text-primary);
+  background: var(--miira-bg-primary);
+  border: 1px solid var(--miira-border-color);
+  border-radius: var(--miira-radius-md);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.field:focus {
+  border-color: var(--miira-yellow);
+}
+/* The border is the focus cue (as in the guide); no extra ring. */
+.field:focus-visible {
+  box-shadow: none;
+}
+[data-theme="neutral"] .field:focus {
+  border-color: var(--miira-accent);
+}
+.field::placeholder {
+  color: var(--miira-text-muted);
+}
+textarea.field {
+  resize: vertical;
+  min-height: 88px;
+}
 /* Miira's dropdown trigger: .field look (design guide §4 Inputs), compact for toolbars. */
 .select-field {
   display: inline-flex;
@@ -1445,6 +1475,10 @@ textarea {
     box-shadow 0.12s cubic-bezier(0.2, 0.7, 0.2, 1),
     border-color 0.15s;
 }
+.settings__choice > svg {
+  flex: none;
+  margin-top: 2px;
+}
 .settings__choice > span {
   display: flex;
   flex-direction: column;
@@ -1458,19 +1492,22 @@ textarea {
   transform: translateY(-2px);
   box-shadow: 0 4px 0 0 var(--miira-border-hover);
 }
-.settings__choice.is-active {
-  border-color: var(--miira-accent-shade);
-  box-shadow: 0 3px 0 0 var(--miira-accent-shade);
+/* The chosen card: accent edge and the guide's checked-row tint (switch-row[aria-checked]).
+   It lifts on hover like the others but keeps its accent (chip.is-active:hover). */
+.settings__choice.is-active,
+.settings__choice.is-active:hover:not(:disabled) {
+  border-color: var(--miira-accent);
+  background: color-mix(in srgb, var(--miira-bg-hover) 35%, var(--miira-bg-primary));
+  box-shadow: 0 3px 0 0 var(--miira-accent);
+}
+.settings__choice.is-active:hover:not(:disabled) {
+  box-shadow: 0 5px 0 0 var(--miira-accent);
 }
 .settings__choice:disabled {
   cursor: default;
 }
 .settings__choice:disabled:not(.is-active) {
   opacity: 0.6;
-}
-.settings__description {
-  resize: vertical;
-  font: inherit;
 }
 .settings__error {
   color: var(--miira-color-danger);
@@ -1502,8 +1539,21 @@ textarea {
   font-weight: 500;
 }
 .history__meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.4em;
   margin: var(--miira-space-1) 0 var(--miira-space-2) 22px;
   font-size: var(--miira-font-size-xs);
+}
+/* Wrap between the parts, never inside one ("2 filer" stays together). */
+.history__meta > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history__meta > span:not(:last-child)::after {
+  content: " ·";
 }
 .history__actions {
   display: flex;
