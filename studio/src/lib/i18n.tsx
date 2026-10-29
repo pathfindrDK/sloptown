@@ -1,5 +1,5 @@
 // Danish first, English second. Keys are short and grouped by screen.
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
 
 const da = {
   "app.name": "Vibe",
@@ -345,7 +345,9 @@ export function useLocale(): Locale {
   return useContext(LocaleContext);
 }
 
+// Stable per locale: components put `t` in effect dependencies, and a new
+// function on every render would re-run those effects in a loop.
 export function useT() {
   const locale = useContext(LocaleContext);
-  return (key: Key) => tables[locale][key];
+  return useCallback((key: Key) => tables[locale][key], [locale]);
 }

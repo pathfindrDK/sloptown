@@ -1,5 +1,12 @@
 // Reducer for the editor's live state, fed by the project SSE stream.
-import type { BudgetStatus, Message, Part, ProjectEvent, QueueItem, Thread } from "../api/types";
+import type { BudgetStatus, Commit, Message, Part, ProjectEvent, QueueItem, Thread } from "../api/types";
+
+/** True while only the platform has committed (template seed, design starter,
+ *  platform updates: all `Vibe-Author: SlopTown`, as agentd's
+ *  only_platform_commits). The preview then shows the welcome cover. */
+export function onlyPlatformCommits(commits: Commit[]): boolean {
+  return commits.every((c) => c.authorName === "SlopTown");
+}
 
 export type ProjectState = {
   threads: Thread[];

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SseParser } from "../api/sse";
-import type { Thread } from "../api/types";
-import { initialProjectState, projectReducer } from "../lib/projectState";
+import type { Commit, Thread } from "../api/types";
+import { initialProjectState, onlyPlatformCommits, projectReducer } from "../lib/projectState";
 
 const thread = (id: string): Thread => ({ id, projectId: "p", title: id, ownerSub: "u", createdAt: "", archived: false, status: "idle" });
 
@@ -53,5 +53,17 @@ describe("events the reducer does not handle", () => {
   it("leave the state as it was (project.published after a publish)", () => {
     const next = projectReducer(initialProjectState, { event: "project.published", data: { publishedSha: "a".repeat(40) } } as never);
     expect(next).toBe(initialProjectState);
+  });
+});
+
+describe("onlyPlatformCommits", () => {
+  const commit = (message: string, authorName: string): Commit => ({
+    sha: message, message, authorName, threadId: null, threadTitle: null, createdAt: "", files: [],
+  });
+  it("is true for a fresh Vibe: template seed plus the design starter commit", () => {
+    expect(onlyPlatformCommits([commit("Start med Miira og farverne Hav", "SlopTown"), commit("Start fra skabelon", "SlopTown")])).toBe(true);
+  });
+  it("is false once a teacher or the AI has committed", () => {
+    expect(onlyPlatformCommits([commit("Quiz", "Lærer"), commit("Start fra skabelon", "SlopTown")])).toBe(false);
   });
 });
