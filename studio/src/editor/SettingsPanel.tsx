@@ -5,6 +5,7 @@ import type { IconState } from "../lib/embedBridge";
 import { Globe, ImagePlus, Lock } from "lucide-react";
 import { api } from "../api/client";
 import { ApiError, type Project } from "../api/types";
+import { DesignPreview } from "../components/DesignPreview";
 import { ConfirmModal } from "../components/Modal";
 import { Select } from "../components/Select";
 import { Swatch } from "../components/Swatch";
@@ -49,6 +50,8 @@ export function SettingsPanel({ project, onChange, onAskAi }: Props) {
     }
   };
 
+  // Vibes from before palettes existed have none: their app looks like Miira's.
+  const currentPalette = catalog?.palettes.find((p) => p.id === (project.palette ?? "miira")) ?? null;
   const styleName = (id: string) => catalog?.styles.find((s) => s.id === id)?.name[locale] ?? id;
 
   // A new design system needs the AI to rebuild the UI: confirm, switch, then
@@ -115,7 +118,17 @@ export function SettingsPanel({ project, onChange, onAskAi }: Props) {
           busy={saving}
           onConfirm={() => changeStyle(pendingStyle)}
           onCancel={() => setPendingStyle(null)}
-        />
+        >
+          {catalog && (
+            <DesignPreview
+              style={pendingStyle}
+              styleName={styleName(pendingStyle)}
+              palette={currentPalette}
+              paletteName={currentPalette?.name[locale] ?? t("settings.paletteNone")}
+              title={project.title}
+            />
+          )}
+        </ConfirmModal>
       )}
 
       {project.kind !== "scratch" && (

@@ -45,14 +45,18 @@ type ConfirmProps = {
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  /** Shown under the body, e.g. a preview of what is being confirmed. */
+  children?: ReactNode;
+  wide?: boolean;
 };
 
-export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, busy }: ConfirmProps) {
+export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, busy, children, wide }: ConfirmProps) {
   const t = useT();
   return (
     <Modal
       title={title}
       onClose={onCancel}
+      wide={wide}
       actions={
         <>
           <button className="btn btn--3d" onClick={onCancel}>
@@ -65,6 +69,7 @@ export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, b
       }
     >
       <p>{body}</p>
+      {children}
     </Modal>
   );
 }

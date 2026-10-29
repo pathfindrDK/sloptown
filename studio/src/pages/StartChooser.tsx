@@ -1,11 +1,13 @@
 // The owner's first open of a new Vibe: choose what it is before anything is
 // created. A webapp gets the template, preview and publish; "fra bunden" is an
 // empty project that is never served on the web (control plane: kind="scratch").
-// A webapp then gets a design system and a palette (both can change later under
-// Indstillinger); skipping the palette leaves it to the control plane's random pick.
+// A webapp then gets a name, a design system and a palette (both can change later
+// under Indstillinger), with a preview beside the choices; skipping the palette
+// leaves it to the control plane's random pick.
 import { useState, type ReactNode } from "react";
 import { AppWindow, Cpu, Shuffle } from "lucide-react";
 import { api } from "../api/client";
+import { DesignPreview } from "../components/DesignPreview";
 import { LoadingTiles } from "../components/Loading";
 import { Swatch } from "../components/Swatch";
 import type { Project, ProjectKind } from "../api/types";
@@ -19,6 +21,7 @@ export function StartChooser({ pid, onCreated }: { pid: string; onCreated: (p: P
   const [step, setStep] = useState<"kind" | "design">("kind");
   const [style, setStyle] = useState("miira");
   const [palette, setPalette] = useState<string | null>(null); // null: random
+  const [title, setTitle] = useState("");
   const [busy, setBusy] = useState<ProjectKind | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -26,8 +29,9 @@ export function StartChooser({ pid, onCreated }: { pid: string; onCreated: (p: P
     setBusy(kind);
     setFailed(false);
     try {
-      const design = kind === "webapp" ? { style, palette: palette ?? undefined } : undefined;
-      onCreated(await api.createProject(pid, kind, undefined, design));
+      const webapp = kind === "webapp";
+      const design = webapp ? { style, palette: palette ?? undefined } : undefined;
+      onCreated(await api.createProject(pid, kind, (webapp && title.trim()) || undefined, design));
     } catch {
       setFailed(true);
       setBusy(null);
@@ -88,6 +92,9 @@ export function StartChooser({ pid, onCreated }: { pid: string; onCreated: (p: P
     </button>
   );
 
+  const chosenStyle = catalog?.styles.find((s) => s.id === style);
+  const chosenPalette = catalog?.palettes.find((p) => p.id === palette) ?? null;
+
   return (
     <div className="page page--center">
       <div className="start start--design">
@@ -95,21 +102,42 @@ export function StartChooser({ pid, onCreated }: { pid: string; onCreated: (p: P
         {!catalog ? (
           <LoadingTiles />
         ) : (
-          <>
-            <h2 id="start-style">{t("start.design.style")}</h2>
-            <div className="start__grid" role="radiogroup" aria-labelledby="start-style">
-              {catalog.styles.map((s) =>
-                card(s.id, style === s.id, () => setStyle(s.id), s.name[locale], s.description[locale]),
-              )}
+          <div className="start__design">
+            <div className="start__choices">
+              <h2>
+                <label htmlFor="start-name">{t("start.design.name")}</label>
+              </h2>
+              <input
+                id="start-name"
+                className="field"
+                maxLength={120}
+                value={title}
+                placeholder={t("start.design.namePlaceholder")}
+                disabled={busy !== null}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <h2 id="start-style">{t("start.design.style")}</h2>
+              <div className="start__grid" role="radiogroup" aria-labelledby="start-style">
+                {catalog.styles.map((s) =>
+                  card(s.id, style === s.id, () => setStyle(s.id), s.name[locale], s.description[locale]),
+                )}
+              </div>
+              <h2 id="start-palette">{t("start.design.palette")}</h2>
+              <div className="start__grid start__grid--palettes" role="radiogroup" aria-labelledby="start-palette">
+                {card(null, palette === null, () => setPalette(null), t("start.design.random"), undefined, <Shuffle size={18} aria-hidden />)}
+                {catalog.palettes.map((p) =>
+                  card(p.id, palette === p.id, () => setPalette(p.id), p.name[locale], undefined, <Swatch colours={p.light} />),
+                )}
+              </div>
             </div>
-            <h2 id="start-palette">{t("start.design.palette")}</h2>
-            <div className="start__grid start__grid--palettes" role="radiogroup" aria-labelledby="start-palette">
-              {card(null, palette === null, () => setPalette(null), t("start.design.random"), undefined, <Shuffle size={18} aria-hidden />)}
-              {catalog.palettes.map((p) =>
-                card(p.id, palette === p.id, () => setPalette(p.id), p.name[locale], undefined, <Swatch colours={p.light} />),
-              )}
-            </div>
-          </>
+            <DesignPreview
+              style={style}
+              styleName={chosenStyle?.name[locale] ?? style}
+              palette={chosenPalette}
+              paletteName={chosenPalette?.name[locale] ?? t("start.design.random")}
+              title={title}
+            />
+          </div>
         )}
         <div className="start__actions">
           <button type="button" className="btn btn--3d" disabled={busy !== null} onClick={() => setStep("kind")}>

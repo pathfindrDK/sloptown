@@ -1676,9 +1676,30 @@ textarea.field {
   height: 48px;
 }
 
-/* Design step of the start screen: style and palette cards (.choice-card). */
+/* Design step of the start screen: name, style and palette cards (.choice-card)
+   on the left, the preview (DesignPreview) on the right; stacked when narrow. */
 .start--design {
   width: 100%;
+  max-width: 1040px;
+}
+.start__design {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--miira-space-6);
+  align-items: start;
+  width: 100%;
+  text-align: left;
+}
+.start__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-2);
+  min-width: 0;
+}
+@media (max-width: 820px) {
+  .start__design {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .start h2 {
   align-self: flex-start;
@@ -1720,6 +1741,197 @@ textarea.field {
   border-radius: var(--miira-radius-full);
   /* A light dot (surface) stays visible on a light background. */
   box-shadow: inset 0 0 0 1px var(--miira-color-border);
+}
+
+/* DesignPreview: a mock Vibe in a design system and palette. This is the one place
+   the studio draws in other design systems' shapes, so the per-style sizes below
+   are deliberately not --miira-* tokens; the colours (--pv-*) are catalog data. */
+.design-preview-wrap {
+  position: sticky;
+  top: var(--miira-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--miira-space-2);
+  margin: 0;
+}
+.modal .design-preview-wrap {
+  position: static;
+  margin-top: var(--miira-space-3);
+}
+.design-preview {
+  --pv-font: inherit;
+  --pv-radius: 6px;
+  --pv-card-radius: 8px;
+  --pv-card-border: 1px solid var(--pv-border);
+  --pv-card-bg: var(--pv-surface);
+  --pv-card-shadow: none;
+  --pv-btn-radius: 6px;
+  --pv-btn-pad: 6px 12px;
+  --pv-btn-weight: 500;
+  --pv-btn-shadow: none;
+  --pv-chip-radius: 999px;
+  overflow: hidden;
+  font-family: var(--pv-font);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--pv-text);
+  text-align: left;
+  background: var(--pv-bg);
+  border: 1px solid var(--miira-border-color);
+  border-radius: var(--miira-radius-lg);
+  box-shadow: var(--miira-shadow-sm);
+  transition: background 0.2s, color 0.2s;
+}
+.design-preview__bar {
+  padding: 10px 14px;
+  background: var(--pv-surface);
+  border-bottom: 1px solid var(--pv-border);
+}
+.design-preview__title {
+  display: block;
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.design-preview__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.design-preview__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--pv-card-bg);
+  border: var(--pv-card-border);
+  border-radius: var(--pv-card-radius);
+  box-shadow: var(--pv-card-shadow);
+}
+.design-preview__muted {
+  font-size: 13px;
+  color: var(--pv-muted);
+}
+.design-preview__input {
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--pv-muted);
+  background: var(--pv-surface);
+  border: 1px solid var(--pv-border);
+  border-radius: var(--pv-radius);
+}
+.design-preview__actions,
+.design-preview__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.design-preview__btn {
+  padding: var(--pv-btn-pad);
+  font-size: 13px;
+  font-weight: var(--pv-btn-weight);
+  color: var(--pv-text);
+  border: 1px solid var(--pv-border);
+  border-radius: var(--pv-btn-radius);
+}
+.design-preview__btn--primary {
+  color: var(--pv-on-primary);
+  background: var(--pv-primary);
+  border-color: var(--pv-primary);
+  box-shadow: var(--pv-btn-shadow);
+}
+.design-preview__chip {
+  padding: 2px 10px;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--pv-primary) 15%, var(--pv-surface));
+  border-radius: var(--pv-chip-radius);
+}
+.design-preview__caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--miira-space-2);
+  font-size: var(--miira-font-size-sm);
+}
+/* Miira: rounded, bold, the 3D button. */
+.design-preview[data-style="miira"] {
+  --pv-radius: 10px;
+  --pv-card-radius: 16px;
+  --pv-card-shadow: 0 2px 0 var(--pv-border);
+  --pv-btn-radius: 10px;
+  --pv-btn-pad: 6px 14px 5px;
+  --pv-btn-weight: 700;
+  --pv-btn-shadow: 0 3px 0 color-mix(in srgb, var(--pv-primary) 60%, var(--pv-text));
+}
+/* Bootstrap 5: system font, 6px corners, flat bordered card, filled badges. */
+.design-preview[data-style="bootstrap"] {
+  --pv-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pv-card-radius: 6px;
+  --pv-btn-weight: 400;
+  --pv-chip-radius: 6px;
+}
+.design-preview[data-style="bootstrap"] .design-preview__chip {
+  font-weight: 700;
+  color: var(--pv-on-primary);
+  background: var(--pv-primary);
+}
+/* Tailwind: soft shadows and rings instead of borders, semibold buttons. */
+.design-preview[data-style="tailwind"] {
+  --pv-font: ui-sans-serif, system-ui, sans-serif;
+  --pv-card-radius: 12px;
+  --pv-card-border: 0;
+  --pv-card-shadow: 0 1px 3px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1), 0 0 0 1px var(--pv-border);
+  --pv-btn-weight: 600;
+  --pv-chip-radius: 6px;
+}
+.design-preview[data-style="tailwind"] .design-preview__btn:not(.design-preview__btn--primary) {
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 0 0 1px var(--pv-border);
+}
+.design-preview[data-style="tailwind"] .design-preview__chip {
+  color: var(--pv-primary);
+  background: color-mix(in srgb, var(--pv-primary) 10%, var(--pv-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pv-primary) 30%, transparent);
+}
+/* Bulma: borderless box with a deep soft shadow, roomy buttons. */
+.design-preview[data-style="bulma"] {
+  --pv-font: Inter, "SF Pro", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --pv-card-radius: 12px;
+  --pv-card-border: 0;
+  --pv-card-shadow: 0 0.5em 1em -0.125em rgb(10 10 10 / 0.12), 0 0 0 1px rgb(10 10 10 / 0.03);
+  --pv-btn-pad: 8px 16px;
+  --pv-btn-weight: 400;
+  --pv-chip-radius: 6px;
+}
+/* Material 3: pill buttons, tinted card, filled input, text button. */
+.design-preview[data-style="materialize"] {
+  --pv-font: Roboto, system-ui, sans-serif;
+  --pv-card-radius: 12px;
+  --pv-card-border: 0;
+  --pv-card-bg: color-mix(in srgb, var(--pv-primary) 8%, var(--pv-surface));
+  --pv-card-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --pv-btn-radius: 999px;
+  --pv-btn-pad: 8px 20px;
+  --pv-chip-radius: 8px;
+}
+.design-preview[data-style="materialize"] .design-preview__btn {
+  letter-spacing: 0.1px;
+}
+.design-preview[data-style="materialize"] .design-preview__btn:not(.design-preview__btn--primary) {
+  color: var(--pv-primary);
+  border-color: transparent;
+}
+.design-preview[data-style="materialize"] .design-preview__input {
+  background: color-mix(in srgb, var(--pv-text) 6%, var(--pv-surface));
+  border-width: 0 0 1px;
+  border-color: var(--pv-muted);
+  border-radius: 4px 4px 0 0;
+}
+.design-preview[data-style="materialize"] .design-preview__chip {
+  background: transparent;
+  border: 1px solid var(--pv-border);
 }
 
 .settings__design {
