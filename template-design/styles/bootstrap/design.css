@@ -1,0 +1,79 @@
+/* Platform-owned (locked): maps the palette (palette.css) onto Bootstrap 5.3's CSS
+   variables. Bootstrap compiles its button colours into .btn-* rules, so those are
+   set here too. Import after bootstrap.min.css. */
+:root,
+:root[data-theme] {
+  --bs-primary: var(--palette-primary);
+  --bs-primary-rgb: var(--palette-primary-rgb);
+  --bs-primary-bg-subtle: color-mix(in srgb, var(--palette-primary) 15%, var(--palette-surface));
+  --bs-primary-border-subtle: color-mix(in srgb, var(--palette-primary) 40%, var(--palette-surface));
+  --bs-primary-text-emphasis: color-mix(in srgb, var(--palette-primary) 60%, var(--palette-text));
+  --bs-link-color: var(--palette-primary);
+  --bs-link-color-rgb: var(--palette-primary-rgb);
+  --bs-link-hover-color: color-mix(in srgb, var(--palette-primary) 80%, var(--palette-text));
+  --bs-body-bg: var(--palette-bg);
+  --bs-body-bg-rgb: var(--palette-bg-rgb);
+  --bs-body-color: var(--palette-text);
+  --bs-body-color-rgb: var(--palette-text-rgb);
+  --bs-emphasis-color: var(--palette-text);
+  --bs-emphasis-color-rgb: var(--palette-text-rgb);
+  --bs-secondary-color: var(--palette-muted);
+  --bs-secondary-color-rgb: var(--palette-muted-rgb);
+  --bs-secondary-bg: var(--palette-surface);
+  --bs-secondary-bg-rgb: var(--palette-surface-rgb);
+  --bs-tertiary-bg: color-mix(in srgb, var(--palette-surface) 60%, var(--palette-bg));
+  --bs-border-color: var(--palette-border);
+  --bs-focus-ring-color: rgba(var(--palette-primary-rgb), 0.25);
+}
+.card,
+.modal-content,
+.dropdown-menu,
+.list-group-item {
+  --bs-card-bg: var(--palette-surface);
+  --bs-modal-bg: var(--palette-surface);
+  --bs-dropdown-bg: var(--palette-surface);
+  --bs-list-group-bg: var(--palette-surface);
+}
+.btn-primary {
+  --bs-btn-color: var(--palette-on-primary);
+  --bs-btn-bg: var(--palette-primary);
+  --bs-btn-border-color: var(--palette-primary);
+  --bs-btn-hover-color: var(--palette-on-primary);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--palette-primary) 85%, var(--palette-text));
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--palette-primary) 80%, var(--palette-text));
+  --bs-btn-focus-shadow-rgb: var(--palette-primary-rgb);
+  --bs-btn-active-color: var(--palette-on-primary);
+  --bs-btn-active-bg: color-mix(in srgb, var(--palette-primary) 75%, var(--palette-text));
+  --bs-btn-active-border-color: color-mix(in srgb, var(--palette-primary) 70%, var(--palette-text));
+  --bs-btn-disabled-color: var(--palette-on-primary);
+  --bs-btn-disabled-bg: var(--palette-primary);
+  --bs-btn-disabled-border-color: var(--palette-primary);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--palette-primary);
+  --bs-btn-border-color: var(--palette-primary);
+  --bs-btn-hover-color: var(--palette-on-primary);
+  --bs-btn-hover-bg: var(--palette-primary);
+  --bs-btn-hover-border-color: var(--palette-primary);
+  --bs-btn-focus-shadow-rgb: var(--palette-primary-rgb);
+  --bs-btn-active-color: var(--palette-on-primary);
+  --bs-btn-active-bg: var(--palette-primary);
+  --bs-btn-active-border-color: var(--palette-primary);
+  --bs-btn-disabled-color: var(--palette-primary);
+  --bs-btn-disabled-border-color: var(--palette-primary);
+}
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: color-mix(in srgb, var(--palette-primary) 50%, var(--palette-surface));
+  box-shadow: 0 0 0 0.25rem rgba(var(--palette-primary-rgb), 0.25);
+}
+.form-check-input:checked {
+  background-color: var(--palette-primary);
+  border-color: var(--palette-primary);
+}
+.form-control,
+.form-select {
+  background-color: var(--palette-surface);
+  color: var(--palette-text);
+}

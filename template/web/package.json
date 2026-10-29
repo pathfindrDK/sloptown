@@ -9,14 +9,19 @@
     "sdk:link": "npm install --no-save --install-links ../../sdk/js"
   },
   "dependencies": {
+    "@materializecss/materialize": "^2.4.0",
+    "bootstrap": "^5.3.8",
+    "bulma": "^1.0.4",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3",
     "vite": "^7.0.0"
   }

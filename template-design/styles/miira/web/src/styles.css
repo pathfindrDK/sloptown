@@ -1,0 +1,6 @@
+/* App styles. Use --miira-* tokens only (see DESIGN.md). */
+.side {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--miira-space-6) var(--miira-space-4);
+}

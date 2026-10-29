@@ -2,7 +2,8 @@
 # Run every SlopTown test suite. Everything runs in containers; the host only needs podman.
 #
 #   scripts/test-all.sh            unit suites (~3 min): control plane, egress, fake-miira,
-#                                  SDKs, template, studio, vibe-agentd, design sync
+#                                  SDKs, template, studio, vibe-agentd, design sync,
+#                                  template-design palettes
 #   scripts/test-all.sh --full     also the container-level suites (~15 min): edge config,
 #                                  image smoke test, platform smoke, real-Podman integration,
 #                                  the end-to-end API test of the whole stack, and a browser
@@ -60,6 +61,7 @@ suite studio        "${JS[@]}" -w /src/studio $NODE sh -c 'npm ci --silent && np
 suite vibe-agentd   "${PY[@]}" -w /src/images/vibe-agentd $UV sh -c \
                       'apt-get -qq update && apt-get -qq install -y git >/dev/null && uv run -q pytest -q -p no:cacheprovider'
 suite design-sync   design/test/test-sync.sh
+suite template-design "${PY[@]}" -w /src $UV python -I template-design/build.py --check
 suite edge-gate     "${PY[@]}" -w /src/edge $UV uv run -q --no-project --with pytest pytest -q -p no:cacheprovider test/test_gate.py
 
 if [ "$FULL" = 1 ]; then

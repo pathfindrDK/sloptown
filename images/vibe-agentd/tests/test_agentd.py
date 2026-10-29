@@ -150,3 +150,107 @@ def test_reset_scratch_never_throws_work_away(tmp_path, monkeypatch, scratch_dir
     c.post("/commit", json={"message": "AI", "trailers": {"Vibe-Thread": "t1"}})
     assert c.post("/reset-scratch").status_code == 409, "an AI turn"
     assert (tmp_path / "web" / "App.tsx").read_text() == "export default 2\n"
+
+
+# The real catalog, styles and palettes: these tests also check that they fit together.
+DESIGN = __import__("pathlib").Path(__file__).resolve().parents[3] / "template-design"
+
+
+@pytest.fixture
+def fresh(tmp_path, monkeypatch):
+    """A fresh warm-pool webapp workspace (platform seed only), with the design dir."""
+    monkeypatch.setattr(agentd, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(agentd, "TOKEN", "t0k")
+    monkeypatch.setattr(agentd, "DESIGN_DIR", DESIGN)
+    monkeypatch.setattr(agentd, "PLATFORM_FILES", [])
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+    (tmp_path / ".git" / "info").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".git" / "info" / "exclude").write_text(agentd.EXCLUDE)
+    src = tmp_path / "web" / "src"
+    src.mkdir(parents=True)
+    (src / "main.tsx").write_text('import "@miira/vibe/theme.css";\nimport "./styles.css";\n\nrender();\n')
+    (src / "App.tsx").write_text("export default 1\n")
+    (src / "styles.css").write_text(".side {}\n")
+    c = TestClient(agentd.app, headers={"Authorization": "Bearer t0k"})
+    c.post("/commit", json={"message": "Start fra skabelon", "trailers": {"Vibe-Author": "SlopTown"}})
+    return c
+
+
+def test_design_starter_lays_a_style_over_a_fresh_project(fresh, tmp_path):
+    assert fresh.get("/design").json() == {"style": None, "palette": None}
+    r = fresh.post("/design", json={"style": "bootstrap", "palette": "hav", "starter": True})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["style"] == "bootstrap" and body["palette"] == "hav"
+    assert body["message"] == "Start med Bootstrap og farverne Hav" and body["authorName"] == "SlopTown"
+    assert fresh.get("/design").json() == {"style": "bootstrap", "palette": "hav"}
+    src = tmp_path / "web" / "src"
+    assert '"bootstrap/dist/css/bootstrap.min.css"' in (src / "main.tsx").read_text()
+    assert (src / "palette.css").read_bytes() == (DESIGN / "palettes" / "hav.css").read_bytes()
+    assert (src / "design.css").read_bytes() == (DESIGN / "styles" / "bootstrap" / "design.css").read_bytes()
+    assert (tmp_path / "DESIGN.md").read_text().startswith("# Design: Bootstrap")
+    files = {f["path"]: f for f in fresh.get("/files").json()["files"]}
+    assert files["DESIGN.md"]["locked"] and files["web/src/palette.css"]["locked"]
+    assert ".vibe-design" not in files
+    # Platform files match the platform's copies, so the version can be published.
+    assert fresh.post("/export", json={"sha": body["sha"]}).status_code == 200
+    # Still nobody's work: a "fra bunden" reset would be allowed.
+    assert agentd.only_platform_commits()
+
+
+def test_design_starter_never_overwrites_work(fresh, tmp_path):
+    (tmp_path / "web" / "src" / "App.tsx").write_text("export default 2\n")
+    fresh.post("/commit", json={"message": "AI", "trailers": {"Vibe-Thread": "t1"}})
+    assert fresh.post("/design", json={"style": "bulma", "palette": "skov", "starter": True}).status_code == 409
+    assert (tmp_path / "web" / "src" / "App.tsx").read_text() == "export default 2\n"
+
+
+def test_design_later_changes_only_platform_files(fresh, tmp_path):
+    fresh.post("/design", json={"style": "tailwind", "palette": "miira", "starter": True})
+    app = tmp_path / "web" / "src" / "App.tsx"
+    app.write_text("export default 'mine'\n")
+    fresh.post("/commit", json={"message": "AI", "trailers": {"Vibe-Thread": "t1"}})
+
+    r = fresh.post("/design", json={"palette": "solnedgang"}).json()
+    assert r["message"] == "Farver: Solnedgang" and r["style"] == "tailwind"
+    assert set(r["files"]) == {"web/src/palette.css"}
+    r = fresh.post("/design", json={"style": "bulma"}).json()
+    assert r["message"] == "Design: Bulma med farverne Solnedgang" and r["palette"] == "solnedgang"
+    assert set(r["files"]) == {"DESIGN.md", "web/src/design.css"}
+    assert app.read_text() == "export default 'mine'\n", "the AI rebuilds the UI, not the platform"
+    assert fresh.post("/export", json={"sha": r["sha"]}).status_code == 200
+
+
+def test_design_on_an_older_vibe_adds_the_imports(fresh, tmp_path):
+    r = fresh.post("/design", json={"palette": "skov"})
+    assert r.status_code == 200 and r.json()["style"] == "miira"
+    main = (tmp_path / "web" / "src" / "main.tsx").read_text()
+    assert main.index('"./palette.css"') < main.index('"./design.css"') < main.index('"./styles.css"')
+    assert main.startswith('import "@miira/vibe/theme.css";')
+    # Idempotent: a second change adds nothing.
+    fresh.post("/design", json={"palette": "hav"})
+    assert (tmp_path / "web" / "src" / "main.tsx").read_text().count("palette.css") == 1
+
+
+def test_design_rejects_unknown_ids_and_edited_platform_files(fresh, tmp_path):
+    assert fresh.post("/design", json={"style": "foundation"}).status_code == 400
+    assert fresh.post("/design", json={"palette": "lilla"}).status_code == 400
+    fresh.post("/design", json={"style": "miira", "palette": "hav", "starter": True})
+    pal = tmp_path / "web" / "src" / "palette.css"
+    pal.chmod(0o644)
+    pal.write_text(":root { --palette-primary: hotpink; }\n")
+    sha = fresh.post("/commit", json={"message": "AI", "trailers": {"Vibe-Thread": "t1"}}).json()["sha"]
+    r = fresh.post("/export", json={"sha": sha})
+    assert r.status_code == 422 and r.json() == {"paths": ["web/src/palette.css"]}
+    # A marker the agent rewrote to nonsense is ignored (no design, no design files expected).
+    (tmp_path / ".vibe-design").write_text("../../etc x\n")
+    assert fresh.get("/design").json() == {"style": None, "palette": None}
+
+
+def test_catalog_has_files_for_every_style_and_palette():
+    cat = __import__("json").loads((DESIGN / "catalog.json").read_text())
+    for s in cat["styles"]:
+        for name in ("DESIGN.md", "design.css", *agentd.STARTER_FILES):
+            assert (DESIGN / "styles" / s["id"] / name).is_file(), (s["id"], name)
+    for p in cat["palettes"]:
+        assert (DESIGN / "palettes" / f"{p['id']}.css").is_file(), p["id"]

@@ -1,0 +1,27 @@
+/* Platform-owned (locked): maps the palette (palette.css) onto Materialize 2's
+   Material Design colour roles (--md-sys-color-*). Import after materialize.min.css. */
+:root,
+:root[data-theme] {
+  --md-sys-color-primary: var(--palette-primary);
+  --md-sys-color-on-primary: var(--palette-on-primary);
+  --md-sys-color-primary-container: color-mix(in srgb, var(--palette-primary) 18%, var(--palette-surface));
+  --md-sys-color-on-primary-container: var(--palette-text);
+  --md-sys-color-secondary: color-mix(in srgb, var(--palette-primary) 55%, var(--palette-muted));
+  --md-sys-color-on-secondary: var(--palette-on-primary);
+  --md-sys-color-secondary-container: color-mix(in srgb, var(--palette-primary) 10%, var(--palette-surface));
+  --md-sys-color-on-secondary-container: var(--palette-text);
+  --md-sys-color-background: var(--palette-bg);
+  --md-sys-color-on-background: var(--palette-text);
+  --md-sys-color-surface: var(--palette-surface);
+  --md-sys-color-on-surface: var(--palette-text);
+  --md-sys-color-surface-variant: color-mix(in srgb, var(--palette-surface) 60%, var(--palette-bg));
+  --md-sys-color-on-surface-variant: var(--palette-muted);
+  --md-sys-color-outline: var(--palette-border);
+  --md-sys-color-outline-variant: var(--palette-border);
+  /* Cards mix 17% of this into the surface: a hint of the palette, not a wash. */
+  --md-sys-color-surface-tint: color-mix(in srgb, var(--palette-primary) 25%, var(--palette-surface));
+}
+body {
+  background-color: var(--palette-bg);
+  color: var(--palette-text);
+}

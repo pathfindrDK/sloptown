@@ -33,13 +33,24 @@ PLATFORM_FILES = ["AGENTS.md", "web/package.json", "web/package-lock.json", "web
 SCRATCH_DIR = Path(os.environ.get("VIBE_SCRATCH_DIR", "/opt/template-scratch"))
 KIND_FILE = ".vibe-kind"
 RESET_SETTLE_SECONDS = float(os.environ.get("VIBE_RESET_SETTLE", "2.0"))  # > two supervisor ticks
-EXCLUDE = "# managed by vibe-dev\n.data/\n.opencode/\n.vibe-kind\nnode_modules\nweb/dist/\n__pycache__/\n"
+# The design system ("style") and colour palette of a webapp: catalog, per-style
+# files and generated palettes from template-design/. The choice lives in an
+# untracked marker "<style> <palette>" that the entrypoint reads too. No marker
+# means an older Vibe with no design files (Miira look via theme.css).
+DESIGN_DIR = Path(os.environ.get("VIBE_DESIGN_DIR", "/opt/template-design"))
+DESIGN_FILE = ".vibe-design"
+DESIGN_TARGETS = {"DESIGN.md": "DESIGN.md", "design.css": "web/src/design.css"}  # style dir -> workspace
+PALETTE_TARGET = "web/src/palette.css"
+STARTER_FILES = ["web/src/main.tsx", "web/src/App.tsx", "web/src/styles.css"]
+EXCLUDE = ("# managed by vibe-dev\n.data/\n.opencode/\n.vibe-kind\n.vibe-design\n"
+           "node_modules\nweb/dist/\n__pycache__/\n")
 
 HIDDEN = [".git", ".git/**", "node_modules", "node_modules/**", "*/node_modules", "*/node_modules/**",
           ".opencode", ".opencode/**", ".data", ".data/**", "web/dist", "web/dist/**", KIND_FILE,
-          "**/__pycache__", "**/__pycache__/**"]
+          DESIGN_FILE, "**/__pycache__", "**/__pycache__/**"]
 LOCKED = ["AGENTS.md", "web/package.json", "web/package-lock.json", "web/vite.config.ts",
-          "api/requirements.lock", ".opencode/**", ".data/**"]
+          "api/requirements.lock", "DESIGN.md", "web/src/design.css", "web/src/palette.css",
+          ".opencode/**", ".data/**"]
 
 LANGUAGES = {
     ".ts": "typescript", ".tsx": "tsx", ".js": "javascript", ".jsx": "jsx", ".mjs": "javascript",
@@ -293,13 +304,23 @@ def kind() -> str:
         return "webapp"
 
 
+def platform_sources() -> dict[str, Path]:
+    """Workspace path -> the platform's copy, for every platform-owned file of this project."""
+    if kind() == "scratch":
+        return {"AGENTS.md": SCRATCH_DIR / "AGENTS.md"}
+    out = {path: PLATFORM_DIR / path for path in PLATFORM_FILES}
+    if d := design():
+        style, palette = d
+        out |= {target: DESIGN_DIR / "styles" / style / name for name, target in DESIGN_TARGETS.items()}
+        out[PALETTE_TARGET] = DESIGN_DIR / "palettes" / f"{palette}.css"
+    return out
+
+
 def locked_violations(sha: str) -> list[str]:
     """Platform-owned files whose content at `sha` is neither the platform copy nor allowlisted."""
     allowed = _allowlist()
     bad = []
-    scratch = kind() == "scratch"
-    for path in ["AGENTS.md"] if scratch else PLATFORM_FILES:
-        platform = (SCRATCH_DIR if scratch else PLATFORM_DIR) / path
+    for path, platform in platform_sources().items():
         expected = platform.read_bytes() if platform.is_file() else None
         proc = subprocess.run(["git", "show", f"{sha}:{path}"], cwd=WORKSPACE, capture_output=True)
         actual = proc.stdout if proc.returncode == 0 else None
@@ -327,6 +348,110 @@ def export(body: ExportIn) -> StreamingResponse | JSONResponse:
     return StreamingResponse(gen(), media_type="application/x-tar", headers={"X-Vibe-Sha": sha})
 
 
+def catalog() -> dict:
+    return json.loads((DESIGN_DIR / "catalog.json").read_text())
+
+
+def design() -> tuple[str, str] | None:
+    """(style, palette) from the marker, if it names ones the catalog knows."""
+    try:
+        style, palette = (WORKSPACE / DESIGN_FILE).read_text().split()[:2]
+    except (OSError, ValueError):
+        return None
+    c = catalog()
+    if style in {s["id"] for s in c["styles"]} and palette in {p["id"] for p in c["palettes"]}:
+        return style, palette
+    return None
+
+
+def only_platform_commits() -> bool:
+    """True while nobody but the platform has changed the workspace (every commit
+    carries `Vibe-Author: SlopTown` and nothing is uncommitted)."""
+    if has_head():
+        for sha in git("rev-list", "HEAD").decode().split():
+            if "Vibe-Author: SlopTown" not in git("log", "-1", "--format=%(trailers:only)", sha).decode():
+                return False
+    return not git("status", "--porcelain").strip()
+
+
+def write_platform_file(path: str, data: bytes) -> None:
+    target = WORKSPACE / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.unlink(missing_ok=True)  # read-only copies: replace, don't open for writing
+    target.write_bytes(data)
+    os.chmod(target, 0o444)
+
+
+def ensure_design_imports(main: Path) -> None:
+    """An older Miira-look Vibe getting its first palette: its main.tsx predates
+    palette.css and design.css, so import them before the app's own styles."""
+    if not main.is_file():
+        return
+    text = main.read_text()
+    missing = [f'import "./{n}";\n' for n in ("palette.css", "design.css") if f'"./{n}"' not in text]
+    if not missing:
+        return
+    anchor = 'import "./styles.css";'
+    i = text.find(anchor)
+    i = i if i >= 0 else 0
+    main.write_text(text[:i] + "".join(missing) + text[i:])
+
+
+class DesignIn(BaseModel):
+    style: str | None = None
+    palette: str | None = None
+    # Also lay the style's starter files over the template: only for a project
+    # nobody has worked on yet (right after it is created).
+    starter: bool = False
+
+
+@app.get("/design", dependencies=[Depends(auth)])
+def get_design() -> dict:
+    d = design()
+    return {"style": d[0], "palette": d[1]} if d else {"style": None, "palette": None}
+
+
+@app.post("/design", dependencies=[Depends(auth)])
+def set_design(body: DesignIn) -> dict:
+    """Set the design system and/or palette: write the platform's design files and
+    the marker, and commit as the platform. Never touches the agent's code, except
+    the starter files (`starter`, fresh projects only) and adding the palette
+    imports to an older Vibe's main.tsx."""
+    if kind() == "scratch":
+        raise HTTPException(409, "a scratch project has no design")
+    c = catalog()
+    styles = {s["id"]: s for s in c["styles"]}
+    palettes = {p["id"]: p for p in c["palettes"]}
+    current = design()
+    style = body.style or (current[0] if current else "miira")
+    palette = body.palette or (current[1] if current else "miira")
+    if style not in styles or palette not in palettes:
+        raise HTTPException(400, "unknown style or palette")
+    if body.starter and not only_platform_commits():
+        raise HTTPException(409, "project already has work")
+    if body.starter:
+        for path in STARTER_FILES:
+            src = DESIGN_DIR / "styles" / style / path
+            if src.is_file():
+                (WORKSPACE / path).parent.mkdir(parents=True, exist_ok=True)
+                (WORKSPACE / path).write_bytes(src.read_bytes())
+    elif current is None:
+        ensure_design_imports(WORKSPACE / "web" / "src" / "main.tsx")
+    (WORKSPACE / DESIGN_FILE).write_text(f"{style} {palette}\n")
+    for path, src in platform_sources().items():
+        if path in (PALETTE_TARGET, *DESIGN_TARGETS.values()):
+            write_platform_file(path, src.read_bytes())
+    s_name, p_name = styles[style]["name"]["da"], palettes[palette]["name"]["da"]
+    if body.starter:
+        msg = f"Start med {s_name} og farverne {p_name}"
+    elif current and current[0] == style:
+        msg = f"Farver: {p_name}"
+    else:
+        msg = f"Design: {s_name} med farverne {p_name}"
+    commit = _commit(msg, {"Vibe-Author": "SlopTown"})
+    return {"style": style, "palette": palette, **(commit or commit_info("HEAD"))}
+
+
 @app.get("/kind", dependencies=[Depends(auth)])
 def get_kind() -> dict:
     return {"kind": kind()}
@@ -343,16 +468,13 @@ def reset_scratch() -> dict:
     """
     if kind() == "scratch":
         return {"kind": "scratch", **commit_info("HEAD")}
-    if has_head():
-        for sha in git("rev-list", "HEAD").decode().split():
-            if "Vibe-Author: SlopTown" not in git("log", "-1", "--format=%(trailers:only)", sha).decode():
-                raise HTTPException(409, "project already has work")
-    if git("status", "--porcelain").strip():
+    if not only_platform_commits():
         raise HTTPException(409, "project already has work")
     # Marker first: the supervisor polls it and stops Vite and the API, which must
     # not be running in web/ and api/ while those are deleted under them.
     (WORKSPACE / KIND_FILE).write_text("scratch\n")
     time.sleep(RESET_SETTLE_SECONDS)
+    (WORKSPACE / DESIGN_FILE).unlink(missing_ok=True)
     for entry in WORKSPACE.iterdir():
         if entry.name in (".opencode", KIND_FILE):
             continue

@@ -1,0 +1,25 @@
+/* Platform-owned (locked): Tailwind 4 with the palette (palette.css) as colours:
+   bg-primary, text-on-primary, bg-background, bg-surface, text-foreground,
+   text-muted, border-border. `dark:` follows data-theme="dark" (Miira's dark mode).
+   Imported once, from main.tsx. */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-primary: var(--palette-primary);
+  --color-on-primary: var(--palette-on-primary);
+  --color-background: var(--palette-bg);
+  --color-surface: var(--palette-surface);
+  --color-foreground: var(--palette-text);
+  --color-muted: var(--palette-muted);
+  --color-border: var(--palette-border);
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--palette-bg);
+    color: var(--palette-text);
+  }
+}

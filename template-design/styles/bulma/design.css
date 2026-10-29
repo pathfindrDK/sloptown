@@ -1,0 +1,29 @@
+/* Platform-owned (locked): maps the palette (palette.css) onto Bulma 1's CSS
+   variables (Bulma derives its shades from h/s/l). Import after bulma.min.css. */
+:root,
+:root[data-theme] {
+  --bulma-primary-h: var(--palette-primary-h);
+  --bulma-primary-s: var(--palette-primary-s);
+  --bulma-primary-l: var(--palette-primary-l);
+  --bulma-primary-invert-l: var(--palette-on-primary-l);
+  --bulma-link-h: var(--palette-primary-h);
+  --bulma-link-s: var(--palette-primary-s);
+  --bulma-link-l: var(--palette-primary-l);
+  --bulma-link-invert-l: var(--palette-on-primary-l);
+  --bulma-scheme-h: var(--palette-bg-h);
+  --bulma-scheme-s: var(--palette-bg-s);
+  --bulma-body-background-color: var(--palette-bg);
+  --bulma-body-color: var(--palette-text);
+  --bulma-text: var(--palette-text);
+  --bulma-text-strong: var(--palette-text);
+  --bulma-text-weak: var(--palette-muted);
+  --bulma-border: var(--palette-border);
+}
+html {
+  background-color: var(--palette-bg);
+}
+.box,
+.card {
+  background-color: var(--palette-surface);
+  color: var(--palette-text);
+}

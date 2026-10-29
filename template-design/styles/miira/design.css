@@ -1,0 +1,18 @@
+/* Platform-owned (locked): maps the palette (palette.css) onto Miira's tokens, which
+   @miira/vibe/theme.css turns into the --miira-color-* names the app uses.
+   :root[data-theme] outranks theme.css's own [data-theme] blocks. */
+:root,
+:root[data-theme] {
+  --miira-accent: var(--palette-primary);
+  --miira-accent-text: var(--palette-on-primary);
+  --miira-accent-shade: color-mix(in srgb, var(--palette-primary) 70%, var(--palette-text));
+  --miira-bg-surface: var(--palette-bg);
+  --miira-bg-primary: var(--palette-surface);
+  --miira-bg-secondary: color-mix(in srgb, var(--palette-surface) 60%, var(--palette-bg));
+  --miira-bg-hover: color-mix(in srgb, var(--palette-primary) 10%, var(--palette-surface));
+  --miira-text-primary: var(--palette-text);
+  --miira-text-secondary: var(--palette-muted);
+  --miira-text-muted: var(--palette-muted);
+  --miira-border-color: var(--palette-border);
+  --miira-border-hover: color-mix(in srgb, var(--palette-border) 70%, var(--palette-text));
+}

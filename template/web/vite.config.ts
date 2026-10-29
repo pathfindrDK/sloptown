@@ -1,4 +1,5 @@
 // Platform-owned (locked): the agent cannot change this file.
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -7,7 +8,8 @@ const appsDomain = process.env.VIBE_APPS_DOMAIN;
 const hmrPort = process.env.VIBE_HMR_CLIENT_PORT;
 
 export default defineConfig({
-  plugins: [react()],
+  // Tailwind only touches CSS that imports "tailwindcss" (the tailwind style's design.css).
+  plugins: [react(), tailwindcss()],
   server: {
     host: "0.0.0.0",
     port: 5173,

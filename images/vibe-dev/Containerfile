@@ -20,6 +20,10 @@ RUN rm -rf /opt/template/web/node_modules /opt/template/web/dist /opt/template/.
     /opt/template/README.md /opt/template/tests
 # A "fra bunden" project starts from this instead (agentd /reset-scratch).
 COPY template-scratch/ /opt/template-scratch/
+# Design systems and palettes (agentd /design, the entrypoint). Not part of any project.
+COPY template-design/catalog.json /opt/template-design/catalog.json
+COPY template-design/palettes/ /opt/template-design/palettes/
+COPY template-design/styles/ /opt/template-design/styles/
 COPY images/vibe-dev/opencode.json /etc/opencode/opencode.json
 COPY images/vibe-dev/platform-allowlist.txt /opt/vibe/platform-allowlist.txt
 COPY --chmod=0755 images/vibe-dev/entrypoint.sh /usr/local/bin/vibe-dev-entrypoint

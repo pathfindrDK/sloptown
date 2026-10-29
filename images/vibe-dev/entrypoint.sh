@@ -28,7 +28,7 @@ git_c() { git -C "$W" -c user.name=SlopTown -c user.email=vibe@sloptown.invalid 
 # projects too and the agent's .gitignore edits cannot un-ignore them.
 # "node_modules" has no trailing slash: web/node_modules is a symlink.
 write_exclude() {
-  printf '%s\n' "# managed by vibe-dev" .data/ .opencode/ .vibe-kind node_modules web/dist/ __pycache__/ > "$W/.git/info/exclude"
+  printf '%s\n' "# managed by vibe-dev" .data/ .opencode/ .vibe-kind .vibe-design node_modules web/dist/ __pycache__/ > "$W/.git/info/exclude"
 }
 
 if [ ! -d "$W/.git" ]; then
@@ -40,15 +40,35 @@ if [ ! -d "$W/.git" ]; then
   git_c commit -q -m "Start fra skabelon" -m "Vibe-Author: SlopTown"
 fi
 
+# copy_platform <source> <workspace path>: a read-only copy of a platform file.
+copy_platform() {
+  if [ -f "$1" ]; then
+    mkdir -p "$(dirname "$W/$2")"
+    rm -f "$W/$2"
+    cp "$1" "$W/$2"
+    chmod a-w "$W/$2"
+  fi
+}
+
 write_exclude
 for f in $PLATFORM_FILES; do
-  if [ -f "$T/$f" ]; then
-    mkdir -p "$(dirname "$W/$f")"
-    rm -f "$W/$f"
-    cp "$T/$f" "$W/$f"
-    chmod a-w "$W/$f"
-  fi
+  copy_platform "$T/$f" "$f"
 done
+
+# The design system and palette (agentd /design writes the marker "<style> <palette>").
+# No marker: an older Vibe without design files. Ids are checked against the
+# directories, because the agent can write the marker.
+D=/opt/template-design
+if [ "$T" = /opt/template ] && [ -f "$W/.vibe-design" ]; then
+  read -r STYLE PALETTE _ < "$W/.vibe-design" || true
+  case "$STYLE$PALETTE" in *[!a-z0-9-]*|"") STYLE="" ;; esac
+  if [ -n "$STYLE" ] && [ -d "$D/styles/$STYLE" ] && [ -f "$D/palettes/$PALETTE.css" ]; then
+    copy_platform "$D/styles/$STYLE/DESIGN.md" DESIGN.md
+    copy_platform "$D/styles/$STYLE/design.css" web/src/design.css
+    copy_platform "$D/palettes/$PALETTE.css" web/src/palette.css
+    PLATFORM_FILES="$PLATFORM_FILES DESIGN.md web/src/design.css web/src/palette.css"
+  fi
+fi
 
 # An image update can bring new platform files: record them as their own commit
 # so the working tree is clean before the agent's first turn.

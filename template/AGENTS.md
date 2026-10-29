@@ -14,6 +14,8 @@ This file is owned by the platform. You cannot change it.
 | `web/` | React 18 + Vite + TypeScript frontend. Entry `web/src/main.tsx`, UI in `web/src/App.tsx`. |
 | `api/main.py` | FastAPI backend. The browser reaches it at `/api/...` (`/api/hej` → `@app.get("/hej")`). |
 | `/data/app.sqlite` | The app's SQLite database. Use `db.session()` from the SDK. |
+| `DESIGN.md` | The design system this Vibe is built with (Miira, Bootstrap, Tailwind, Bulma or Material) and how to use its colours. Platform-owned. |
+| `web/src/palette.css`, `web/src/design.css` | The teacher's colour palette and how it maps onto the design system. Platform-owned: never edit. |
 
 The live preview reloads by itself when you save files. The backend restarts
 by itself when Python files change.
@@ -30,13 +32,18 @@ by itself when Python files change.
    `web/package.json`, `web/package-lock.json`, `api/requirements.lock` or
    `web/vite.config.ts` (they are locked). Available: React 18, lucide-react
    icons, FastAPI, Pydantic, httpx, the SDK, and the Python standard library
-   (including `sqlite3`). Build what you need with these.
+   (including `sqlite3`). Build what you need with these. Bootstrap, Tailwind,
+   Bulma and Materialize are installed too, but use **only** the one
+   `DESIGN.md` names.
 4. **Do not commit.** The platform commits after each turn. Do not run `git`.
 5. **Danish UI.** All visible text is Danish, written for children aged 6–16
    and their teachers. Simple words, short sentences.
-6. **Miira look.** Import `@miira/vibe/theme.css` once (already done in
-   `main.tsx`) and style with `--miira-*` CSS variables only, never raw colours.
-   Use `lucide-react` for icons. Support `data-theme="dark"`.
+6. **Follow `DESIGN.md`.** It names the design system and the colours to use;
+   never write raw colours. Use `lucide-react` for icons. Support
+   `data-theme="dark"`. If the teacher asks for another design system or
+   colours, explain that they choose them under Indstillinger. If there is no
+   `DESIGN.md` (older Vibes): Miira look, `@miira/vibe/theme.css` imported once
+   in `main.tsx`, `--miira-*` CSS variables only.
 7. **Data lives in SQLite** at `/data/app.sqlite` (via `db.session()`). Create
    tables with `CREATE TABLE IF NOT EXISTS` at startup; never drop tables or
    delete user data unless the teacher asks. Store users by `user.id`, never by

@@ -4,3 +4,7 @@
 # web/package-lock.json, web/vite.config.ts, api/requirements.lock), append the
 # hash of the PREVIOUS version here, so versions committed before the image
 # update can still be published. Copied to /opt/vibe/platform-allowlist.txt.
+21a8bd8857a3364799e41f8192f388e43aa5551601bbe36b048e3de74c76d7b8  AGENTS.md
+4aaa8dddd8fe5280c01f49b4580ad73deb0fa34148e44a18aacc552d8ac5f15c  web/package.json
+0ca03f69775aa833cc2131e23f45de44db7a0c1894f14c61c1ced085126c0da1  web/package-lock.json
+f285b6ef609c0887481ca5cc058622ac10ab29e9f76e7393d21fb18ef7825b5b  web/vite.config.ts

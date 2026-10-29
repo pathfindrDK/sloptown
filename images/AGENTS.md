@@ -18,15 +18,15 @@ Build context is always the **repo root** (`.containerignore` there).
 |---|---|
 | `versions.env` | every pinned upstream: base images, uv, OpenCode, Caddy, Trivy. Read by the pipeline and `dev-up.sh`; bumped by Renovate |
 | `vibe-base/Containerfile` | multi-stage: packs `sdk/js` (with `design/dist` for its theme), then base |
-| `vibe-dev/Containerfile` | |
-| `vibe-dev/entrypoint.sh` | seeds `/workspace` from `/opt/template` on first start (git init, commit "Start fra skabelon"); on **every** start rewrites `.git/info/exclude`, re-copies platform files read-only, commits them as "Platformopdatering" if they changed, symlinks `web/node_modules` → `/opt/vibe/node_modules`; sets `OPENCODE_SERVER_PASSWORD=$VIBE_PROJECT_TOKEN`. In a "fra bunden" project (`.vibe-kind` = `scratch`, written by agentd `/reset-scratch`) the only platform file is `AGENTS.md`, from `/opt/template-scratch` |
+| `vibe-dev/Containerfile` | also bakes `template-design/` (catalog, palettes, styles) at `/opt/template-design`, outside `/opt/template` so it never lands in a project |
+| `vibe-dev/entrypoint.sh` | seeds `/workspace` from `/opt/template` on first start (git init, commit "Start fra skabelon"); on **every** start rewrites `.git/info/exclude`, re-copies platform files read-only, commits them as "Platformopdatering" if they changed, symlinks `web/node_modules` → `/opt/vibe/node_modules`; sets `OPENCODE_SERVER_PASSWORD=$VIBE_PROJECT_TOKEN`. In a "fra bunden" project (`.vibe-kind` = `scratch`, written by agentd `/reset-scratch`) the only platform file is `AGENTS.md`, from `/opt/template-scratch`. A webapp with a design (`.vibe-design` = `<style> <palette>`, written by agentd `/design`) also gets `DESIGN.md`, `web/src/design.css` and `web/src/palette.css` from `/opt/template-design`; ids are checked against those directories, since the agent can write the marker |
 | `vibe-dev/supervisor.py` | starts the four processes, restarts with backoff 1–30 s, forwards SIGTERM. Vite and the API never run (and are stopped at once) while `/workspace/.vibe-kind` says `scratch` |
 | `vibe-dev/opencode.json` | OpenCode config: only provider `sloptown` (OpenAI-compatible, `OPENAI_BASE_URL`/`OPENAI_API_KEY` = egress + project token), model from `VIBE_AGENT_MODEL` (default `gpt-5.1`), `webfetch` denied |
 | `vibe-dev/vibe-build.sh` | `vibe-build <dir>`: `vite build` of a published snapshot into `<dir>/web/dist` (used at publish, in a one-shot vibe-dev container) |
 | `vibe-dev/platform-allowlist.txt` | sha256 of older platform-file versions that agentd's `/export` still accepts |
 | `vibe-runtime/Containerfile` | |
 | `vibe-agentd/` | FastAPI helper inside vibe-dev (files, git history/diff/commit/restore, export with platform-file check, SSE). Contract: `docs/internal-api.md` § vibe-agentd |
-| `test/smoke.sh` | hardened end-to-end test of vibe-dev and vibe-runtime |
+| `test/smoke.sh` | hardened end-to-end test of vibe-dev and vibe-runtime, incl. agentd `/design` + restart, and a `vibe-build` of every style in `template-design` with a palette |
 
 ## Build and test
 
@@ -36,7 +36,7 @@ set -a; . images/versions.env; set +a
 podman build -t localhost/sloptown/vibe-base:latest    -f images/vibe-base/Containerfile .
 podman build -t localhost/sloptown/vibe-dev:latest     -f images/vibe-dev/Containerfile --build-arg OPENCODE_VERSION=$OPENCODE_VERSION .
 podman build -t localhost/sloptown/vibe-runtime:latest -f images/vibe-runtime/Containerfile .
-images/test/smoke.sh                       # 25 checks, ~2 min
+images/test/smoke.sh                       # 36 checks, ~4 min
 
 # agentd unit tests (needs git in the container)
 cd images/vibe-agentd && podman run --rm -v $PWD:/src:Z -w /src -e UV_PROJECT_ENVIRONMENT=/tmp/venv \
@@ -62,7 +62,14 @@ The nightly pipeline (`deploy/pipeline/nightly.sh`) does all of this with
   `sha256sum` of the **previous** version to `vibe-dev/platform-allowlist.txt`,
   or versions committed before the image update can no longer be published.
   Keep this list in sync with `PLATFORM_FILES` in `vibe-agentd/vibe_agentd/app.py`
-  and `entrypoint.sh`.
+  and `entrypoint.sh`. The design files (`DESIGN.md`, `web/src/design.css`,
+  `web/src/palette.css`) are platform files too, but per style/palette from
+  `/opt/template-design`; agentd's `platform_sources()` is the one list.
+- **Design systems are installed for every Vibe.** Bootstrap, Tailwind (with its
+  Vite plugin in the shared `vite.config.ts`), Bulma and Materialize are all in
+  the template's `package.json`; `DESIGN.md` tells the agent which one to use.
+  A new design system means: its package in `template/web/package.json`, a
+  `template-design/styles/<id>/` and a catalog entry (see `template-design/AGENTS.md`).
 - **`@miira/vibe` is not in the template's package.json.** vibe-base packs
   `sdk/js` and copies it into `/opt/vibe/node_modules/@miira/vibe`.
 - **OpenCode** listens on 0.0.0.0:4096 with basic auth (`opencode` /

@@ -8,6 +8,9 @@
 # dev:     seeds /workspace, git history, locked platform files, agentd /health
 #          and /files, Vite serves the app (incl. @miira/vibe), API on :8000,
 #          opencode serve answers.
+# design:  agentd /design lays a style over the fresh workspace; after a restart
+#          the entrypoint keeps the design files read-only and git clean; every
+#          style in template-design builds with a palette (vibe-build).
 # runtime: vibe-build of the template (in vibe-dev), then vibe-runtime serves
 #          /healthz, index.html and the API under /api.
 set -euo pipefail
@@ -19,7 +22,7 @@ check() { if eval "$2"; then echo "  ok   $1"; pass=$((pass+1)); else echo "  FA
 HARD=(--read-only --tmpfs /tmp:rw,exec,mode=1777 --cap-drop ALL --security-opt no-new-privileges --pids-limit 512 --memory 2g)
 cleanup() {
   podman rm -f -t 0 $P-dev $P-run >/dev/null 2>&1 || true
-  podman volume rm -f $P-ws $P-pub $P-data >/dev/null 2>&1 || true
+  podman volume rm -f $P-ws $P-pub $P-data $P-sty >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 cleanup
@@ -36,6 +39,17 @@ except urllib.error.HTTPError as e:
     print(e.code, e.read().decode(errors='replace')[:200])
 except Exception as e:
     print('ERR', e)"
+}
+# POST JSON inside a container: prints "<status> <body prefix>".
+post() {
+  podman exec "$1" python -c "
+import sys, urllib.request, urllib.error
+req = urllib.request.Request('$2', data=sys.argv[1].encode(), method='POST',
+    headers={'Authorization': 'Bearer smoke-token', 'Content-Type': 'application/json'})
+try:
+    r = urllib.request.urlopen(req, timeout=30); print(r.status, r.read().decode(errors='replace')[:400])
+except urllib.error.HTTPError as e:
+    print(e.code, e.read().decode(errors='replace')[:200])" "$3"
 }
 wait_for() { # container url seconds
   for _ in $(seq "$3"); do [[ "$(get "$1" "$2" 20)" == 200* ]] && return 0; sleep 1; done; return 1
@@ -71,6 +85,35 @@ check "git status clean after start" '[ -z "$(podman exec $P-dev git -C /workspa
 podman restart -t 5 $P-dev >/dev/null
 check "opencode stays up (no crash loop)" '[ "$(podman logs $P-dev 2>&1 | grep -c "opencode: exited")" = 0 ]'
 check "restart keeps history (no reseed)" 'wait_for $P-dev http://127.0.0.1:4097/health 60 && [ "$(podman exec $P-dev git -C /workspace rev-list --count HEAD)" = 1 ]'
+
+echo "== design (agentd /design, entrypoint)"
+r=$(post $P-dev http://127.0.0.1:4097/design '{"style":"bulma","palette":"skov","starter":true}')
+check "agentd /design starter on a fresh workspace" '[[ "$r" == 200*"Start med Bulma og farverne Skov"* ]]'
+check "design files are read-only" '! podman exec $P-dev sh -c "echo x >> /workspace/web/src/palette.css" 2>/dev/null'
+check "marker is not tracked" '[ -z "$(podman exec $P-dev git -C /workspace ls-files .vibe-design)" ]'
+podman restart -t 5 $P-dev >/dev/null
+check "restart keeps the design and git clean" 'wait_for $P-dev http://127.0.0.1:4097/health 60 && [ -z "$(podman exec $P-dev git -C /workspace status --porcelain)" ] && [[ "$(get $P-dev http://127.0.0.1:4097/design)" == *"\"bulma\""*"\"skov\""* ]]'
+check "vite serves the bulma main.tsx" 'wait_for $P-dev http://127.0.0.1:5173/ 90 && [[ "$(get $P-dev http://127.0.0.1:5173/src/main.tsx 2000)" == 200*bulma* ]]'
+
+echo "== design systems build with a palette"
+STYLES=$(podman run --rm --entrypoint python "$DEV" -c 'import json; print(" ".join(s["id"] for s in json.load(open("/opt/template-design/catalog.json"))["styles"]))')
+for style in $STYLES; do
+  podman volume rm -f $P-sty >/dev/null 2>&1 || true
+  podman volume create $P-sty >/dev/null
+  podman exec $P-dev git -C /workspace archive --format=tar HEAD | podman volume import $P-sty -
+  r=$(podman run --rm "${HARD[@]}" -v $P-sty:/srv/app:U --entrypoint sh "$DEV" -c '
+    set -e; D=/opt/template-design/styles/'"$style"'; cd /srv/app
+    for f in main.tsx styles.css; do rm -f web/src/$f; cp $D/web/src/$f web/src/$f; done
+    rm -f web/src/design.css web/src/palette.css DESIGN.md
+    cp $D/design.css web/src/design.css; cp /opt/template-design/palettes/hav.css web/src/palette.css
+    echo "export default function App() { return <button className=\"btn btn-primary button is-primary bg-primary text-on-primary\">Hej</button>; }" > web/src/App.tsx
+    vibe-build /srv/app | tail -1
+    echo "palette-refs=$(cat web/dist/assets/*.css | grep -o -- "--palette-primary" | wc -l)"
+    echo "tw-utility=$(cat web/dist/assets/*.css | grep -c "\.bg-primary" || true)"' 2>&1 || true)
+  check "$style builds and uses the palette" '[[ "$r" == *"vibe-build: ok"* && "$r" != *"palette-refs=0"* ]]'
+  [ "$style" = tailwind ] && check "tailwind generates bg-primary from the palette" '[[ "$r" != *"tw-utility=0"* ]]'
+  [[ "$r" == *"vibe-build: ok"* ]] || echo "$r" | tail -15
+done
 
 echo "== vibe-build + vibe-runtime ($RUN)"
 # Publish-like snapshot: git archive of HEAD into a fresh volume, built by vibe-dev.
