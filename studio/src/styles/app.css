@@ -1094,6 +1094,88 @@ textarea.field {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* The AI's Markdown replies (components/Markdown). Compact: it sits in a chat column. */
+.md {
+  overflow-wrap: anywhere;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md blockquote,
+.md table {
+  margin: 0 0 var(--miira-space-2);
+}
+.md ul,
+.md ol {
+  padding-left: var(--miira-space-5);
+}
+.md li + li {
+  margin-top: 2px;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: var(--miira-space-3) 0 var(--miira-space-1);
+  font-size: var(--miira-font-size-md);
+  font-weight: 600;
+}
+.md strong {
+  font-weight: 600;
+}
+.md a {
+  color: var(--miira-accent-shade);
+}
+.md code {
+  font-family: var(--miira-font-mono);
+  font-size: 0.9em;
+  padding: 1px 4px;
+  border-radius: var(--miira-radius-sm);
+  background: var(--miira-color-surface-2);
+}
+.md pre {
+  padding: var(--miira-space-2);
+  overflow: auto;
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-sm);
+  background: var(--miira-color-surface-2);
+  font-size: var(--miira-font-size-xs);
+}
+.md pre code {
+  padding: 0;
+  background: none;
+}
+.md blockquote {
+  padding-left: var(--miira-space-3);
+  border-left: 3px solid var(--miira-color-border);
+  color: var(--miira-color-text-muted);
+}
+.md table {
+  display: block;
+  overflow: auto;
+  border-collapse: collapse;
+  font-size: var(--miira-font-size-sm);
+}
+.md th,
+.md td {
+  padding: var(--miira-space-1) var(--miira-space-2);
+  border: 1px solid var(--miira-color-border);
+  text-align: left;
+}
+.md hr {
+  border: none;
+  border-top: 1px solid var(--miira-color-border);
+  margin: var(--miira-space-3) 0;
+}
 .msg__image {
   max-width: 100%;
   border-radius: var(--miira-radius-md);

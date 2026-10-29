@@ -195,7 +195,7 @@ function makeProject(pid: string, title: string, seeded: boolean): ProjectData {
           { type: "tool", tool: "read", title: "Læste web/src/App.tsx", status: "done", output: "…" },
           { type: "tool", tool: "write", title: "Skrev web/src/Quiz.tsx", status: "done" },
           { type: "tool", tool: "bash", title: "Kørte npm run build", status: "done", output: "✓ built in 1.2s" },
-          { type: "text", text: "Jeg har lavet en quiz med 10 spørgsmål. Eleverne får point for hvert rigtigt svar, og du kan se resultaterne under \"Klassen\"." },
+          { type: "text", text: "Jeg har lavet en quiz med **10 spørgsmål**. Eleverne får point for hvert rigtigt svar:\n\n- Rigtigt svar: **1 point**\n- Svar inden for 10 sekunder: **1 bonuspoint**\n\nDu kan se resultaterne under **“Klassen”**. Spørgsmålene ligger i `web/src/questions.ts`." },
         ],
         createdAt: created,
       },

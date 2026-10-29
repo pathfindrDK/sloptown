@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import {
   Archive,
   ArchiveRestore,
@@ -412,17 +412,29 @@ function MessageView({ message }: { message: Message }) {
     <div className={`msg msg--${message.role}`}>
       {message.role === "user" && message.authorName && <div className="msg__author">{message.authorName}</div>}
       {message.parts.map((p, i) => (
-        <PartView key={i} part={p} />
+        <PartView key={i} part={p} markdown={message.role === "assistant"} />
       ))}
     </div>
   );
 }
 
-function PartView({ part }: { part: Part }) {
+// react-markdown + remark-gfm are ~170 kB: load them with the first AI reply.
+const Markdown = lazy(() => import("../components/Markdown").then((m) => ({ default: m.Markdown })));
+
+/** `markdown`: the AI writes Markdown; a teacher's own text is shown as typed. */
+function PartView({ part, markdown }: { part: Part; markdown: boolean }) {
   const [open, setOpen] = useState(false);
   switch (part.type) {
     case "text":
-      return part.text ? <div className="msg__text">{part.text}</div> : null;
+      if (!part.text) return null;
+      const plain = <div className="msg__text">{part.text}</div>;
+      return markdown ? (
+        <Suspense fallback={plain}>
+          <Markdown text={part.text} />
+        </Suspense>
+      ) : (
+        plain
+      );
     case "image":
       return <img className="msg__image" src={part.url} alt="" />;
     case "tool": {
