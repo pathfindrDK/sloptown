@@ -3,7 +3,7 @@ import { AlertTriangle, ExternalLink, Monitor, RotateCw, Smartphone, Tablet, Wre
 import { api } from "../api/client";
 import type { Project, Role } from "../api/types";
 import { useT } from "../lib/i18n";
-import { Loading } from "../components/Loading";
+import { Loading, LoadingTiles } from "../components/Loading";
 import { Select } from "../components/Select";
 import { useSegmentedIndicator } from "../lib/useSegmentedIndicator";
 
@@ -11,6 +11,11 @@ type Viewport = "desktop" | "tablet" | "mobile";
 const widths: Record<Viewport, string> = { desktop: "100%", tablet: "820px", mobile: "390px" };
 // Apps on an editor with an older SDK never send vibe:ready; drop the overlay this long after load.
 const READY_FALLBACK_MS = 4000;
+// The first turn writes the whole app; it usually takes a couple of minutes.
+export const FIRST_BUILD_MS = 3 * 60_000;
+// Between turn.finished and the reloaded history the build is over but the Vibe
+// still looks empty: keep the building cover this long instead of flashing the welcome.
+const BUILD_COVER_GRACE_MS = 5000;
 
 export type PreviewError = { message: string; stack?: string; at: number };
 
@@ -25,8 +30,12 @@ export function parsePreviewError(data: unknown): PreviewError | null {
 type Props = {
   project: Project;
   reloadSignal: number;
-  /** Nothing built yet (only the template commit): invite the teacher to the chat. */
+  /** Nothing built yet (only platform commits): invite the teacher to the chat. */
   empty: boolean;
+  /** The AI is working (or a message is queued) while the Vibe is still empty. */
+  building?: boolean;
+  /** When the teacher sent the first message (ms), if known; else when `building` was seen. */
+  buildStartedAt?: number | null;
   onFixError: (prompt: string) => void;
 };
 
@@ -52,7 +61,40 @@ function HandDrawnArrow() {
   );
 }
 
-export function Preview({ project, reloadSignal, empty, onFixError }: Props) {
+/** "m:ss" left of the first build's estimate, never below 0:00. */
+export function formatCountdown(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Covers the preview while the first version is built: tiles and a countdown. */
+function BuildingCover({ since }: { since: number }) {
+  const t = useT();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const left = since + FIRST_BUILD_MS - now;
+  return (
+    <div className="preview__welcome preview__building" role="status" aria-live="off">
+      <LoadingTiles />
+      <div>
+        <h2>{t("preview.building.title")}</h2>
+        {left > 0 ? (
+          <p>
+            {t("preview.building.eta")} <strong className="preview__countdown">{formatCountdown(left)}</strong>
+          </p>
+        ) : (
+          <p>{t("preview.building.late")}</p>
+        )}
+        <p className="preview__building-hint">{t("preview.building.hint")}</p>
+      </div>
+    </div>
+  );
+}
+
+export function Preview({ project, reloadSignal, empty, building = false, buildStartedAt = null, onFixError }: Props) {
   const t = useT();
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [viewAs, setViewAs] = useState<Role>("owner");
@@ -66,6 +108,15 @@ export function Preview({ project, reloadSignal, empty, onFixError }: Props) {
   const fallback = useRef<ReturnType<typeof setTimeout>>();
   const segRef = useRef<HTMLDivElement>(null);
   useSegmentedIndicator(segRef, viewport);
+  // Start of the first build while the cover is up; null shows the welcome (or the app).
+  const [buildSince, setBuildSince] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!empty) return setBuildSince(null);
+    if (building) return setBuildSince((s) => buildStartedAt ?? s ?? Date.now());
+    const id = setTimeout(() => setBuildSince(null), BUILD_COVER_GRACE_MS);
+    return () => clearTimeout(id);
+  }, [empty, building, buildStartedAt]);
 
   // One-time session URL sets the preview cookie (and view-as) on the preview host.
   useEffect(() => {
@@ -193,7 +244,9 @@ export function Preview({ project, reloadSignal, empty, onFixError }: Props) {
           <Loading label={t("preview.starting")} />
         ) : (
           <div className="preview__frame-wrap" style={{ width: widths[viewport] }}>
-            {empty ? (
+            {empty && buildSince !== null ? (
+              <BuildingCover since={buildSince} />
+            ) : empty ? (
               <div className="preview__welcome">
                 <div>
                   <h2>{t("preview.welcome.title")}</h2>

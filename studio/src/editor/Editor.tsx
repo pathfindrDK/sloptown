@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useReducer, useRef, useState, t
 import { Eye, FileCode, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { api } from "../api/client";
 import { ApiError, type BucketStatus, type Commit, type Project } from "../api/types";
-import { initialProjectState, onlyPlatformCommits, projectReducer } from "../lib/projectState";
+import { firstMessageAt, initialProjectState, onlyPlatformCommits, projectReducer } from "../lib/projectState";
 import { meterFor } from "../lib/budget";
 import { useT } from "../lib/i18n";
 import { useShell } from "../lib/shell";
@@ -263,6 +263,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                   project={project}
                   reloadSignal={state.historyVersion}
                   empty={!!history && onlyPlatformCommits(history.commits)}
+                  building={!!state.runningThreadId || state.queue.length > 0}
+                  buildStartedAt={firstMessageAt(state.messages)}
                   onFixError={askAiToFix}
                 />
               </div>

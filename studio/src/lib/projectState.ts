@@ -8,6 +8,18 @@ export function onlyPlatformCommits(commits: Commit[]): boolean {
   return commits.every((c) => c.authorName === "SlopTown");
 }
 
+/** When the earliest loaded teacher message was sent (ms), or null if none is loaded.
+ *  While a Vibe is still empty that is the message its first build answers. */
+export function firstMessageAt(messages: Record<string, Message[]>): number | null {
+  let first: number | null = null;
+  for (const list of Object.values(messages))
+    for (const m of list) {
+      const at = Date.parse(m.createdAt);
+      if (m.role === "user" && !Number.isNaN(at) && (first === null || at < first)) first = at;
+    }
+  return first;
+}
+
 export type ProjectState = {
   threads: Thread[];
   messages: Record<string, Message[]>; // by thread id

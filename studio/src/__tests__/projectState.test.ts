@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SseParser } from "../api/sse";
 import type { Commit, Thread } from "../api/types";
-import { initialProjectState, onlyPlatformCommits, projectReducer } from "../lib/projectState";
+import { firstMessageAt, initialProjectState, onlyPlatformCommits, projectReducer } from "../lib/projectState";
 
 const thread = (id: string): Thread => ({ id, projectId: "p", title: id, ownerSub: "u", createdAt: "", archived: false, status: "idle" });
 
@@ -65,5 +65,18 @@ describe("onlyPlatformCommits", () => {
   });
   it("is false once a teacher or the AI has committed", () => {
     expect(onlyPlatformCommits([commit("Quiz", "Lærer"), commit("Start fra skabelon", "SlopTown")])).toBe(false);
+  });
+});
+
+describe("firstMessageAt", () => {
+  it("is the earliest teacher message across threads, ignoring the AI's", () => {
+    const msg = (role: "user" | "assistant", createdAt: string) => ({ id: createdAt, threadId: "t", role, parts: [], createdAt });
+    expect(firstMessageAt({})).toBeNull();
+    expect(
+      firstMessageAt({
+        a: [msg("assistant", "2026-10-29T10:00:00Z"), msg("user", "2026-10-29T10:02:00Z")],
+        b: [msg("user", "2026-10-29T10:01:00Z")],
+      }),
+    ).toBe(Date.parse("2026-10-29T10:01:00Z"));
   });
 });

@@ -883,6 +883,21 @@ textarea.field {
 @media (prefers-reduced-motion: reduce) {
   .preview__welcome-arrow { animation: none; }
 }
+/* First build: tiles above the text, centred. */
+.preview__building {
+  flex-direction: column;
+  text-align: center;
+}
+.preview__building p + p {
+  margin-top: var(--miira-space-2);
+}
+.preview__countdown {
+  font-variant-numeric: tabular-nums;
+  color: var(--miira-color-text);
+}
+.preview__building-hint {
+  font-size: var(--miira-font-size-sm);
+}
 .preview__frame {
   height: 100%;
   max-width: 100%;
