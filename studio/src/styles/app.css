@@ -986,24 +986,36 @@ textarea.field {
   max-height: 34%;
   overflow: auto;
   border-bottom: 1px solid var(--miira-color-border);
-  padding: var(--miira-space-2);
+  padding: var(--miira-space-3) var(--miira-space-3) var(--miira-space-2);
 }
+/* "Tråde" label left, archive toggle and "Ny tråd" right; room for the 3D button's ledge. */
 .chat__threads-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--miira-space-1);
+  gap: var(--miira-space-3);
+  margin-bottom: var(--miira-space-3);
+}
+.chat__threads-label {
+  flex: 1;
+  margin: 0;
+  font-size: var(--miira-font-size-sm);
+  font-weight: 500;
+  color: var(--miira-color-text-muted);
 }
 .thread-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .thread-list__item {
   display: flex;
   align-items: center;
   gap: var(--miira-space-2);
-  padding: 2px var(--miira-space-1) 2px var(--miira-space-2);
+  min-height: 34px;
+  padding: var(--miira-space-1) var(--miira-space-1) var(--miira-space-1) var(--miira-space-3);
   border-radius: var(--miira-radius-sm);
   cursor: pointer;
   font-size: var(--miira-font-size-sm);

@@ -87,15 +87,18 @@ export function ChatPanel(props: Props) {
     <div className="chat">
       <div className="chat__threads">
         <div className="chat__threads-head">
-          <button className="btn btn--3d btn--small" onClick={newThread}>
-            <Plus size={14} /> {t("chat.newThread")}
-          </button>
+          <h3 className="chat__threads-label" id="chat-threads-label">
+            {t("chat.threads")}
+          </h3>
           <label className="check">
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             {t("chat.showArchived")}
           </label>
+          <button className="btn btn--3d btn--small" onClick={newThread}>
+            <Plus size={14} /> {t("chat.newThread")}
+          </button>
         </div>
-        <ul className="thread-list" role="listbox" aria-label={t("side.chat")}>
+        <ul className="thread-list" role="listbox" aria-labelledby="chat-threads-label">
           {threads.map((th) => (
             <li
               key={th.id}
