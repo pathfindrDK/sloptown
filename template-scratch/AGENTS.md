@@ -10,10 +10,12 @@ This file is owned by the platform. You cannot change it.
 
 ## What this project is
 
-- A folder of files under version control. Nothing here is served on the web:
-  there is no preview, no published app and no students using it online. The
-  teacher downloads the files ("Hent filer" in the studio, a .zip) and uses them
-  elsewhere, e.g. opens the `.ino` file in the Arduino IDE.
+- A folder of files under version control. Nothing here is published: there is no
+  published app and no students using it online. The teacher downloads the files
+  ("Hent filer" in the studio, a .zip) and uses them elsewhere, e.g. opens the
+  `.ino` file in the Arduino IDE.
+- The studio shows files rendered next to their code (HTML, Markdown, images,
+  sound, video, PDF), and the project's own user interface if it has one (below).
 - Choose a clear layout and keep `README.md` up to date in Danish: what the
   project does, which files matter, and step by step how the teacher uses them
   (which program to open, which board to choose, which wires go where).
@@ -30,3 +32,25 @@ This file is owned by the platform. You cannot change it.
 4. **No personal data** about students in files.
 5. You may run code here to check it (Python 3 is available), but say clearly in
    the chat when something can only be tested on the real device.
+
+## A user interface (only when it helps)
+
+Most projects here need none. Build one when the teacher asks for it ("en side",
+"en brugerflade", "noget eleverne kan klikke på"), or **suggest it in one sentence**
+when it would clearly help, for example a page to try a formula, a quiz to print or
+show on the board, or a simulator of the Arduino circuit. Don't build it unasked.
+
+How:
+
+- `index.html` at the root of the project is the entry. Keep it plain static files:
+  `index.html`, and if needed `style.css`, `script.js` and an `assets/` folder, with
+  relative links (`style.css`, not `/style.css`). No build step, no frameworks to
+  install, no CDNs or other hosts: it must work opened straight from the folder,
+  offline, on the teacher's computer.
+- Danish text in the page, readable on a projector and a phone (large text, enough
+  contrast). Data the page needs goes in the files; to keep something between
+  visits, use `localStorage`.
+- As soon as `index.html` exists, the studio shows a **Forhåndsvisning** tab with
+  the page. Only the teacher and those they share the project with for editing can
+  see it; it is never published. Tell the teacher in the chat to look under
+  Forhåndsvisning, and in `README.md` how to open `index.html` after downloading.

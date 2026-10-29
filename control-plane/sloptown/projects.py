@@ -52,7 +52,8 @@ def is_webapp(p: Project) -> bool:
 
 
 def require_webapp(p: Project) -> None:
-    """A "fra bunden" project is never served: no preview, no app, no publish."""
+    """A "fra bunden" project is never published: no app host, no publish. It does
+    have the editor-only preview host (its files, served as they are)."""
     if not is_webapp(p):
         raise ApiError(409, "not_a_webapp", "Projektet er ikke en webapp og kan ikke vises eller udgives")
 
@@ -66,7 +67,7 @@ def project_json(p: Project, role: str) -> dict[str, Any]:
         "ownerSub": p.owner_sub,
         "myRole": role,
         "status": p.status,
-        "previewUrl": host_url(p.slug, preview=True) + "/" if is_webapp(p) else None,
+        "previewUrl": host_url(p.slug, preview=True) + "/",
         "appUrl": host_url(p.slug) + "/" if p.published_sha else None,
         "publishedSha": p.published_sha,
         "public": p.public,
@@ -399,10 +400,10 @@ class PreviewSessionBody(BaseModel):
 async def preview_session(
     pid: str, principal: CurrentPrincipal, db: Db, body: PreviewSessionBody | None = None
 ) -> dict[str, Any]:
-    """One-time URL for the preview host. `viewAs` (dev only) is bound to the code and set as a cookie."""
+    """One-time URL for the preview host (a "fra bunden" project's too). `viewAs` (dev
+    only, webapps only) is bound to the code and set as a cookie."""
     project, _ = await require_project(db, principal, pid, "editor")
-    require_webapp(project)
-    view_as = body.viewAs if body and get_settings().dev_mode else None
+    view_as = body.viewAs if body and get_settings().dev_mode and is_webapp(project) else None
     code = await mint_edge_code(db, project, principal.sub, "preview", view_as)
     url = f"{host_url(project.slug, preview=True)}/_vibe/session?code={code}&next=/"
     return {"url": url + (f"&viewAs={view_as}" if view_as else "")}

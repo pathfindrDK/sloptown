@@ -150,10 +150,14 @@ launch token) **or** `Authorization: Bearer <session token>`. Errors:
 | POST | `/api/projects/{pid}/app-session` | → `{ url }` one-time URL that sets the app cookie on the app host |
 | GET | `/api/projects/{pid}/download` | `?sha=` (default HEAD) → `application/zip` of the tree (editors); agentd `/export` repacked |
 
-A `scratch` ("fra bunden") project is never served on the web: `publish`,
-`preview-session` and `app-session` answer `409 { error: "not_a_webapp" }`, its
-`previewUrl` and `appUrl` are `null`, and the edge endpoints (`/edge/auth/*`,
-`/edge/tls-ask`) treat its hosts as unknown. Its container runs no Vite or API.
+A `scratch` ("fra bunden") project is never published: `publish` and `app-session`
+answer `409 { error: "not_a_webapp" }`, its `appUrl` is `null`, and the edge
+(`/edge/auth/app`, `/edge/tls-ask`) treats its app host as unknown. It does have the
+editor-only preview host, like a webapp (`previewUrl`, `preview-session`, which
+ignores `viewAs`): its container runs `vibe-static` on Vite's port instead of Vite and
+the API, serving the workspace as plain files (no dotfiles, no `node_modules`, no
+listings, nothing outside the workspace), so a project with an `index.html` at the
+root shows that page. The studio adds the preview tab only then.
 
 ```ts
 type Project = {
@@ -223,6 +227,7 @@ events are `event: <name>\ndata: <json>`:
 |---|---|---|
 | GET | `/api/projects/{pid}/files` | `{ files: [{ path, size, locked, changed }] }` (flat, sorted) |
 | GET | `/api/projects/{pid}/files/{path}` | `{ path, content, locked, language }` (`?sha=` for a version) |
+| GET | `/api/projects/{pid}/raw/{path}` | the bytes of a media file (image, audio, video, PDF; `?sha=` for a version) for the studio's file preview, fetched with the bearer and shown from a blob URL. `Content-Disposition: attachment`, `CSP: sandbox`, `nosniff`: never rendered on the studio origin. `415 no_preview` for other types, `413 too_large` over 50 MB |
 | GET | `/api/projects/{pid}/history` | `{ commits: Commit[], publishedSha }` |
 | GET | `/api/projects/{pid}/history/{sha}/diff` | `{ sha, files: [{ path, status, patch }] }` |
 | POST | `/api/projects/{pid}/restore` | `{ sha }` → `Commit` (new commit reverting the tree to `sha`) |
@@ -242,6 +247,8 @@ Commit trailers: every commit made by a turn carries
 ### `vibe-agentd` (inside `vibe-dev`, :4097, called only by the control plane)
 
 Bearer `VIBE_PROJECT_TOKEN`. `GET /files`, `GET /files/{path}?sha=`,
+`GET /raw/{path}?sha=` (media bytes with their type, from a fixed extension list;
+`415` otherwise, `413` over 50 MB; symlinks out of the workspace are 404),
 `GET /history` → `{ commits: Commit[] }` (`threadId` from the `Vibe-Thread` trailer),
 `GET /diff/{sha}`, `POST /commit { message, trailers }` → `{ sha | null, files }`
 (`sha: null` when nothing changed), `POST /restore { sha, message, trailers }` →

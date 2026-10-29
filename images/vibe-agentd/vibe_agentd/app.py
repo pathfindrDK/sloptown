@@ -16,7 +16,7 @@ import time
 from pathlib import Path, PurePosixPath
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 WORKSPACE = Path(os.environ.get("VIBE_WORKSPACE", "/workspace"))
@@ -194,6 +194,43 @@ def read_file(path: str, sha: str | None = None) -> dict:
     else:
         content, language = data.decode("utf-8", errors="replace"), LANGUAGES.get(Path(path).suffix, "text")
     return {"path": path, "content": content, "locked": is_locked(path), "language": language}
+
+
+# Media the studio previews (images, audio, video, PDF). Anything else is text, read
+# through /files, or has no preview.
+RAW_TYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+    ".webp": "image/webp", ".avif": "image/avif", ".svg": "image/svg+xml", ".ico": "image/x-icon",
+    ".bmp": "image/bmp", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg",
+    ".oga": "audio/ogg", ".m4a": "audio/mp4", ".flac": "audio/flac", ".mp4": "video/mp4",
+    ".webm": "video/webm", ".ogv": "video/ogg", ".mov": "video/quicktime", ".pdf": "application/pdf",
+}
+RAW_MAX = 50 * 1024 * 1024
+
+
+@app.get("/raw/{path:path}", dependencies=[Depends(auth)])
+def read_raw(path: str, sha: str | None = None) -> Response:
+    """A media file's bytes (RAW_TYPES) for the studio's file preview; 415 for other types."""
+    path = safe_path(path)
+    media = RAW_TYPES.get(Path(path).suffix.lower())
+    if media is None:
+        raise HTTPException(415, "no preview for this type")
+    if sha:
+        proc = subprocess.run(["git", "show", f"{resolve_sha(sha)}:{path}"], cwd=WORKSPACE, capture_output=True)
+        if proc.returncode != 0:
+            raise HTTPException(404, "not found")
+        data = proc.stdout
+    else:
+        f = WORKSPACE / path
+        # A symlink the agent made must not reach outside the workspace.
+        if not f.is_file() or not f.resolve().is_relative_to(WORKSPACE.resolve()):
+            raise HTTPException(404, "not found")
+        if f.stat().st_size > RAW_MAX:
+            raise HTTPException(413, "too large to preview")
+        data = f.read_bytes()
+    if len(data) > RAW_MAX:
+        raise HTTPException(413, "too large to preview")
+    return Response(data, media_type=media)
 
 
 SEP = "\x1e"

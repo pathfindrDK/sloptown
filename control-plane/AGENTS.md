@@ -26,12 +26,12 @@ Contracts (change them first, then the code):
 | `access.py` | Role resolution: owner → launch `file_role` → cached members; `require_project` |
 | `members.py` | Members API fetch + `members_cache` (TTL, stale fallback), `for_app` strips `sub` |
 | `design.py` | Design systems and palettes: the catalog (`template-design/catalog.json`, copied into the image at `design_catalog`; repo copy as fallback), id lists, a random palette for Vibes started without one |
-| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; publish/unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is refused every web path (`require_webapp`) and unknown to `edge.py` |
+| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; publish/unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is never published (`require_webapp` on publish and app-session; `edge.py` knows only its preview host, served by `vibe-static`) |
 | `pool.py` | Warm pool: `claim` (`FOR UPDATE SKIP LOCKED`), `refill_once`/`refill_loop` (advisory lock), stale-image discard |
 | `orchestrator.py` | Podman libpod REST (hardened specs, networks, volumes, rename, publish via volume import, runtime roll, editor replace); `FakeOrchestrator` for tests |
 | `containers.py` | httpx clients for vibe-agentd (:4097, bearer) and opencode serve (:4096, basic) in `vibe-dev` |
 | `threads.py` | Threads (= OpenCode sessions) and `TurnManager`: one turn per project, a persistent queue (edit, delete, send now, paused by Stop), event mapping, commit after turn |
-| `files.py` | Files, history, diff, restore via agentd; `commit_turn`; agentd `files.changed` relay |
+| `files.py` | Files, history, diff, restore via agentd; `/raw` media bytes for the file preview (sandboxed, attachment, nosniff); `commit_turn`; agentd `files.changed` relay |
 | `events.py` | In-process pub/sub (`project:<pid>`, `members:<pid>`) and SSE helpers |
 | `edge.py` | Caddy `forward_auth` (`/edge/auth/app`, `/edge/auth/preview`), `/auth/app-login`, `/edge/session`, `/edge/tls-ask`, dev view-as |
 | `platform.py` | `/platform/*` for app code via egress (members, members SSE, dev whoami) |

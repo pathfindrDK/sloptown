@@ -5,6 +5,8 @@
 #   images/test/smoke.sh
 #   VIBE_DEV_IMAGE=... VIBE_RUNTIME_IMAGE=... images/test/smoke.sh   (pipeline)
 #
+# scratch: agentd /reset-scratch, then vibe-static serves the files on :5173
+#          (no dotfiles) instead of Vite.
 # dev:     seeds /workspace, git history, locked platform files, agentd /health
 #          and /files, Vite serves the app (incl. @miira/vibe), API on :8000,
 #          opencode serve answers.
@@ -21,8 +23,8 @@ pass=0; fail=0
 check() { if eval "$2"; then echo "  ok   $1"; pass=$((pass+1)); else echo "  FAIL $1"; fail=$((fail+1)); fi; }
 HARD=(--read-only --tmpfs /tmp:rw,exec,mode=1777 --cap-drop ALL --security-opt no-new-privileges --pids-limit 512 --memory 2g)
 cleanup() {
-  podman rm -f -t 0 $P-dev $P-run >/dev/null 2>&1 || true
-  podman volume rm -f $P-ws $P-pub $P-data $P-sty >/dev/null 2>&1 || true
+  podman rm -f -t 0 $P-dev $P-run $P-scr >/dev/null 2>&1 || true
+  podman volume rm -f $P-ws $P-pub $P-data $P-sty $P-scrv >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 cleanup
@@ -134,9 +136,29 @@ check "runtime mounts the API under /api" '[[ "$r" == 200* ]]'
 check "runtime has no node, git or uv" '! podman exec $P-run sh -c "command -v node || command -v git || command -v uv"'
 check "runtime can write /data only" 'podman exec $P-run sh -c "touch /data/x" && ! podman exec $P-run touch /srv/app/x 2>/dev/null'
 
+echo "== fra bunden (agentd /reset-scratch, vibe-static)"
+podman volume create $P-scrv >/dev/null
+# Vibes run on gVisor, where the supervisor can stop Vite on the spot. Under plain
+# crun on an AppArmor host it can't signal it, so the switch waits for a restart.
+SCR_RT=(); command -v runsc >/dev/null && SCR_RT=(--runtime runsc)
+podman run -d --name $P-scr "${SCR_RT[@]}" "${HARD[@]}" -v $P-scrv:/workspace:U \
+  -e VIBE_PROJECT_TOKEN=smoke-token -e VIBE_PROJECT_ID=smoke -e VIBE_PLATFORM_URL=http://127.0.0.1:9 \
+  -e OPENAI_BASE_URL=http://127.0.0.1:9/v1 -e OPENAI_API_KEY=smoke-token "$DEV" >/dev/null
+wait_for $P-scr http://127.0.0.1:4097/health 60 || true
+r=$(post $P-scr http://127.0.0.1:4097/reset-scratch '{}')
+check "agentd /reset-scratch converts a fresh workspace" '[[ "$r" == 200*"\"kind\":\"scratch\""* ]]'
+podman exec $P-scr sh -c 'printf "<h1>Trafiklys</h1>" > /workspace/index.html; printf "h1{}" > /workspace/style.css'
+[ ${#SCR_RT[@]} = 0 ] && podman restart -t 5 $P-scr >/dev/null
+check "vibe-static serves index.html on :5173 (Vite stopped)" 'wait_for $P-scr http://127.0.0.1:5173/ 30 && [[ "$(get $P-scr http://127.0.0.1:5173/ 100)" == "200 <h1>Trafiklys</h1>"* ]]'
+check "vibe-static serves the page's files" '[[ "$(get $P-scr http://127.0.0.1:5173/style.css 20)" == "200 h1{}"* ]]'
+check "vibe-static hides .git and .opencode" '[[ "$(get $P-scr http://127.0.0.1:5173/.git/HEAD 20)" == 404* && "$(get $P-scr http://127.0.0.1:5173/.opencode/ 20)" == 404* ]]'
+check "Vite and the API are gone" '[ -z "$(podman exec $P-scr sh -c "grep -lE \"[v]ite.js|[m]ain:app\" /proc/[0-9]*/cmdline 2>/dev/null")" ]'
+check "agentd /raw refuses text" '[[ "$(get $P-scr http://127.0.0.1:4097/raw/index.html 20)" == 415* ]]'
+
 echo "== $pass passed, $fail failed"
 if [ "$fail" != 0 ]; then
   echo "--- $P-dev logs"; podman logs --tail 40 $P-dev 2>&1
   echo "--- $P-run logs"; podman logs --tail 20 $P-run 2>&1 || true
+  echo "--- $P-scr logs"; podman logs --tail 30 $P-scr 2>&1 || true
   exit 1
 fi

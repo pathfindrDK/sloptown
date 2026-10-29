@@ -104,26 +104,37 @@ async def test_owner_opening_a_new_vibe_chooses_before_anything_is_created(env):
     assert (await env.client.get("/api/projects/f9", headers=no_terms)).json()["error"] == "terms_required"
 
 
-async def test_scratch_project_is_never_served(env):
+async def test_scratch_project_is_never_published_but_has_a_preview(env):
     import io
     import tarfile
     import zipfile
+
+    from .test_edge import fwd, host_cookie
 
     h = await env.user("s-t", file_id="fs", file_role="owner")
     reset = env.mock.post(f"{dev_base('fs', 4097)}/reset-scratch").respond(200, json={"kind": "scratch"})
     r = await env.client.post("/api/projects", json={"fileId": "fs", "kind": "scratch", "title": "Trafiklys"}, headers=h)
     assert r.status_code == 201, r.text
     p = r.json()
-    assert reset.called and p["kind"] == "scratch" and p["previewUrl"] is None and p["appUrl"] is None
-    for path in ("publish", "preview-session", "app-session"):
+    assert reset.called and p["kind"] == "scratch" and p["appUrl"] is None
+    assert p["previewUrl"].startswith("http://preview-" + p["slug"])
+    for path in ("publish", "app-session"):
         r = await env.client.post(f"/api/projects/fs/{path}", json={"sha": "abc1234"}, headers=h)
         assert r.status_code == 409 and r.json()["error"] == "not_a_webapp", path
-    for host in (p["slug"], f"preview-{p['slug']}"):
-        domain = f"{host}.apps.sloptown.localhost"
-        assert (await env.client.get("/edge/tls-ask", params={"domain": domain})).status_code == 404
-        hdr = {"X-Forwarded-Host": domain, "X-Forwarded-Uri": "/", "X-Forwarded-Proto": "https"}
-        kind = "preview" if host.startswith("preview-") else "app"
-        assert (await env.client.get(f"/edge/auth/{kind}", headers=hdr)).status_code == 404
+    # No app host at all.
+    app_host = f"{p['slug']}.apps.sloptown.localhost"
+    assert (await env.client.get("/edge/tls-ask", params={"domain": app_host})).status_code == 404
+    assert (await env.client.get("/edge/auth/app", headers=fwd(app_host))).status_code == 404
+    # The editor-only preview host: its files, from vibe-static on Vite's port. viewAs is ignored.
+    phost = f"preview-{p['slug']}.apps.sloptown.localhost"
+    assert (await env.client.get("/edge/tls-ask", params={"domain": phost})).status_code == 200
+    assert (await env.client.get("/edge/auth/preview", headers=fwd(phost))).status_code == 302
+    url = (await env.client.post("/api/projects/fs/preview-session", json={"viewAs": "viewer"}, headers=h)).json()["url"]
+    assert "viewAs" not in url
+    r = await env.client.get("/edge/auth/preview", headers=fwd(phost, cookie=await host_cookie(env, phost, url)))
+    assert r.status_code == 200 and r.headers["x-vibe-upstream"] == "fake-vibe-dev-fs:5173"
+    await env.share("fs", "s-v", "viewer")
+    assert (await env.client.post("/api/projects/fs/preview-session", headers=await env.user("s-v", role="elev"))).status_code == 403
 
     tar_buf = io.BytesIO()
     with tarfile.open(fileobj=tar_buf, mode="w") as tar:

@@ -80,8 +80,9 @@ async def _project_for_host(db: Db, request: Request, want: str) -> Project:
     if parsed is None or parsed[0] != want:
         raise ApiError(404, "unknown_host", "Ukendt adresse")
     project = (await db.execute(select(Project).where(Project.slug == parsed[1]))).scalar_one_or_none()
-    # A "fra bunden" project has no hosts at all: it is never served on the web.
-    if project is None or project.kind == "scratch":
+    # A "fra bunden" project is never published: it has the editor-only preview host
+    # (its files, served by vibe-static in its dev container) and no app host.
+    if project is None or (project.kind == "scratch" and want != "preview"):
         raise ApiError(404, "unknown_host", "Ukendt adresse")
     return project
 
@@ -190,9 +191,10 @@ async def tls_ask(db: Db, domain: str = "") -> Response:
     parsed = parse_host(domain)
     if parsed is None:
         return Response(status_code=404)
-    found = (
-        await db.execute(select(Project.id).where(Project.slug == parsed[1], Project.kind != "scratch"))
-    ).first()
+    q = select(Project.id).where(Project.slug == parsed[1])
+    if parsed[0] == "app":
+        q = q.where(Project.kind != "scratch")  # scratch: preview host only
+    found = (await db.execute(q)).first()
     return Response(status_code=200 if found else 404)
 
 

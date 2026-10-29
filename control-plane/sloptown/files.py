@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -74,6 +74,42 @@ async def read_file(pid: str, path: str, principal: CurrentPrincipal, db: Db, sh
     params = {"sha": sha} if sha else None
     async with await agentd(project) as client:
         return raise_for(await client.get(f"/files/{path}", params=params), "Fil")
+
+
+# What agentd's /raw may answer with (its RAW_TYPES): media for the file preview.
+RAW_MEDIA = re.compile(r"^(image|audio|video)/[a-z0-9.+-]+$|^application/pdf$")
+
+
+@router.get("/api/projects/{pid}/raw/{path:path}")
+async def read_raw(pid: str, path: str, principal: CurrentPrincipal, db: Db, sha: str | None = None) -> Response:
+    """A media file's bytes for the studio's file preview (fetched with the bearer, shown
+    from a blob URL). On the studio origin, so: download-only and sandboxed if opened
+    directly, never sniffed."""
+    project, _ = await require_project(db, principal, pid, "editor")
+    if is_hidden(path):
+        raise forbidden("Filen er skjult")
+    params = {"sha": sha} if sha else None
+    async with await agentd(project, timeout=60) as client:
+        r = await client.get(f"/raw/{path}", params=params)
+    if r.status_code == 415:
+        raise ApiError(415, "no_preview", "Filen kan ikke vises")
+    if r.status_code == 413:
+        raise ApiError(413, "too_large", "Filen er for stor til at blive vist")
+    if r.status_code >= 400:
+        raise_for(r, "Fil")
+    media = r.headers.get("content-type", "").split(";")[0].strip().lower()
+    if not RAW_MEDIA.match(media):
+        raise ApiError(502, "upstream_error", "Fil fejlede")
+    return Response(
+        r.content,
+        media_type=media,
+        headers={
+            "Content-Disposition": "attachment",
+            "Content-Security-Policy": "sandbox; default-src 'none'",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.get("/api/projects/{pid}/history")

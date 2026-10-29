@@ -7,7 +7,7 @@ every app.
 | Image | What | Runs |
 |---|---|---|
 | `vibe-base` | `python:3.13-slim-bookworm` + Node 22 + uv; template deps locked into `/opt/vibe/venv` (on `PATH`) and `/opt/vibe/node_modules` (`NODE_PATH`); `miira_vibe` and `@miira/vibe` installed from `sdk/`; user `vibe` (uid 1000) | nothing |
-| `vibe-dev` | base + OpenCode + git + ripgrep + vibe-agentd + `/opt/template` + `/opt/template-scratch` | supervisor: `opencode serve` :4096, Vite :5173, `uvicorn --reload` :8000, agentd :4097 |
+| `vibe-dev` | base + OpenCode + git + ripgrep + vibe-agentd + `/opt/template` + `/opt/template-scratch` | supervisor: `opencode serve` :4096, Vite :5173 (`vibe-static` in a "fra bunden" project), `uvicorn --reload` :8000, agentd :4097 |
 | `vibe-runtime` | base with node/npm/uv removed | `uvicorn miira_vibe.runtime:app` :8000 (`/healthz`, `/api/*`, SPA) |
 
 Build context is always the **repo root** (`.containerignore` there).
@@ -20,7 +20,8 @@ Build context is always the **repo root** (`.containerignore` there).
 | `vibe-base/Containerfile` | multi-stage: packs `sdk/js` (with `design/dist` for its theme), then base |
 | `vibe-dev/Containerfile` | also bakes `template-design/` (catalog, palettes, styles) at `/opt/template-design`, outside `/opt/template` so it never lands in a project |
 | `vibe-dev/entrypoint.sh` | seeds `/workspace` from `/opt/template` on first start (git init, commit "Start fra skabelon"); on **every** start rewrites `.git/info/exclude`, re-copies platform files read-only, commits them as "Platformopdatering" if they changed, symlinks `web/node_modules` → `/opt/vibe/node_modules`; sets `OPENCODE_SERVER_PASSWORD=$VIBE_PROJECT_TOKEN`. In a "fra bunden" project (`.vibe-kind` = `scratch`, written by agentd `/reset-scratch`) the only platform file is `AGENTS.md`, from `/opt/template-scratch`. A webapp with a design (`.vibe-design` = `<style> <palette>`, written by agentd `/design`) also gets `DESIGN.md`, `web/src/design.css` and `web/src/palette.css` from `/opt/template-design`; ids are checked against those directories, since the agent can write the marker |
-| `vibe-dev/supervisor.py` | starts the four processes, restarts with backoff 1–30 s, forwards SIGTERM. Vite and the API never run (and are stopped at once) while `/workspace/.vibe-kind` says `scratch` |
+| `vibe-dev/supervisor.py` | starts the processes, restarts with backoff 1–30 s, forwards SIGTERM. Vite and the API never run (and are stopped at once) while `/workspace/.vibe-kind` says `scratch`; `vibe-static` runs only then, and only once what was stopped has exited (it takes Vite's port). Each program runs in its own process group; a stop is SIGTERM to the group, SIGKILL after 5 s. Under plain crun on an AppArmor host (containers-default stacked with crun) signals between the container's own processes are refused: the switch then waits for the next start. Vibes run on gVisor, where it is immediate |
+| `vibe-dev/static.py` | `vibe-static`: a "fra bunden" project's files on :5173 for its editor-only preview host. `index.html` for directories, no listings, 404 for any dot-segment (`.git`, `.opencode`, `.data`), `node_modules`, `__pycache__` and symlinks out of `/workspace`; `Cache-Control: no-store` |
 | `vibe-dev/opencode.json` | OpenCode config: only provider `sloptown` (OpenAI-compatible, `OPENAI_BASE_URL`/`OPENAI_API_KEY` = egress + project token), model from `VIBE_AGENT_MODEL` (default `gpt-5.1`), `webfetch` denied |
 | `vibe-dev/vibe-build.sh` | `vibe-build <dir>`: `vite build` of a published snapshot into `<dir>/web/dist` (used at publish, in a one-shot vibe-dev container) |
 | `vibe-dev/platform-allowlist.txt` | sha256 of older platform-file versions that agentd's `/export` still accepts |

@@ -18,7 +18,7 @@ Read first:
 | `images/` | `vibe-base`, `vibe-dev`, `vibe-runtime` Containerfiles, `vibe-agentd` |
 | `template/` | boilerplate Vibe app, baked into `vibe-dev` at `/opt/template`, with the agent's `AGENTS.md` |
 | `template-design/` | design systems (Miira, Bootstrap, Tailwind, Bulma, Material) and colour palettes for webapps: catalog, per-style files, generated palettes; baked at `/opt/template-design` |
-| `template-scratch/` | the "fra bunden" project (README + the agent's `AGENTS.md`), baked at `/opt/template-scratch`; never served on the web |
+| `template-scratch/` | the "fra bunden" project (README + the agent's `AGENTS.md`), baked at `/opt/template-scratch`; never published (its optional `index.html` UI shows only on the editor-only preview host) |
 | `sdk/python/` `sdk/js/` | platform SDK (`miira_vibe`, `@miira/vibe`), installed into `vibe-base` |
 | `edge/` | Caddyfile, `egress.env`, nftables rules |
 | `fake-miira/` | dev-only Miira: OIDC, members API, webhook, launch token |

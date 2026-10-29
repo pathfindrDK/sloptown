@@ -28,6 +28,7 @@ COPY images/vibe-dev/opencode.json /etc/opencode/opencode.json
 COPY images/vibe-dev/platform-allowlist.txt /opt/vibe/platform-allowlist.txt
 COPY --chmod=0755 images/vibe-dev/entrypoint.sh /usr/local/bin/vibe-dev-entrypoint
 COPY --chmod=0755 images/vibe-dev/supervisor.py /usr/local/bin/vibe-supervisor
+COPY --chmod=0755 images/vibe-dev/static.py /usr/local/bin/vibe-static
 COPY --chmod=0755 images/vibe-dev/vibe-build.sh /usr/local/bin/vibe-build
 
 # Read-only root: /data points into the project volume, everything else is tmpfs.

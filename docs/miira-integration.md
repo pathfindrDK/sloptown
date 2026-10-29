@@ -41,7 +41,8 @@ SlopTown never forwards the service-level id into an app.
 - Only users with Miira role `laerer` (teacher) may create Vibe files (v1).
 - The first time the owner opens a new Vibe, the studio asks what it is: an app
   (preview, publish, students use it) or "fra bunden", an empty project for code
-  that is never served on the web (Arduino, scripts), downloaded as a .zip. Nothing
+  that is never published (Arduino, scripts), downloaded as a .zip; if it gets a
+  page of its own (`index.html`), the editors see it in the studio's preview. Nothing
   changes for Miira: same file type, same sharing; viewers of a "fra bunden" project
   just see that there is nothing to open.
 - Deep links SlopTown uses when it runs standalone (outside the iframe):

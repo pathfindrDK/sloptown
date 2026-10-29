@@ -254,3 +254,19 @@ def test_catalog_has_files_for_every_style_and_palette():
             assert (DESIGN / "styles" / s["id"] / name).is_file(), (s["id"], name)
     for p in cat["palettes"]:
         assert (DESIGN / "palettes" / f"{p['id']}.css").is_file(), p["id"]
+
+
+def test_raw_media_for_the_file_preview(client, tmp_path):
+    png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR"
+    (tmp_path / "web" / "logo.png").write_bytes(png)
+    r = client.get("/raw/web/logo.png")
+    assert r.status_code == 200 and r.content == png and r.headers["content-type"] == "image/png"
+    sha = client.post("/commit", json={"message": "logo"}).json()["sha"]
+    (tmp_path / "web" / "logo.png").write_bytes(b"new")
+    assert client.get("/raw/web/logo.png", params={"sha": sha}).content == png
+    assert client.get("/raw/web/App.tsx").status_code == 415, "text goes through /files"
+    assert client.get("/raw/.data/x.png").status_code == 404
+    assert client.get("/raw/web/missing.png").status_code == 404
+    (tmp_path / "web" / "escape.png").symlink_to("/etc/hostname")
+    assert client.get("/raw/web/escape.png").status_code == 404
+    assert TestClient(agentd.app).get("/raw/web/logo.png").status_code == 401
