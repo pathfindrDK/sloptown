@@ -1,4 +1,45 @@
 /* @miira/vibe base styles: apply Miira tokens to the page. Tokens only, no raw colours. */
+
+/* The names apps use (template/AGENTS.md). Miira's own tokens (the synced tokens.css
+   above) don't have them, so every one is an alias of a Miira token, as in the
+   studio's tokens.css. Aliases and Miira's [data-theme] blocks sit on the same
+   element (<html>), so they resolve per theme. Keep every name the earlier
+   placeholder theme had: apps already published use them. */
+:root {
+  --miira-font-family: var(--miira-font);
+  --miira-font-size-md: 0.875rem;
+  --miira-font-size-lg: 1rem;
+  --miira-font-size-xl: 1.25rem;
+  --miira-font-size-2xl: 1.625rem;
+
+  --miira-space-1: 4px;
+  --miira-space-2: 8px;
+  --miira-space-3: 12px;
+  --miira-space-4: 16px;
+  --miira-space-5: 24px;
+  --miira-space-6: 32px;
+  --miira-radius-full: 999px;
+
+  --miira-color-bg: var(--miira-bg-surface);
+  --miira-color-surface: var(--miira-bg-primary);
+  --miira-color-surface-2: var(--miira-bg-secondary);
+  --miira-color-border: var(--miira-border-color);
+  --miira-color-border-strong: var(--miira-border-hover);
+  --miira-color-text: var(--miira-text-primary);
+  --miira-color-text-muted: var(--miira-text-secondary);
+  --miira-color-text-subtle: var(--miira-text-muted);
+  --miira-color-accent: var(--miira-accent);
+  --miira-color-accent-contrast: var(--miira-accent-text);
+  --miira-color-accent-shade: var(--miira-accent-shade);
+  --miira-color-accent-soft: color-mix(in srgb, var(--miira-accent) 18%, var(--miira-bg-primary));
+  --miira-color-success: var(--miira-green);
+  --miira-color-warning: var(--miira-orange);
+  --miira-color-danger: var(--miira-red);
+
+  --miira-shadow-sm: 0 1px 2px rgba(var(--miira-shadow-rgb), 0.08);
+  --miira-shadow-md: 0 4px 16px rgba(var(--miira-shadow-rgb), 0.12);
+}
+
 html, body {
   margin: 0;
   font-family: var(--miira-font-family);

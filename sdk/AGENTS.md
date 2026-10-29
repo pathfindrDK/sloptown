@@ -36,7 +36,7 @@ browser ──/api/_vibe/*──▶ app backend (miira_vibe.setup) ──Bearer 
 | `js/src/client.ts` | `VibeClient` (fetch + SSE parsing), `BudgetExceededError`, types |
 | `js/src/react.tsx` | `VibeProvider`, `useCurrentUser`, `useRole`, `RequireRole`, `useMembers`, `useAi`, `miiraTheme` |
 | `js/src/errors.ts` | preview error bridge: posts `{type:"vibe:error", message, stack}` to the studio, and `announceReady()` posts `{type:"vibe:ready"}` after `VibeProvider`'s first render |
-| `js/src/base.css` + `js/scripts/copy-theme.mjs` | builds `dist/theme.css` = `design/dist/tokens.css` (+ fonts) + base styles |
+| `js/src/base.css` + `js/scripts/copy-theme.mjs` | builds `dist/theme.css` = `design/dist/tokens.css` (+ fonts) + base styles. Miira's tokens have no `--miira-color-*`/`--miira-space-*`/`--miira-font-family`; `base.css` defines them as aliases of Miira tokens (as `studio/src/styles/tokens.css` does). Published apps use those names: never drop one. A test checks that every `var(--miira-*)` in `theme.css` is defined |
 | `js/test/` | `node --test` against the built `dist/` |
 
 SQLite access uses the standard library `sqlite3` (no SQLAlchemy), so apps get

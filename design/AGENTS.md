@@ -16,8 +16,9 @@ The sync also writes the same files to `studio/src/styles/vendor/`. Vibe apps
 get the theme through the SDK: `sdk/js/scripts/copy-theme.mjs` builds
 `@miira/vibe/theme.css` from `design/dist` (so the template needs no copy).
 
-Until the first real sync, `dist/tokens.css` is a placeholder written by the
-SDK work, and there is no `PINNED`, so `--check` fails by design.
+The first real sync ran on 2026-10-28 (`PINNED`). Before it, `dist/tokens.css`
+was a placeholder with a purple accent, and Vibe images built then still carry
+it: every app in them is purple until the image is rebuilt.
 
 ## Commands
 

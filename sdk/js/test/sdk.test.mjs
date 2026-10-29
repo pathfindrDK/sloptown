@@ -87,3 +87,18 @@ test("announceReady posts vibe:ready from preview hosts only", () => {
   announceReady(pub.win);
   assert.equal(pub.posted.length, 0);
 });
+
+test("theme.css defines every token it uses, including the names apps rely on", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = await readFile(new URL("../dist/theme.css", import.meta.url), "utf8");
+  const defined = new Set([...css.matchAll(/(--miira-[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const used = new Set([...css.matchAll(/var\((--miira-[a-z0-9-]+)/g)].map((m) => m[1]));
+  assert.deepEqual([...used].filter((v) => !defined.has(v)), []);
+  // The placeholder theme's names: published apps use them (template/AGENTS.md).
+  for (const name of ["--miira-font-family", "--miira-color-bg", "--miira-color-surface", "--miira-color-text",
+    "--miira-color-text-muted", "--miira-color-border", "--miira-color-accent", "--miira-color-accent-contrast",
+    "--miira-color-danger", "--miira-radius-md", "--miira-space-4", "--miira-space-6", "--miira-shadow-sm"]) {
+    assert.ok(defined.has(name), name);
+  }
+  assert.doesNotMatch(css, /PLACEHOLDER/);
+});
