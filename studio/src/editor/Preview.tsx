@@ -30,6 +30,8 @@ export function parsePreviewError(data: unknown): PreviewError | null {
 type Props = {
   project: Project;
   reloadSignal: number;
+  /** A "fra bunden" project's UI: plain files, no SDK (no roles, no vibe:ready). */
+  staticSite?: boolean;
   /** Nothing built yet (only platform commits): invite the teacher to the chat. */
   empty: boolean;
   /** The AI is working (or a message is queued) while the Vibe is still empty. */
@@ -94,7 +96,7 @@ function BuildingCover({ since }: { since: number }) {
   );
 }
 
-export function Preview({ project, reloadSignal, empty, building = false, buildStartedAt = null, onFixError }: Props) {
+export function Preview({ project, reloadSignal, staticSite = false, empty, building = false, buildStartedAt = null, onFixError }: Props) {
   const t = useT();
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [viewAs, setViewAs] = useState<Role>("owner");
@@ -159,6 +161,7 @@ export function Preview({ project, reloadSignal, empty, building = false, buildS
 
   const onFrameLoad = () => {
     clearTimeout(fallback.current);
+    if (staticSite) return setAppLoading(false);
     fallback.current = setTimeout(() => setAppLoading(false), READY_FALLBACK_MS);
   };
 
@@ -209,21 +212,23 @@ export function Preview({ project, reloadSignal, empty, building = false, buildS
         <a className="icon-btn" href={project.previewUrl ?? undefined} target="_blank" rel="noopener" title={t("preview.open")} aria-label={t("preview.open")}>
           <ExternalLink size={16} />
         </a>
-        <div className="preview__viewas">
-          <span className="muted" aria-hidden>
-            {t("preview.viewAs")}
-          </span>
-          <Select<Role>
-            label={t("preview.viewAs")}
-            value={viewAs}
-            onChange={setViewAs}
-            options={[
-              { value: "owner", label: t("role.owner") },
-              { value: "editor", label: t("role.editor") },
-              { value: "viewer", label: t("role.viewer") },
-            ]}
-          />
-        </div>
+        {!staticSite && (
+          <div className="preview__viewas">
+            <span className="muted" aria-hidden>
+              {t("preview.viewAs")}
+            </span>
+            <Select<Role>
+              label={t("preview.viewAs")}
+              value={viewAs}
+              onChange={setViewAs}
+              options={[
+                { value: "owner", label: t("role.owner") },
+                { value: "editor", label: t("role.editor") },
+                { value: "viewer", label: t("role.viewer") },
+              ]}
+            />
+          </div>
+        )}
         <div className="topbar__spacer" />
         {errors.length > 0 && (
           <div className="preview__errors">

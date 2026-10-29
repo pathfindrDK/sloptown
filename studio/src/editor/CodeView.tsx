@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GitCompare, Lock } from "lucide-react";
+import { Code2, Eye, GitCompare, Lock } from "lucide-react";
 import { EditorState, RangeSetBuilder, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultHighlightStyle, syntaxHighlighting, foldGutter } from "@codemirror/language";
@@ -13,6 +13,9 @@ import { unifiedMergeView } from "@codemirror/merge";
 import { api } from "../api/client";
 import { changedLines } from "../lib/lineDiff";
 import { useT } from "../lib/i18n";
+import { previewKind } from "../lib/filePreview";
+import { useSegmentedIndicator } from "../lib/useSegmentedIndicator";
+import { FilePreview } from "./FilePreview";
 
 function languageFor(path: string): Extension[] {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
@@ -79,12 +82,22 @@ type Props = {
   /** Highlight lines changed relative to compareSha (the AI touched this file in its last turn). */
   highlight: boolean;
   reloadSignal: number;
+  /** HTML files open on the preview host (a "fra bunden" project). */
+  previewHost?: boolean;
 };
 
-export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSignal }: Props) {
+type Mode = "code" | "preview";
+
+export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSignal, previewHost = false }: Props) {
   const t = useT();
   const host = useRef<HTMLDivElement>(null);
+  const kind = previewKind(path);
+  // Rendered first, except when the AI just changed the file: then its changed lines.
+  const [mode, setMode] = useState<Mode>(kind && !highlight ? "preview" : "code");
+  const segRef = useRef<HTMLDivElement>(null);
+  useSegmentedIndicator(segRef, mode);
   const [content, setContent] = useState<string | null>(null);
+  const [binary, setBinary] = useState(false);
   const [previous, setPrevious] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [diff, setDiff] = useState(false);
@@ -98,6 +111,7 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
       .then((f) => {
         if (!live) return;
         setContent(f.content);
+        setBinary(f.content === null);
         setLocked(f.locked);
       })
       .catch(() => live && setError(true));
@@ -114,8 +128,11 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
     };
   }, [projectId, path, sha, compareSha, reloadSignal]);
 
+  // A binary file (an image, a sound) has no code to show.
+  const showPreview = !!kind && (mode === "preview" || binary);
+
   useEffect(() => {
-    if (!host.current || content === null) return;
+    if (showPreview || !host.current || content === null) return;
     const exts: Extension[] = [
       lineNumbers(),
       foldGutter(),
@@ -133,7 +150,7 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
     }
     const view = new EditorView({ state: EditorState.create({ doc: content, extensions: exts }), parent: host.current });
     return () => view.destroy();
-  }, [content, previous, diff, highlight, path]);
+  }, [content, previous, diff, highlight, path, showPreview]);
 
   return (
     <div className="codeview">
@@ -152,16 +169,49 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
           <span className="chip chip--muted">{t("code.readonly")}</span>
         )}
         <div className="topbar__spacer" />
-        <button
-          className={`btn btn--ghost btn--small${diff ? " is-active" : ""}`}
-          onClick={() => setDiff((d) => !d)}
-          disabled={previous === null}
-          aria-pressed={diff}
-        >
-          <GitCompare size={14} /> {t("code.diff")}
-        </button>
+        {!showPreview && (
+          <button
+            className={`btn btn--ghost btn--small${diff ? " is-active" : ""}`}
+            onClick={() => setDiff((d) => !d)}
+            disabled={previous === null}
+            aria-pressed={diff}
+          >
+            <GitCompare size={14} /> {t("code.diff")}
+          </button>
+        )}
+        {kind && !binary && (
+          <div className="segmented" role="group" aria-label={t("code.mode")} ref={segRef}>
+            <span className="segmented__indicator" aria-hidden />
+            {(
+              [
+                ["code", Code2, t("code.modeCode")],
+                ["preview", Eye, t("code.modePreview")],
+              ] as const
+            ).map(([m, Icon, label]) => (
+              <button key={m} className={mode === m ? "active" : undefined} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                <Icon size={14} /> {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      {error ? <div className="empty">{t("common.error")}</div> : <div className="codeview__editor" ref={host} />}
+      {error ? (
+        <div className="empty">{t("common.error")}</div>
+      ) : showPreview && kind ? (
+        <div className="codeview__preview">
+          <FilePreview
+            projectId={projectId}
+            path={path}
+            sha={sha}
+            kind={kind}
+            content={content}
+            previewHost={previewHost}
+            reloadSignal={reloadSignal}
+          />
+        </div>
+      ) : (
+        <div className="codeview__editor" ref={host} />
+      )}
     </div>
   );
 }

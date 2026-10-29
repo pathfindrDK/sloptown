@@ -11,6 +11,7 @@ import { BudgetModal } from "../components/Budget";
 import { PublishErrorModal } from "../components/PublishError";
 import { ConfirmModal } from "../components/Modal";
 import { publishState } from "../lib/publish";
+import { SCRATCH_UI_ENTRY } from "../lib/filePreview";
 import type { ToolbarAction } from "../lib/embedBridge";
 import { Preview } from "./Preview";
 import { ChatPanel } from "./ChatPanel";
@@ -104,6 +105,29 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
 
   const headSha = history?.commits[0]?.sha ?? null;
   const prevSha = history?.commits[1]?.sha ?? null;
+
+  // A "fra bunden" project gets the preview tab once it has a UI (index.html at the
+  // root, served as plain files on its preview host). It opens by itself when the UI
+  // appears while the teacher is here, and goes away if the file does.
+  const filesLoad = useLoad(
+    () => (webapp ? Promise.resolve(null) : api.files(project.id)),
+    [project.id, webapp, state.filesVersion],
+  );
+  const scratchUi = !webapp && !!filesLoad.data?.files.some((f) => f.path === SCRATCH_UI_ENTRY);
+  const hasPreview = webapp || scratchUi;
+  const uiSeen = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (webapp || !filesLoad.data) return;
+    const before = uiSeen.current;
+    uiSeen.current = scratchUi;
+    if (scratchUi) {
+      setTabs((ts) => (ts.some((x) => x.kind === "preview") ? ts : [{ kind: "preview" }, ...ts]));
+      if (before === false) setActiveTab("preview");
+    } else {
+      setTabs((ts) => ts.filter((x) => x.kind !== "preview"));
+      setActiveTab((a) => (a === "preview" ? tabKey({ kind: "file", path: "README.md" }) : a));
+    }
+  }, [webapp, filesLoad.data, scratchUi]);
 
   const openTab = useCallback((tab: Tab) => {
     const key = tabKey(tab);
@@ -297,13 +321,14 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
           </div>
           <div className="editor__view">
             {/* Preview stays mounted so switching tabs doesn't reload the app. */}
-            {webapp && (
+            {hasPreview && (
               <div className="editor__pane" hidden={active?.kind !== "preview"}>
                 <Preview
                   project={project}
                   reloadSignal={state.historyVersion}
-                  empty={!!history && onlyPlatformCommits(history.commits)}
-                  building={!!state.runningThreadId || state.queue.length > 0}
+                  staticSite={!webapp}
+                  empty={webapp && !!history && onlyPlatformCommits(history.commits)}
+                  building={webapp && (!!state.runningThreadId || state.queue.length > 0)}
                   buildStartedAt={firstMessageAt(state.messages)}
                   onFixError={askAiToFix}
                 />
@@ -321,6 +346,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                   compareSha={active.sha ? active.compareSha : prevSha}
                   highlight={active.sha ? !!active.highlight : state.changedFiles.includes(active.path)}
                   reloadSignal={active.sha ? 0 : state.filesVersion}
+                  previewHost={!webapp}
                 />
                 </Suspense>
               </div>

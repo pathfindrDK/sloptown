@@ -153,6 +153,17 @@ export const api = {
   files: (pid: string) => req<{ files: FileEntry[] }>("GET", `/api/projects/${enc(pid)}/files`),
   file: (pid: string, path: string, sha?: string) =>
     req<FileContent>("GET", `/api/projects/${enc(pid)}/files/${encPath(path)}${sha ? `?sha=${enc(sha)}` : ""}`),
+  /** A media file's bytes for the file preview (images, audio, video, PDF), as a Blob.
+   *  Fetched so the in-memory bearer is sent; shown from a blob URL. */
+  rawFile: async (pid: string, path: string, sha?: string): Promise<Blob> => {
+    const url = `/api/projects/${enc(pid)}/raw/${encPath(path)}${sha ? `?sha=${enc(sha)}` : ""}`;
+    const res = await fetch(url, { credentials: "include", headers: headers(false) });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, body.error ?? "raw_failed", body.message ?? res.statusText);
+    }
+    return res.blob();
+  },
   history: (pid: string) => req<History>("GET", `/api/projects/${enc(pid)}/history`),
   diff: (pid: string, sha: string) => req<Diff>("GET", `/api/projects/${enc(pid)}/history/${enc(sha)}/diff`),
   restore: (pid: string, sha: string) => req<Commit>("POST", `/api/projects/${enc(pid)}/restore`, { sha }),

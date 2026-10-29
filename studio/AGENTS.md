@@ -60,9 +60,19 @@ Screenshots: build mock, `vite preview --outDir dist-mock`, drive it with
 
 ## Project kinds
 
-`Project.kind` is `webapp` or `scratch` ("fra bunden"). A scratch project has no
-preview tab (the editor opens on `README.md`), no Udgiv (top bar and history), and
-the viewer says there is nothing to open. "Hent filer" (`api.download`, a fetched
+`Project.kind` is `webapp` or `scratch` ("fra bunden"). A scratch project opens on
+`README.md` and has no Udgiv (top bar and history); the viewer says there is nothing
+to open. Once it has `index.html` at the root (`lib/filePreview` `SCRATCH_UI_ENTRY`,
+from `api.files`, refetched on `filesVersion`) the editor adds the preview tab
+(`Preview` with `staticSite`: no "Se som", no SDK ready signal), opening it when the
+UI appears while the teacher is there and removing it if the file goes.
+
+The code view (`CodeView`) has a Kode / Visning toggle for HTML, Markdown, images,
+audio, video and PDF (`lib/filePreview` `previewKind`); `FilePreview` renders them:
+Markdown with `Markdown`; HTML on the preview host at the file's path in a scratch
+project's working tree, else as a sandboxed `srcdoc` (opaque origin); media from
+`api.rawFile` (a fetched blob, so the bearer is sent). Previewable files open in
+Visning unless the AI just changed them; binary files have no Kode. "Hent filer" (`api.download`, a fetched
 .zip so an embedded session's bearer is sent) is there for both kinds.
 
 ## Routes
