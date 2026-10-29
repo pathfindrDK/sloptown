@@ -84,6 +84,11 @@ describe("parseInbound", () => {
       fileId: "f",
       action: "download",
     });
+    expect(parseInbound({ type: "drive:action", fileId: "f", action: "unpublish" })).toEqual({
+      type: "drive:action",
+      fileId: "f",
+      action: "unpublish",
+    });
     expect(parseInbound({ type: "drive:action", fileId: "f", action: "delete" })).toBeNull();
     expect(parseInbound({ type: "drive:action", action: "publish" })).toBeNull();
   });

@@ -2,7 +2,7 @@
 // system and colours, who can open the published app, and its description.
 import { useEffect, useState } from "react";
 import type { IconState } from "../lib/embedBridge";
-import { Globe, ImagePlus, Lock } from "lucide-react";
+import { CircleStop, ExternalLink, Globe, ImagePlus, Lock } from "lucide-react";
 import { api } from "../api/client";
 import { ApiError, type Project } from "../api/types";
 import { DesignPreview } from "../components/DesignPreview";
@@ -18,11 +18,13 @@ type Props = {
   onChange: (project: Project) => void;
   /** Put a prompt in the chat composer for the teacher to send (Editor.askAiToFix). */
   onAskAi: (prompt: string) => void;
+  /** "Stop udgivelse" (Editor confirms, then calls the control plane). */
+  onUnpublish: () => void;
 };
 
 type Patch = { description?: string; public?: boolean; style?: string; palette?: string };
 
-export function SettingsPanel({ project, onChange, onAskAi }: Props) {
+export function SettingsPanel({ project, onChange, onAskAi, onUnpublish }: Props) {
   const t = useT();
   const locale = useLocale();
   const shell = useShell();
@@ -129,6 +131,27 @@ export function SettingsPanel({ project, onChange, onAskAi }: Props) {
             />
           )}
         </ConfirmModal>
+      )}
+
+      {project.kind !== "scratch" && (
+        <section className="settings__section">
+          <h3>{t("settings.publication")}</h3>
+          {project.publishedSha && project.appUrl ? (
+            <>
+              <p>
+                {t("settings.publishedAt")}{" "}
+                <a href={project.appUrl} target="_blank" rel="noopener" className="settings__app-link">
+                  {project.appUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")} <ExternalLink size={12} aria-hidden />
+                </a>
+              </p>
+              <button className="btn btn--3d btn--small" onClick={onUnpublish}>
+                <CircleStop size={14} /> {t("unpublish.action")}
+              </button>
+            </>
+          ) : (
+            <p className="muted">{t("settings.notPublished")}</p>
+          )}
+        </section>
       )}
 
       {project.kind !== "scratch" && (

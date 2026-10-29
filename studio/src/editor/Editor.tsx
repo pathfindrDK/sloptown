@@ -9,6 +9,9 @@ import { useShell } from "../lib/shell";
 import { TopBar } from "../components/TopBar";
 import { BudgetModal } from "../components/Budget";
 import { PublishErrorModal } from "../components/PublishError";
+import { ConfirmModal } from "../components/Modal";
+import { publishState } from "../lib/publish";
+import type { ToolbarAction } from "../lib/embedBridge";
 import { Preview } from "./Preview";
 import { ChatPanel } from "./ChatPanel";
 import { FilesPanel } from "./FilesPanel";
@@ -55,6 +58,10 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const [budgetModal, setBudgetModal] = useState<BucketStatus | null>(null);
   const [publishError, setPublishError] = useState<ApiError | null>(null);
   const [publishing, setPublishing] = useState(false);
+  // "Stop udgivelse": asked from the top bar menu, Indstillinger or Miira's top bar.
+  const [unpublishAsked, setUnpublishAsked] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishFailed, setUnpublishFailed] = useState(false);
   const shownBudgetState = useRef<string>("ok");
   const segRef = useRef<HTMLDivElement>(null);
   useSegmentedIndicator(segRef, `${sideTab}:${sideOpen}`);
@@ -108,6 +115,26 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     const rest = tabs.filter((x) => tabKey(x) !== key);
     setTabs(rest);
     if (activeTab === key) setActiveTab(rest[0] ? tabKey(rest[0]) : "");
+  };
+
+  const askUnpublish = () => {
+    setUnpublishFailed(false);
+    setUnpublishAsked(true);
+  };
+
+  const unpublish = async () => {
+    setUnpublishing(true);
+    setUnpublishFailed(false);
+    try {
+      await api.unpublish(project.id);
+      setProject((p) => ({ ...p, publishedSha: null }));
+      setHistoryRefresh((n) => n + 1);
+      setUnpublishAsked(false);
+    } catch {
+      setUnpublishFailed(true);
+    } finally {
+      setUnpublishing(false);
+    }
   };
 
   const publish = async (sha: string) => {
@@ -177,12 +204,23 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const download = () => api.download(project.id, `${project.title || "vibe"}.zip`);
 
   // chrome=none: Miira's top bar shows publish/download/budget/open app; keep it current.
-  const upToDate = !!headSha && headSha === project.publishedSha;
+  const pubState = publishState(headSha, project.publishedSha);
+  const upToDate = pubState === "published";
+  const busy = publishing || unpublishing;
   const bucket = state.budget?.enabled ? state.budget.build : null;
   const meter = meterFor(bucket);
   const toolbarKey = JSON.stringify({
     canEdit,
-    publish: canEdit && webapp ? { published: upToDate, busy: publishing, disabled: !headSha || upToDate || publishing } : null,
+    publish:
+      canEdit && webapp
+        ? {
+            state: pubState,
+            published: upToDate,
+            busy,
+            disabled: !headSha || upToDate || busy,
+            canUnpublish: !!project.publishedSha && !busy,
+          }
+        : null,
     appUrl: project.appUrl && project.publishedSha ? project.appUrl : null,
     download: canEdit && !!headSha,
     budget: bucket && {
@@ -196,10 +234,11 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   useEffect(() => shell.toolbar(project.id, JSON.parse(toolbarKey)), [shell, project.id, toolbarKey]);
   useEffect(() => () => shell.toolbar(project.id, null), [shell, project.id]);
 
-  const onAction = useRef<(action: "publish" | "download") => void>(() => {});
+  const onAction = useRef<(action: ToolbarAction) => void>(() => {});
   onAction.current = (action) => {
     if (action === "download" && canEdit && headSha) download();
-    if (action === "publish" && canEdit && webapp && headSha && !upToDate && !publishing) publish(headSha);
+    if (action === "publish" && canEdit && webapp && headSha && !upToDate && !busy) publish(headSha);
+    if (action === "unpublish" && canEdit && webapp && project.publishedSha && !busy) askUnpublish();
   };
   useEffect(
     () => shell.onAction((fileId, action) => fileId === project.id && onAction.current(action)),
@@ -222,6 +261,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
           onRename={rename}
           onShare={() => shell.share(project.id)}
           onPublish={() => headSha && publish(headSha)}
+          onUnpublish={askUnpublish}
           onDownload={download}
         />
       )}
@@ -345,12 +385,25 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
                   onPublish={webapp ? publish : undefined}
                 />
               )}
-              {sideTab === "settings" && canEdit && <SettingsPanel project={project} onChange={setProject} onAskAi={askAiToFix} />}
+              {sideTab === "settings" && canEdit && <SettingsPanel project={project} onChange={setProject} onAskAi={askAiToFix} onUnpublish={askUnpublish} />}
             </div>
           </aside>
         )}
       </div>
       {budgetModal && <BudgetModal bucket={budgetModal} onClose={() => setBudgetModal(null)} />}
+      {unpublishAsked && (
+        <ConfirmModal
+          title={t("unpublish.title")}
+          body={t("unpublish.body")}
+          confirmLabel={unpublishing ? t("unpublish.busy") : t("unpublish.action")}
+          onConfirm={unpublish}
+          onCancel={() => setUnpublishAsked(false)}
+          busy={unpublishing}
+          danger
+        >
+          {unpublishFailed && <p className="settings__error">{t("common.error")}</p>}
+        </ConfirmModal>
+      )}
       {publishError && <PublishErrorModal error={publishError} onFix={askAiToFix} onClose={() => setPublishError(null)} />}
     </div>
   );

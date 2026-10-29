@@ -48,9 +48,11 @@ type ConfirmProps = {
   /** Shown under the body, e.g. a preview of what is being confirmed. */
   children?: ReactNode;
   wide?: boolean;
+  /** The confirm button is red: the action takes something away (e.g. "Stop udgivelse"). */
+  danger?: boolean;
 };
 
-export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, busy, children, wide }: ConfirmProps) {
+export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, busy, children, wide, danger }: ConfirmProps) {
   const t = useT();
   return (
     <Modal
@@ -62,7 +64,7 @@ export function ConfirmModal({ title, body, confirmLabel, onConfirm, onCancel, b
           <button className="btn btn--3d" onClick={onCancel}>
             {t("common.cancel")}
           </button>
-          <button className="btn btn--3d btn--primary" onClick={onConfirm} disabled={busy}>
+          <button className={`btn btn--3d ${danger ? "btn--danger" : "btn--primary"}`} onClick={onConfirm} disabled={busy}>
             {confirmLabel}
           </button>
         </>

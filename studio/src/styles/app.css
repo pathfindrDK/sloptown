@@ -603,6 +603,12 @@ textarea.field {
 .topbar__spacer {
   flex: 1;
 }
+/* Udgiv/Opdater/Udgivet plus, once published, a menu with "Stop udgivelse". */
+.topbar__publish {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 
 .budget-meter {
   display: flex;
@@ -1531,6 +1537,13 @@ textarea.field {
 .settings__section p {
   margin: 0;
   font-size: var(--miira-font-size-sm);
+}
+.settings__app-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--miira-accent-shade);
+  overflow-wrap: anywhere;
 }
 .settings__icon {
   display: flex;

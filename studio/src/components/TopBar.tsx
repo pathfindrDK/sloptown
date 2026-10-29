@@ -1,8 +1,10 @@
 // Mirrors the docs-editor TopBar pattern: back, file icon, editable title, actions.
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, ExternalLink, Rocket, Share2, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, CircleStop, Download, ExternalLink, RefreshCw, Rocket, Share2, Sparkles } from "lucide-react";
 import type { BudgetStatus, Project } from "../api/types";
 import { useT } from "../lib/i18n";
+import { publishState } from "../lib/publish";
+import { Menu } from "./Menu";
 import { BudgetMeter } from "./Budget";
 
 type Props = {
@@ -15,10 +17,12 @@ type Props = {
   onRename: (title: string) => void;
   onShare: () => void;
   onPublish: () => void;
+  /** Asks to stop the publication (the Editor confirms first). */
+  onUnpublish: () => void;
   onDownload: () => void;
 };
 
-export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, onRename, onShare, onPublish, onDownload }: Props) {
+export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, onRename, onShare, onPublish, onUnpublish, onDownload }: Props) {
   const t = useT();
   const [title, setTitle] = useState(project.title);
   useEffect(() => setTitle(project.title), [project.title]);
@@ -29,7 +33,8 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, 
     else setTitle(project.title);
   };
 
-  const upToDate = !!headSha && headSha === project.publishedSha;
+  const state = publishState(headSha, project.publishedSha);
+  const PublishIcon = state === "update" ? RefreshCw : state === "published" ? Check : Rocket;
 
   return (
     <header className="topbar">
@@ -71,14 +76,24 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, 
         <Share2 size={16} /> {t("top.share")}
       </button>
       {canEdit && project.kind !== "scratch" && (
-        <button
-          className="btn btn--3d btn--primary"
-          onClick={onPublish}
-          disabled={!headSha || upToDate || publishing}
-          title={t("top.publishVersion")}
-        >
-          <Rocket size={16} /> {upToDate ? t("top.published") : t("top.publish")}
-        </button>
+        <div className="topbar__publish">
+          <button
+            className="btn btn--3d btn--primary"
+            onClick={onPublish}
+            disabled={!headSha || state === "published" || publishing}
+            title={t(`top.${state}Title`)}
+          >
+            <PublishIcon size={16} />{" "}
+            {publishing ? t(state === "update" ? "top.updating" : "top.publishing") : t(`top.${state}`)}
+          </button>
+          {project.publishedSha && (
+            <Menu
+              label={t("top.publishMenu")}
+              trigger={<ChevronDown size={16} />}
+              items={[{ label: t("unpublish.action"), icon: <CircleStop size={14} />, onSelect: onUnpublish, danger: true }]}
+            />
+          )}
+        </div>
       )}
     </header>
   );

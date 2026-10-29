@@ -117,7 +117,7 @@ describe("design in Indstillinger", () => {
     render(
       <LocaleProvider locale="da">
         <ShellProvider shell={standaloneShell(() => {})}>
-          <SettingsPanel project={p} onChange={onChange} onAskAi={onAskAi} />
+          <SettingsPanel project={p} onChange={onChange} onAskAi={onAskAi} onUnpublish={vi.fn()} />
         </ShellProvider>
       </LocaleProvider>,
     );

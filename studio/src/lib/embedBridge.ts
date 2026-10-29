@@ -1,4 +1,5 @@
 // SlopTown side of Miira's drive:* postMessage protocol (docs/miira-integration.md §3).
+import type { PublishState } from "./publish";
 
 /** Miira's theme names; "org" is the school's own palette, carried as tokens. */
 export type MiiraTheme = "miira" | "neutral" | "dark" | "kontrast" | "org";
@@ -28,13 +29,22 @@ export type IconState = { src: string; custom: boolean };
 const ICON_SRC = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
 const ICON_SRC_MAX = 600_000;
 
-export type ToolbarAction = "publish" | "download";
+export type ToolbarAction = "publish" | "download" | "unpublish";
+const TOOLBAR_ACTIONS: ToolbarAction[] = ["publish", "download", "unpublish"];
 
 /** What Miira's top bar may offer for this project (docs/miira-integration.md §3). */
 export type ToolbarState = {
   canEdit: boolean;
-  /** null for a "fra bunden" project or a viewer: nothing to publish. */
-  publish: { published: boolean; busy: boolean; disabled: boolean } | null;
+  /** null for a "fra bunden" project or a viewer: nothing to publish. `state` picks the
+   *  button ("Udgiv" / "Opdater" / "Udgivet"); `published` (= state "published") stays
+   *  for Miira builds that predate it. `canUnpublish`: offer "Stop udgivelse". */
+  publish: {
+    state: PublishState;
+    published: boolean;
+    busy: boolean;
+    disabled: boolean;
+    canUnpublish: boolean;
+  } | null;
   appUrl: string | null;
   download: boolean;
   budget: {
@@ -117,8 +127,8 @@ export function parseInbound(data: unknown): InboundMessage | null {
       if (m.src.length > ICON_SRC_MAX || !ICON_SRC.test(m.src)) return null;
       return { type: "drive:icon-state", fileId: m.fileId, icon: { src: m.src, custom: m.custom === true } };
     case "drive:action":
-      if (typeof m.fileId !== "string" || (m.action !== "publish" && m.action !== "download")) return null;
-      return { type: "drive:action", fileId: m.fileId, action: m.action };
+      if (typeof m.fileId !== "string" || !TOOLBAR_ACTIONS.includes(m.action as ToolbarAction)) return null;
+      return { type: "drive:action", fileId: m.fileId, action: m.action as ToolbarAction };
     default:
       return null;
   }

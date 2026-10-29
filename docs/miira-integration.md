@@ -77,7 +77,7 @@ check `event.origin` against an allowlist.
 | SlopTown → Miira| `drive:toolbar`      | `{ fileId, toolbar: ToolbarState \| null }`          | what Miira's top bar may offer (sent on every change; `null` when the editor closes) |
 | Miira → SlopTown| `drive:icon-state`   | `{ fileId, src, custom }`                            | the Vibe's icon as Miira shows it (a `data:image/...` URL), sent once the studio runs and on every change |
 | SlopTown → Miira| `drive:icon`         | `{ fileId }`                                         | open Miira's icon dialog (Indstillinger → Skift ikon) |
-| Miira → SlopTown| `drive:action`       | `{ fileId, action: "publish" \| "download" }`        | a press on one of those actions; the studio runs it as if its own button was pressed |
+| Miira → SlopTown| `drive:action`       | `{ fileId, action: "publish" \| "download" \| "unpublish" }` | a press on one of those actions; the studio runs it as if its own button was pressed (`unpublish` opens the studio's "Stop udgivelsen af appen?" confirmation) |
 | SlopTown → Miira| `drive:close`        | `{}`                                                 | user pressed back |
 | Miira → SlopTown| `drive:access-changed`| `{ fileId }`                                        | optional fast path after the share dialog closes |
 
@@ -94,7 +94,13 @@ actions are described by `drive:toolbar` and pressed with `drive:action`:
 ```ts
 type ToolbarState = {
   canEdit: boolean;
-  publish: { published: boolean; busy: boolean; disabled: boolean } | null; // null: scratch or viewer
+  publish: {                  // null: scratch or viewer
+    state: "publish" | "update" | "published"; // which button to draw, see below
+    published: boolean;         // = state === "published"; kept for builds before `state`
+    busy: boolean;              // publishing or unpublishing right now
+    disabled: boolean;
+    canUnpublish: boolean;      // offer "Stop udgivelse" (published, nothing running)
+  } | null;
   appUrl: string | null;      // the published app, opened by Miira in a new tab
   download: boolean;          // "Hent filer" may run now
   budget: {                   // the build budget meter; null when budgets are off
@@ -113,6 +119,20 @@ otherwise), already worked out by Miira. The studio reads its colours from Miira
 vendored tokens (`studio/src/styles/vendor/tokens.css`), so it wears every Miira theme
 and lays a school's tokens over it. `theme` stays for older builds. A school's own font
 is not carried: its files need the Miira session, which a studio on another site lacks.
+
+The publish button follows `publish.state`, as the studio's own top bar does:
+
+| `state` | Label | Hover text | |
+|---|---|---|---|
+| `publish` | Udgiv | Udgiv appen, så andre kan åbne den | nothing published yet |
+| `update` | Opdater | Opdater udgivelse med seneste ændringer | published, with newer changes |
+| `published` | Udgivet | Den udgivne app har alle de seneste ændringer | disabled |
+
+While `busy`, the label is "Udgiver …" or "Opdaterer …". When `canUnpublish`, Miira
+puts "Stop udgivelse" next to it (the studio uses a small menu on the button) and sends
+`drive:action` `unpublish`; the studio asks for confirmation and calls
+`POST /api/projects/{pid}/unpublish`. Indstillinger → Udgivelse in the studio offers the
+same, so a Miira build without it still lets teachers unpublish.
 
 The download itself still happens in the frame (it needs the in-memory bearer), so the
 iframe keeps `allow-downloads`. Budget and publish-error dialogs stay in the studio.
