@@ -44,8 +44,11 @@ App and preview hosts (`<slug>.APPS`, `preview-<slug>.APPS`):
    `X-Vibe-Upstream`/`X-Vibe-View-As`; websockets (Vite HMR) pass through.
 
 Both: `Content-Security-Policy: frame-ancestors …` set after the upstream
-(`>` prefix), so apps cannot loosen it; rate limit per client IP
-(600/min studio, 1200/min apps).
+(`>` prefix), so apps cannot loosen it; rate limits: studio 1200/min per client IP,
+apps 6000/min per client IP **and host** (`app_ip` keyed `"{remote_host} {host}"`).
+Keying apps by host matters: with one bucket per IP, a Vibe polling ~10/s used up a
+teacher's whole budget and the studio's `preview-*` iframe got 429s too. Request
+loops are also caught before publishing (`control-plane/sloptown/appcheck.py`).
 
 ## Build and test
 

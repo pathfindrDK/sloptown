@@ -59,3 +59,30 @@ async def test_a_new_network_address_is_looked_up_at_once(env):
         assert await peers.allowed("10.89.5.2")
     finally:
         peers.reset()
+
+
+async def test_a_burst_from_a_new_address_waits_for_one_refresh(env):
+    """Opening a Vibe sends several requests at once from the edge's address on that
+    Vibe's network. Those arriving while the first one refreshes must not get a 404."""
+    import asyncio
+
+    from sloptown import peers
+
+    peers.reset()
+    env.orch.platform_ips = {"sloptown-edge": EDGE}
+    real = env.orch.container_ips
+    calls = 0
+
+    async def slow(containers):
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.05)
+        return await real(containers)
+
+    env.orch.container_ips = slow
+    try:
+        assert all(await asyncio.gather(*(peers.allowed(EDGE) for _ in range(6))))
+        assert calls == 1
+    finally:
+        env.orch.container_ips = real
+        peers.reset()

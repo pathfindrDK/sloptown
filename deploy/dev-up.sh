@@ -31,6 +31,11 @@
 # SLOPTOWN_DEV_DB_VOLUME picks the Postgres volume (tests/e2e uses its own).
 # Set SLOPTOWN_OPENAI_API_KEY in the environment to get real inference
 # (SLOPTOWN_OPENAI_BASE_URL points it elsewhere; tests/e2e/run.sh uses a fake).
+#
+# Production switches (put them in deploy/.public.env to make them stick):
+#   SLOPTOWN_DEV_MODE=false          turns off dev-only features ("view as" in previews). Default true.
+#   SLOPTOWN_RESTART_POLICY=on-failure  podman restarts a platform container that crashes.
+#                                    Default: none. Survives nothing across a reboot (the vault is locked).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -92,6 +97,9 @@ MIIRA_ISSUER="$MIIRA_ORIGIN"
 MIIRA_API_BASE=http://sloptown-fake-miira:8100
 GATE_MODE=on
 ADMIN_IPS="10.0.0.0/8 127.0.0.1/32"
+DEV_MODE="${SLOPTOWN_DEV_MODE:-true}"
+RESTART=()
+[ -n "${SLOPTOWN_RESTART_POLICY:-}" ] && RESTART=(--restart "$SLOPTOWN_RESTART_POLICY")
 EXTERNAL_MIIRA="${SLOPTOWN_MIIRA_ORIGIN:-}"
 if [ -n "$EXTERNAL_MIIRA" ]; then
   MIIRA_ORIGIN="${EXTERNAL_MIIRA%/}"
@@ -117,7 +125,7 @@ podman network exists $NET || podman network create --label sloptown=1 $NET >/de
 podman rm -f "${PLATFORM[@]}" >/dev/null 2>&1 || true
 
 CP_ENV=(
-  -e SLOPTOWN_DEV_MODE=true
+  -e SLOPTOWN_DEV_MODE="$DEV_MODE"
   -e SLOPTOWN_DATABASE_URL=postgresql+asyncpg://sloptown:sloptown@sloptown-db:5432/sloptown
   -e SLOPTOWN_STUDIO_ORIGIN="$STUDIO_ORIGIN"
   -e SLOPTOWN_APPS_DOMAIN="$APPS"
@@ -145,7 +153,7 @@ CP_ENV=(
 )
 
 echo "-- sloptown-db"
-podman run -d --name sloptown-db --network $NET --label sloptown=1 \
+podman run -d --name sloptown-db "${RESTART[@]}" --network $NET --label sloptown=1 \
   -e POSTGRES_USER=sloptown -e POSTGRES_PASSWORD=sloptown -e POSTGRES_DB=sloptown \
   -v "$DB_VOLUME:/var/lib/postgresql/data" docker.io/library/postgres:17 >/dev/null
 for _ in $(seq 30); do podman exec sloptown-db pg_isready -q -U sloptown 2>/dev/null && break; sleep 1; done
@@ -156,7 +164,7 @@ FM_STATE=()
 # Public test: keep files, shares and the signing key across restarts.
 [ -n "$PUBLIC" ] && FM_STATE=(-v sloptown-public-fake-miira:/var/lib/fake-miira
   -e FAKE_MIIRA_DATA_FILE=/var/lib/fake-miira/store.json -e FAKE_MIIRA_KEY_FILE=/var/lib/fake-miira/key.pem)
-podman run -d --name sloptown-fake-miira --network $NET --label sloptown=1 "${FM_STATE[@]}" \
+podman run -d --name sloptown-fake-miira "${RESTART[@]}" --network $NET --label sloptown=1 "${FM_STATE[@]}" \
   -e FAKE_MIIRA_ISSUER="$MIIRA_ORIGIN" \
   -e FAKE_MIIRA_STUDIO_ORIGIN="$STUDIO_ORIGIN" \
   -e FAKE_MIIRA_STUDIO_API_BASE=http://sloptown-cp:8000 \
@@ -170,19 +178,19 @@ echo "-- sloptown-cp"
 # The socket is owned by the caller. Rootful (root): run the cp as uid 0 so it
 # can open it (dev only). Rootless: keep-id maps the caller to the image's uid 1000.
 if [ "$(id -u)" = 0 ]; then CP_USER=(--user 0:0); else CP_USER=(--userns keep-id:uid=1000,gid=1000); fi
-podman run -d --name sloptown-cp --network $NET --label sloptown=1 "${CP_ENV[@]}" "${CP_USER[@]}" \
+podman run -d --name sloptown-cp "${RESTART[@]}" --network $NET --label sloptown=1 "${CP_ENV[@]}" "${CP_USER[@]}" \
   --security-opt label=disable -v "$CP_SOCK:/run/podman/podman.sock" \
   $T/control-plane:dev >/dev/null
 
 echo "-- sloptown-egress"
-podman run -d --name sloptown-egress --network $NET --label sloptown=1 "${CP_ENV[@]}" \
+podman run -d --name sloptown-egress "${RESTART[@]}" --network $NET --label sloptown=1 "${CP_ENV[@]}" \
   -v "$ROOT/edge/egress.env:/etc/sloptown/egress.env:ro,Z" \
   $T/control-plane:dev python -m sloptown.egress >/dev/null
 
 EDGE_ENV=()
 if [ -n "$PUBLIC" ] && [ "$GATE_MODE" = on ]; then
   echo "-- sloptown-gate"
-  podman run -d --name sloptown-gate --network $NET --label sloptown=1 \
+  podman run -d --name sloptown-gate "${RESTART[@]}" --network $NET --label sloptown=1 \
     -e GATE_PASSWORD="$GATE_PASSWORD" -e GATE_DOMAIN="$PUBLIC" -e GATE_SECRET="$SESSION_SECRET" \
     -v "$ROOT/edge/gate.py:/gate.py:ro,Z" ghcr.io/astral-sh/uv:python3.13-bookworm-slim python /gate.py >/dev/null
   # Certificates survive restarts (Let's Encrypt rate limits: 50 new certs/week per domain).
@@ -197,7 +205,7 @@ if [ -n "$PUBLIC" ] && [ -n "$TLS_DIR" ] && [ -r "$TLS_DIR/fullchain.pem" ] && [
 fi
 
 echo "-- sloptown-edge (${EDGE_PORTS[*]})"
-podman run -d --name sloptown-edge --network $NET --label sloptown=1 "${EDGE_PORTS[@]}" "${EDGE_ENV[@]}" \
+podman run -d --name sloptown-edge "${RESTART[@]}" --network $NET --label sloptown=1 "${EDGE_PORTS[@]}" "${EDGE_ENV[@]}" \
   -e STUDIO_HOST="$STUDIO_HOST" -e APPS_DOMAIN="$APPS" \
   -e STUDIO_ORIGIN="$STUDIO_ORIGIN" -e MIIRA_ORIGINS="$MIIRA_ORIGIN" \
   -e CP_UPSTREAM=sloptown-cp:8000 -e FAKE_MIIRA_UPSTREAM=sloptown-fake-miira:8100 \
@@ -221,7 +229,7 @@ fi
 if [ -n "$PUBLIC" ]; then
   cat <<EOF
 
-SlopTown public TEST stack is up (password gate: $GATE_MODE):
+SlopTown public stack is up (password gate: $GATE_MODE, dev mode: $DEV_MODE, restart: ${SLOPTOWN_RESTART_POLICY:-no}):
   studio      https://$STUDIO_HOST
   Miira       $MIIRA_ORIGIN
   apps        https://<slug>.$APPS

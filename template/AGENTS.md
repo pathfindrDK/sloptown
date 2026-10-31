@@ -55,6 +55,24 @@ by itself when Python files change.
    send student data to the AI unless that is the point of the feature.
 10. Keep the app working after every turn. If the preview shows an error, fix it
     before doing anything else.
+11. **Be gentle with the server.** A whole class uses the app at once, from one
+    school network. Fetch data when the page opens and after the user acts; if
+    the app must follow changes (a game, a live score), poll **at most every
+    3 seconds** with `setInterval` cleared on unmount, skip a round while the
+    previous request is still running, and wait longer after each failed request
+    (double the pause, up to a minute). Never fetch in a loop without a pause,
+    never call a function that fetches from `setTimeout(…, 0)` on itself, and
+    always give `useEffect` a dependency array. Members update live by themselves
+    (`useMembers`); don't poll for them.
+12. **Safe code.** No `eval`/`new Function`/`exec`, no `shell=True`, and SQL
+    always with parameters (`?`), never built with f-strings or `%`. Never put
+    keys or passwords in the code.
+
+Publishing runs an automatic check for the patterns in rules 11 and 12. If it
+finds any, you get a "Tjek før udgivelse" message listing them: fix them without
+changing what the app does. If a flagged line is really fine, add a comment with
+`vibe-check: ok` and the reason on the line before it (not possible for keys,
+eval, SQL or shell).
 
 ## SDK reference — backend (`miira_vibe`)
 

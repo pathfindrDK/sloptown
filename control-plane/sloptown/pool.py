@@ -43,6 +43,11 @@ async def claim(db: AsyncSession, project_id: str) -> PoolSlot:
             .with_for_update(skip_locked=True)
         )
     ).scalar_one_or_none()
+    if slot is not None and not await orch.wake_slot(slot.container_name, slot.network_name):
+        log.warning("pool slot %s did not come up, discarding it", slot.container_name)
+        await orch.discard(slot.container_name, slot.volume_name, slot.network_name)
+        await db.delete(slot)
+        slot = None
     if slot is None:
         log.info("pool empty, creating a container on demand for %s", project_id)
         spec = await orch.create_pool_slot()

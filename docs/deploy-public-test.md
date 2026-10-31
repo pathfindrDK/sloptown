@@ -106,3 +106,10 @@ SLOPTOWN_OPENAI_API_KEY=sk-... \
 - To make the choice stick across restarts, put `SLOPTOWN_MIIRA_ORIGIN` and
   `SLOPTOWN_ADMIN_ALLOWED_IPS` in `deploy/.public.env` (it is sourced after the
   environment, so it wins). Since 2026-10-29 it points at production, `https://hej.miira.dk`.
+
+## Production switches
+
+`SLOPTOWN_DEV_MODE=false` (no "view as" in previews) and `SLOPTOWN_RESTART_POLICY=on-failure`
+in `deploy/.public.env` run this stack in production mode; both have been set there since
+2026-10-31. On this host, start it through systemd (`systemd-run -r ...`), not from a
+`sudo -i` shell: see `/root/SLOPTOWN-RESTART.md`.

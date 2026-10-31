@@ -26,7 +26,9 @@ Contracts (change them first, then the code):
 | `access.py` | Role resolution: owner → launch `file_role` → cached members; `require_project` |
 | `members.py` | Members API fetch + `members_cache` (TTL, stale fallback), `for_app` strips `sub` |
 | `design.py` | Design systems and palettes: the catalog (`template-design/catalog.json`, copied into the image at `design_catalog`; repo copy as fallback), id lists, a random palette for Vibes started without one |
-| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; publish/unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is never published (`require_webapp` on publish and app-session; `edge.py` knows only its preview host, served by `vibe-static`) |
+| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is never published (`require_webapp` on publish and app-session; `edge.py` knows only its preview host, served by `vibe-static`) |
+| `publishing.py` | `POST /api/projects/{pid}/publish`: agentd `/export` → `appcheck` scan → release (orchestrator build + run), or an AI fix turn in the "Tjek før udgivelse" thread (`Turn.publish_attempt`); `after_fix_turn` (called by `TurnManager._run` while it still holds the turn slot) rescans HEAD and releases, retries (`MAX_FIX_ATTEMPTS` = 2) or emits `publish.failed` |
+| `appcheck.py` | The pre-publish static scan of the exported tar: request loops without a delay, `useEffect` without deps, eval/exec, SQL from strings, `shell=True`, keys in code; `fix_prompt` for the AI |
 | `pool.py` | Warm pool: `claim` (`FOR UPDATE SKIP LOCKED`), `refill_once`/`refill_loop` (advisory lock), stale-image discard |
 | `orchestrator.py` | Podman libpod REST (hardened specs, networks, volumes, rename, publish via volume import, runtime roll, editor replace); `FakeOrchestrator` for tests |
 | `containers.py` | httpx clients for vibe-agentd (:4097, bearer) and opencode serve (:4096, basic) in `vibe-dev` |
@@ -56,7 +58,7 @@ podman run --rm --network host -v $PWD:/src:Z -v sloptown-uv-cache:/root/.cache/
   ghcr.io/astral-sh/uv:python3.13-bookworm-slim uv run pytest -q tests/
 ```
 
-Control-plane tests: `test_auth`, `test_projects` (incl. pool), `test_edge`,
+Control-plane tests: `test_auth`, `test_projects` (incl. pool), `test_publishing`, `test_appcheck`, `test_edge`,
 `test_members_hooks`, `test_turns`, `test_files`, `test_internal`. Fixtures are in
 `tests/a_support.py` (`env` fixture: ASGI client, `FakeMiira` on respx, `FakeOrchestrator`,
 captured hub events). They reuse B's database fixtures (`sloptown_test_b`, truncated per
@@ -82,6 +84,12 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
 
 ### Invariants and gotchas
 
+- **Publishing checks the code first.** A publish whose tree has `appcheck` findings
+  doesn't build: the AI fixes them in a turn and publishing finishes after that turn,
+  on the SSE stream. Keep each rule's signal strong (a network call *in* a loop with
+  no delay): every false positive costs a teacher a fix turn, and two failed attempts
+  block the publish. Add a test with ordinary code that must not be flagged for every
+  new rule (`test_ordinary_timers_are_fine`, `test_the_template_is_clean`).
 - **One turn per project.** All threads share one working tree. `TurnManager` holds a
   per-project lock; submit, finish→start-next, the queue edits (edit, delete, send now),
   stop and restore all take it. Up to `MAX_QUEUED` queued turns (`409 queue_full`); budget

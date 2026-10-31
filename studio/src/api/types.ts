@@ -33,6 +33,8 @@ export type Project = {
   palette: string | null;
   createdAt: string;
   updatedAt: string;
+  /** GET /api/projects/{pid} only: the pre-publish check's AI fix is under way. */
+  publishPending?: boolean;
 };
 
 export type Localized = { da: string; en: string };
@@ -116,6 +118,15 @@ export type QueueItem = {
 /** `paused`: Stop was pressed while messages waited; the next send resumes. */
 export type QueueState = { items: QueueItem[]; paused: boolean };
 
+/** Something the pre-publish check found (title: Danish, for the teacher). */
+export type PublishFinding = { rule: string; title: string; path: string; line: number };
+/** The check found something and the AI is fixing it; publishing carries on by itself. */
+export type PublishFixing = { status: "fixing"; turnId: string; threadId: string; attempt: number; findings: PublishFinding[] };
+/** `project.published`; both null after unpublish. */
+export type Published = { publishedSha: string | null; url: string | null };
+/** `publish.failed`: an ApiError body (build_failed: log, check_failed: findings, ...). */
+export type PublishFailure = { error: string; message: string } & Record<string, unknown>;
+
 export type ProjectEvent =
   | { event: "turn.started"; data: { threadId: string; turnId: string } }
   | { event: "message.part"; data: { threadId: string; messageId: string; index: number; part: Part } }
@@ -135,6 +146,9 @@ export type ProjectEvent =
   | { event: "files.changed"; data: { paths: string[] } }
   | { event: "budget"; data: BudgetStatus }
   | { event: "thread.updated"; data: Thread }
+  | { event: "publish.checking"; data: PublishFixing }
+  | { event: "project.published"; data: Published }
+  | { event: "publish.failed"; data: PublishFailure }
   | { event: "ping"; data: Record<string, never> };
 
 export class ApiError extends Error {

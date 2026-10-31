@@ -140,10 +140,10 @@ launch token) **or** `Authorization: Bearer <session token>`. Errors:
 |---|---|---|
 | GET | `/api/projects` | projects the user owns or has been shared (cached members) |
 | POST | `/api/projects` | `{ fileId, title?, kind?: "webapp"\|"scratch", style?, palette? }` → `Project` (roles `laerer`, `admin`, `system-admin` (`403 teachers_only` otherwise), terms accepted; claims from warm pool; a webapp gets its design with agentd `POST /design { style, palette, starter: true }`: `style` defaults to `"miira"`, `palette` to a random one; `scratch` converts the claimed container with agentd `/reset-scratch` and ignores style/palette; either leaves the project in `status: "error"` if it fails. Unknown ids: `400 bad_style` / `bad_palette`, before anything is claimed) |
-| GET | `/api/projects/{pid}` | `Project`. The owner (per launch `file_role`) of a Vibe with no project yet gets `404 { error: "not_started", canStart: true }`: the studio asks webapp or "fra bunden" and POSTs. `403 { error: "terms_required" }` comes first if that owner has not accepted the current terms (the studio shows the terms modal and retries) |
+| GET | `/api/projects/{pid}` | `Project` plus `publishPending: boolean` (a pre-publish fix turn is queued or running). The owner (per launch `file_role`) of a Vibe with no project yet gets `404 { error: "not_started", canStart: true }`: the studio asks webapp or "fra bunden" and POSTs. `403 { error: "terms_required" }` comes first if that owner has not accepted the current terms (the studio shows the terms modal and retries) |
 | PATCH | `/api/projects/{pid}` | `{ title?, description?, public?, style?, palette? }` → `Project` (editor+; `public` owner only). A changed `style`/`palette` (webapp only, else `409 not_a_webapp`) goes through agentd `POST /design`, which commits the design files as the platform; `409 turn_running` while an AI turn runs; audit `project.design { from, to, commit }`; SSE `files.changed`. A new style changes only `DESIGN.md` and `design.css`: the studio then sends the AI a chat message to rebuild the UI, a normal budgeted turn |
 | GET | `/api/design` | the catalog of design systems and palettes, `template-design/catalog.json` verbatim: `{ styles: [{ id, name: {da,en}, description: {da,en}, package? }], palettes: [{ id, name: {da,en}, light: Colours, dark: Colours }] }`, `Colours = { primary, onPrimary, bg, surface, text, muted, border }` (hex) |
-| POST | `/api/projects/{pid}/publish` | `{ sha }` → `{ publishedSha, url }` |
+| POST | `/api/projects/{pid}/publish` | `{ sha }` → `200 { publishedSha, url }`, or `202 { status: "fixing", turnId, threadId, attempt, findings }` when the pre-publish check found something (see Publish below). `409 publish_pending` while a fix turn is under way |
 | POST | `/api/projects/{pid}/unpublish` | |
 | GET | `/api/projects/{pid}/budget` | `BudgetStatus` for the caller's build bucket and the project's app bucket |
 | POST | `/api/projects/{pid}/preview-session` | `{ viewAs?: "owner"\|"editor"\|"viewer" }` → `{ url }` one-time URL that sets the preview cookie on the preview host; with `viewAs` the URL carries `&viewAs=` so `/edge/session` also sets `vibe_view_as` |
@@ -219,6 +219,9 @@ events are `event: <name>\ndata: <json>`:
 | `files.changed` | `{ paths: string[] }` |
 | `budget` | `BudgetStatus` |
 | `thread.updated` | `Thread` |
+| `publish.checking` | `{ status: "fixing", turnId, threadId, attempt, findings: Finding[] }`: a pre-publish fix turn was submitted |
+| `project.published` | `{ publishedSha \| null, url \| null }` (null after unpublish) |
+| `publish.failed` | an error body `{ error, message, ... }` for a publish that ended after its request: `check_failed { findings }`, `check_stopped`, `build_failed { log }`, `locked_files_changed { paths }`, `budget_blocked { retryAt }`, `internal` |
 | `ping` | `{}` every 15 s |
 
 ### Files and history (via `vibe-agentd`)
@@ -326,6 +329,34 @@ failed build → `422 { error: "build_failed", log }` (tail of the build output)
 and the previously published version keeps running. Then `vibe-run-<pid>` is
 recreated on the new volume.
 
+### Pre-publish check
+
+Teachers don't read code, so publish checks it (`sloptown.appcheck`, a static scan
+of the exported tar) and lets the AI fix what it finds:
+
+- Rules: `fast-poll` (`setInterval` that calls the server more often than every 2 s),
+  `retry-loop` (a function that calls the server and re-schedules itself with
+  `setTimeout` < 1 s), `loop-no-delay` (`while (true)`/`for (;;)`/`while True:` that
+  calls a service without a sleep), `effect-no-deps` (`useEffect` without a
+  dependency array that fetches), `eval` (`eval`, `new Function`, Python `exec`),
+  `sql-string` (`execute(f"…")`, `%`, `.format`), `shell` (`shell=True`), `secret`
+  (OpenAI/AWS/GitHub/Slack/Google keys, private keys). Scanned: `web/**/*.{js,jsx,ts,tsx,mjs,cjs}`
+  and `*.py`, not `node_modules/`, `dist/`, `tests/`, test files or lock files.
+  A `vibe-check: ok` comment on the line or the line before silences a finding,
+  except `eval`, `sql-string`, `shell` and `secret`.
+- `Finding = { rule, title, path, line }` (`title`: Danish, for the teacher).
+- No findings: released at once (`200`). Findings on HEAD: a fix turn (prompt from
+  `appcheck.fix_prompt`, authored by the publisher, charged to their build budget)
+  is submitted to the project's "Tjek før udgivelse" thread (created on first use),
+  ahead of any waiting messages, and the answer is `202`. When it is done, still in
+  the turn slot, the new HEAD is exported and scanned again: clean → released
+  (`project.published`); findings → another fix turn, at most 2 in all; then
+  `publish.failed check_failed`. A fix turn that is stopped or errors →
+  `publish.failed check_stopped`. Findings on an older version →
+  `422 check_failed { findings }` (the fix would land on HEAD, not on that version).
+- Audit: `project.publish_check { sha, attempt, rules, turn? , gaveUp? }`, then
+  `project.publish` or `project.publish_failed` as before.
+
 ### Platform API (called by app code via the SDK, through `egress`)
 
 `egress` authenticates `Authorization: Bearer <VIBE_PROJECT_TOKEN>`, then
@@ -391,7 +422,7 @@ publishes `members.changed` to subscribers of `/platform/members/events`.
 `projects(id pk, title, slug unique, owner_sub, container_name, volume_name, network_name, image_tag, status, dev_token_hash, runtime_token_hash, published_sha, published_at, active_turn_sub, created_at, updated_at)`
 `pool_slots(id pk, container_name, volume_name, network_name, image_tag, state: creating|ready|claimed|discarding, created_at)`
 `threads(id pk, project_id, opencode_session_id, title, owner_sub, archived, created_at)`
-`turns(id pk, project_id, thread_id, author_sub, status: queued|running|done|stopped|error, commit_sha, started_at, finished_at)`
+`turns(id pk, project_id, thread_id, author_sub, status: queued|running|done|stopped|error, queued_at, commit_sha, started_at, finished_at, publish_attempt int null)` (`publish_attempt`: set on pre-publish fix turns)
 `members_cache(project_id pk, version, payload jsonb, fetched_at)`
 `usage_events(id, ts, project_id, user_sub, member_id, bucket, model, requested_model, input_tokens, output_tokens, nerfed)`
 `budget_settings(id=1, payload jsonb, updated_at, updated_by)`

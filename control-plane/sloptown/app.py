@@ -28,6 +28,7 @@ from . import (
     peers,
     platform,
     projects,
+    publishing,
     terms,
     threads,
 )
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
         auth.router,
         terms.router,
         projects.router,
+        publishing.router,
         threads.router,
         files.router,
         edge.router,

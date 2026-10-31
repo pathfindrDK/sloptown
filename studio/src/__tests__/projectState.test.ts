@@ -50,8 +50,8 @@ describe("projectReducer", () => {
 });
 
 describe("events the reducer does not handle", () => {
-  it("leave the state as it was (project.published after a publish)", () => {
-    const next = projectReducer(initialProjectState, { event: "project.published", data: { publishedSha: "a".repeat(40) } } as never);
+  it("leave the state as it was (an event a newer control plane added)", () => {
+    const next = projectReducer(initialProjectState, { event: "project.renamed", data: { title: "Quiz" } } as never);
     expect(next).toBe(initialProjectState);
   });
 });
@@ -78,5 +78,33 @@ describe("firstMessageAt", () => {
         b: [msg("user", "2026-10-29T10:01:00Z")],
       }),
     ).toBe(Date.parse("2026-10-29T10:01:00Z"));
+  });
+});
+
+describe("publishing through the pre-publish check", () => {
+  const fixing = {
+    status: "fixing" as const,
+    turnId: "t1",
+    threadId: "th1",
+    attempt: 1,
+    findings: [{ rule: "fast-poll", title: "Appen spørger serveren for tit", path: "web/src/App.tsx", line: 4 }],
+  };
+
+  it("tracks the AI fix, then the publish", () => {
+    let s = projectReducer(initialProjectState, { event: "publish.checking", data: fixing });
+    expect(s.publishCheck).toEqual(fixing);
+    s = projectReducer(s, { event: "project.published", data: { publishedSha: "b", url: "https://x/" } });
+    expect(s.publishCheck).toBeNull();
+    expect(s.published).toEqual({ publishedSha: "b", url: "https://x/" });
+    expect(s.publishFailure).toBeNull();
+  });
+
+  it("ends the check with the failure, and a new check clears an old failure", () => {
+    let s = projectReducer(initialProjectState, { event: "publish.checking", data: fixing });
+    s = projectReducer(s, { event: "publish.failed", data: { error: "check_failed", message: "Nej", findings: fixing.findings } });
+    expect(s.publishCheck).toBeNull();
+    expect(s.publishFailure?.error).toBe("check_failed");
+    s = projectReducer(s, { event: "publish.checking", data: { ...fixing, attempt: 2 } });
+    expect(s.publishFailure).toBeNull();
   });
 });

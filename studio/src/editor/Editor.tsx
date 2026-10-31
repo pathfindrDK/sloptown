@@ -59,6 +59,9 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const [budgetModal, setBudgetModal] = useState<BucketStatus | null>(null);
   const [publishError, setPublishError] = useState<ApiError | null>(null);
   const [publishing, setPublishing] = useState(false);
+  // The pre-publish check found something and the AI is fixing it; publishing then
+  // finishes on the server (project.published or publish.failed on the stream).
+  const [checking, setChecking] = useState(!!initial.publishPending);
   // "Stop udgivelse": asked from the top bar menu, Indstillinger or Miira's top bar.
   const [unpublishAsked, setUnpublishAsked] = useState(false);
   const [unpublishing, setUnpublishing] = useState(false);
@@ -107,7 +110,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const prevSha = history?.commits[1]?.sha ?? null;
 
   // A "fra bunden" project gets the preview tab once it has a UI (index.html at the
-  // root, served as plain files on its preview host). It opens by itself when the UI
+  // root, served as plain files on its preview host; every new one starts with a
+  // placeholder page). It is the tab shown on opening the project and when the UI
   // appears while the teacher is here, and goes away if the file does.
   const filesLoad = useLoad(
     () => (webapp ? Promise.resolve(null) : api.files(project.id)),
@@ -122,7 +126,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     uiSeen.current = scratchUi;
     if (scratchUi) {
       setTabs((ts) => (ts.some((x) => x.kind === "preview") ? ts : [{ kind: "preview" }, ...ts]));
-      if (before === false) setActiveTab("preview");
+      // Also on opening the project: the page is what the teacher should see first.
+      if (before !== true) setActiveTab("preview");
     } else {
       setTabs((ts) => ts.filter((x) => x.kind !== "preview"));
       setActiveTab((a) => (a === "preview" ? tabKey({ kind: "file", path: "README.md" }) : a));
@@ -165,14 +170,40 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
     setPublishing(true);
     try {
       const r = await api.publish(project.id, sha);
-      setProject((p) => ({ ...p, publishedSha: r.publishedSha, appUrl: r.url }));
-      setHistoryRefresh((n) => n + 1);
+      if ("status" in r) {
+        // Show the AI's fix as it happens.
+        setChecking(true);
+        setActiveThreadId(r.threadId);
+        setSideOpen(true);
+        setSideTab("chat");
+      } else {
+        setProject((p) => ({ ...p, publishedSha: r.publishedSha, appUrl: r.url }));
+        setHistoryRefresh((n) => n + 1);
+      }
     } catch (e) {
       setPublishError(e instanceof ApiError ? e : new ApiError(0, "network", String(e)));
     } finally {
       setPublishing(false);
     }
   };
+
+  useEffect(() => {
+    if (state.publishCheck) setChecking(true);
+  }, [state.publishCheck]);
+  useEffect(() => {
+    const p = state.published;
+    if (!p) return;
+    setChecking(false);
+    setProject((x) => ({ ...x, publishedSha: p.publishedSha, appUrl: p.url }));
+    setHistoryRefresh((n) => n + 1);
+  }, [state.published]);
+  useEffect(() => {
+    const f = state.publishFailure;
+    if (!f) return;
+    setChecking(false);
+    const { error, message, ...body } = f;
+    setPublishError(new ApiError(0, error, message, body));
+  }, [state.publishFailure]);
 
   const askAiToFix = (prompt: string) => {
     setDraft(prompt);
@@ -230,7 +261,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   // chrome=none: Miira's top bar shows publish/download/budget/open app; keep it current.
   const pubState = publishState(headSha, project.publishedSha);
   const upToDate = pubState === "published";
-  const busy = publishing || unpublishing;
+  const busy = publishing || checking || unpublishing;
   const bucket = state.budget?.enabled ? state.budget.build : null;
   const meter = meterFor(bucket);
   const toolbarKey = JSON.stringify({
@@ -280,7 +311,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
           budget={state.budget}
           headSha={headSha}
           canEdit={canEdit}
-          publishing={publishing}
+          publishing={publishing || checking}
+          checking={checking}
           onBack={onBack}
           onRename={rename}
           onShare={() => shell.share(project.id)}

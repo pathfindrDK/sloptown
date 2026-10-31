@@ -16,6 +16,8 @@ import {
   type Project,
   type ProjectEvent,
   type ProjectKind,
+  type PublishFixing,
+  type Published,
   type QueueState,
   type Terms,
   type Thread,
@@ -115,7 +117,7 @@ export const api = {
   updateProject: (pid: string, patch: { description?: string; public?: boolean; style?: string; palette?: string }) =>
     req<Project>("PATCH", `/api/projects/${enc(pid)}`, patch),
   publish: (pid: string, sha: string) =>
-    req<{ publishedSha: string; url: string }>("POST", `/api/projects/${enc(pid)}/publish`, { sha }),
+    req<Published | PublishFixing>("POST", `/api/projects/${enc(pid)}/publish`, { sha }),
   unpublish: (pid: string) => req<void>("POST", `/api/projects/${enc(pid)}/unpublish`),
   budget: (pid: string) => req<BudgetStatus>("GET", `/api/projects/${enc(pid)}/budget`),
   previewSession: (pid: string, viewAs?: string) =>

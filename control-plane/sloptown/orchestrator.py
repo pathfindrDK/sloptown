@@ -57,6 +57,7 @@ class Orchestrator(Protocol):
     async def discard(self, container: str, volume: str, network: str) -> None: ...
     async def rename(self, old: str, new: str) -> None: ...
     async def ensure_running(self, container: str) -> None: ...
+    async def wake_slot(self, container: str, network: str) -> bool: ...
     async def stop(self, container: str) -> None: ...
     async def reconnect_platform(self) -> int: ...
     async def address(self, container: str, network: str) -> str: ...
@@ -320,6 +321,17 @@ class PodmanOrchestrator:
     async def ensure_running(self, container: str) -> None:
         await self._req("POST", f"/containers/{container}/start", ok=(204, 304))
 
+    async def wake_slot(self, container: str, network: str) -> bool:
+        """Start a pool slot if it is stopped and wait for agentd. A reboot stops every
+        slot while its row stays `ready`; handed out like that, creating the Vibe fails
+        on its first call into agentd. False if it is gone or doesn't come up."""
+        try:
+            await self.ensure_running(container)
+        except OrchestratorError as e:
+            log.warning("pool slot %s could not be started: %s", container, e)
+            return False
+        return await self._healthy(container, network, timeout=60, port=4097, path="/health")
+
     async def stop(self, container: str) -> None:
         await self._req("POST", f"/containers/{container}/stop", params={"t": 10}, ok=(204, 304, 404))
 
@@ -522,6 +534,13 @@ class FakeOrchestrator:
     async def ensure_running(self, container: str) -> None:
         if container in self.containers:
             self.containers[container]["running"] = True
+
+    async def wake_slot(self, container: str, network: str) -> bool:
+        c = self.containers.get(container)
+        if c is None or c.get("broken"):
+            return False
+        c["running"] = True
+        return True
 
     async def stop(self, container: str) -> None:
         if container in self.containers:

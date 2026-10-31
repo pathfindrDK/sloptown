@@ -53,7 +53,7 @@ Screenshots: build mock, `vite preview --outDir dist-mock`, drive it with
 | `src/lib/lineDiff.ts`, `fileTree.ts` | changed-line highlight, flat list → tree |
 | `src/pages/` | `ProjectList`, `ProjectPage` (+ `Viewer`), `StartChooser` (the owner's first open: "En app" or "Fra bunden", on `not_started`; "En app" then asks for the app's name (the project title), a design system and a palette, with a `DesignPreview` beside them; "Overrask mig" leaves the palette to the control plane's random pick), `EmbedGate` |
 | `src/editor/` | `Editor` layout, `Preview` (welcome cover while `onlyPlatformCommits`: every commit is `SlopTown`'s, i.e. template seed, design starter, platform updates; once a turn runs or a message is queued it becomes the building cover: tiles and a countdown from `FIRST_BUILD_MS` (3 min) since `firstMessageAt`, then "nearly there"; it stays up 5 s after the turn so the welcome doesn't flash before the history reloads), `CodeView` (lazy, CodeMirror 6), `ChatPanel` (thread list under a "Tråde" label with "Vis arkiverede" and "Ny tråd", then the conversation), `FilesPanel`, `HistoryPanel`, `SettingsPanel` (icon, design system and palette, Udgivelse (link and "Stop udgivelse"), who can open the app, description). A new palette is saved at once; a new design system is confirmed (the dialog shows a `DesignPreview` with the current palette), saved, and then a prompt is put in the chat composer for the teacher to send (`askAiToFix`), since the AI must rebuild the UI on their budget |
-| `src/components/` | `TopBar` (publish button by `lib/publish.ts` `publishState`: Udgiv / Opdater / Udgivet, plus a menu with "Stop udgivelse" once published; the Editor confirms and also takes `unpublish` from Miira's `drive:action`), `Budget` (meter + modal), `Modal`/`ConfirmModal`, `Menu`, `Select` (Miira dropdown; options may carry an `icon`), `Swatch` (a palette as dots), `DesignPreview` (a mock Vibe with its name in a style and palette, light/dark toggle; CSS-drawn, not the real framework), `Markdown` (the AI's chat replies: react-markdown + remark-gfm, lazy-loaded from `ChatPanel`; no raw HTML, no remote images, links open in a new tab; teachers' own messages stay plain text), `TermsModal`, `PublishError` (build log → "Ret fejlen" in chat) |
+| `src/components/` | `TopBar` (publish button by `lib/publish.ts` `publishState`: Udgiv / Opdater / Udgivet, "Tjekker appen …" while the pre-publish check's AI fix runs, plus a menu with "Stop udgivelse" once published; the Editor confirms and also takes `unpublish` from Miira's `drive:action`), `Budget` (meter + modal), `Modal`/`ConfirmModal`, `Menu`, `Select` (Miira dropdown; options may carry an `icon`), `Swatch` (a palette as dots), `DesignPreview` (a mock Vibe with its name in a style and palette, light/dark toggle; CSS-drawn, not the real framework), `Markdown` (the AI's chat replies: react-markdown + remark-gfm, lazy-loaded from `ChatPanel`; no raw HTML, no remote images, links open in a new tab; teachers' own messages stay plain text), `TermsModal`, `PublishError` (build log or the check's findings → "Ret fejlen" in chat) |
 | `src/styles/tokens.css` | **placeholder** Miira tokens; overwritten by `design/sync-from-miira.mjs` |
 | `src/styles/app.css` | all component CSS |
 | `public/mock-preview.html` | stand-in Vibe app used by mock mode |
@@ -151,3 +151,15 @@ Visning unless the AI just changed them; binary files have no Kode. "Hent filer"
 - Against the real stack, `../tests/e2e/browser.sh` covers the embed handshake, terms,
   editor, preview and code view; chat streaming and publish from the UI are covered
   at the API level by `../tests/e2e/test_e2e.py` and in mock mode here.
+
+## Publishing and the pre-publish check
+
+`POST publish` answers `200 { publishedSha, url }` or, when the control plane's
+pre-publish check found something, `202 { status: "fixing", threadId, ... }`: the AI
+is fixing it in the "Tjek før udgivelse" thread, which the Editor opens in the chat.
+The publish then finishes on the SSE stream: `publish.checking` (another attempt),
+`project.published` or `publish.failed` (an ApiError body, shown in `PublishError`).
+`projectReducer` keeps them in `publishCheck` / `published` / `publishFailure`; the
+Editor's `checking` state starts from `Project.publishPending`, so a reload mid-fix
+still shows "Tjekker appen …" and Miira's toolbar stays busy.
+

@@ -15,7 +15,7 @@ This file is owned by the platform. You cannot change it.
   ("Hent filer" in the studio, a .zip) and uses them elsewhere, e.g. opens the
   `.ino` file in the Arduino IDE.
 - The studio shows files rendered next to their code (HTML, Markdown, images,
-  sound, video, PDF), and the project's own user interface if it has one (below).
+  sound, video, PDF), and the project's page, `index.html` (below).
 - Choose a clear layout and keep `README.md` up to date in Danish: what the
   project does, which files matter, and step by step how the teacher uses them
   (which program to open, which board to choose, which wires go where).
@@ -33,24 +33,66 @@ This file is owned by the platform. You cannot change it.
 5. You may run code here to check it (Python 3 is available), but say clearly in
    the chat when something can only be tested on the real device.
 
-## A user interface (only when it helps)
+## The project page: index.html (always)
 
-Most projects here need none. Build one when the teacher asks for it ("en side",
-"en brugerflade", "noget eleverne kan klikke på"), or **suggest it in one sentence**
-when it would clearly help, for example a page to try a formula, a quiz to print or
-show on the board, or a simulator of the Arduino circuit. Don't build it unasked.
+Every project has a page, `index.html` at the root. It is what the teacher sees first
+(the **Forhåndsvisning** tab), so it must always show something real about the project.
+The project starts with a placeholder page: **replace it in your first turn**, and keep
+it up to date whenever the project changes. Never delete it. What the page shows
+depends on the project, for example:
+
+- **Arduino / micro:bit:** a drawing of the circuit (inline SVG: board, components,
+  which pin goes where) and a simulation of what the program does, e.g. LEDs that
+  light up in the right order, a servo that turns, a sensor value you can drag.
+- **Python script:** run it here and show the result: tables, key numbers, a chart
+  (inline SVG or `<canvas>`). The page cannot run Python, so either write the output
+  into the page (e.g. a `data.js` with `const RESULT = {...}` that the page reads),
+  or re-implement the calculation in JavaScript so the teacher can try other inputs.
+  Re-run the script and update the data when the script changes.
+- **Exercises, notes, lesson material:** a clean view for the board and for print
+  (`@media print`), e.g. one exercise per page, answers hidden behind a button.
+- **Anything else:** an overview of what the project does, its files and how to use
+  it, with whatever visual makes it clearer.
+
+If the project only makes sense on a real device, the page still shows the circuit,
+the expected behaviour and the steps to get it running.
 
 How:
 
-- `index.html` at the root of the project is the entry. Keep it plain static files:
-  `index.html`, and if needed `style.css`, `script.js` and an `assets/` folder, with
-  relative links (`style.css`, not `/style.css`). No build step, no frameworks to
-  install, no CDNs or other hosts: it must work opened straight from the folder,
-  offline, on the teacher's computer.
+- Plain static files: `index.html`, `miira-tokens.css` (below), and if needed `style.css`,
+  `script.js`, `data.js` and an `assets/` folder, with relative links (`style.css`, not `/style.css`). No
+  build step, no frameworks to install, no CDNs or other hosts: it must work opened
+  straight from the folder, offline, on the teacher's computer (so load data with a
+  `<script src="data.js">`, not `fetch`).
 - Danish text in the page, readable on a projector and a phone (large text, enough
   contrast). Data the page needs goes in the files; to keep something between
   visits, use `localStorage`.
-- As soon as `index.html` exists, the studio shows a **Forhåndsvisning** tab with
-  the page. Only the teacher and those they share the project with for editing can
-  see it; it is never published. Tell the teacher in the chat to look under
-  Forhåndsvisning, and in `README.md` how to open `index.html` after downloading.
+- Only the teacher and those they share the project with for editing can see the
+  page; it is never published. Mention it in the chat when you change it ("se under
+  Forhåndsvisning"), and say in `README.md` how to open `index.html` after downloading.
+
+### The page looks like Miira
+
+`miira-tokens.css` holds Miira's design tokens. It belongs to the platform: never
+edit or delete it. Every page links it first and is styled only with its tokens:
+
+- `<link rel="stylesheet" href="miira-tokens.css">` in `<head>`, before your own CSS.
+  Dark mode: `if (matchMedia("(prefers-color-scheme: dark)").matches)
+  document.documentElement.dataset.theme = "dark";` in a `<script>` in `<head>`.
+- **Never write a raw colour** (`#fff`, `rgb(...)`, `blue`). Use the tokens:
+  page `var(--miira-bg-primary)`, cards `--miira-bg-secondary` or `--miira-bg-surface`,
+  inputs `--miira-bg-input`, text `--miira-text-primary` / `-secondary` / `-muted`,
+  lines `--miira-border-color`, the accent `--miira-accent` with `--miira-accent-text`
+  on it, and `--miira-green`, `--miira-red`, `--miira-blue`, `--miira-orange` for
+  status and charts. Coloured fills (chart areas, categories, icon tiles):
+  `--miira-sticky-yellow|orange|green|blue|purple|grey` with `--miira-sticky-ink` text.
+- Font `var(--miira-font)`; sizes `--miira-font-size-h1` … `-h5`, `-body`, `-sm`, `-xs`.
+  Corners `--miira-radius-sm|md|lg`.
+- Cards: background `--miira-bg-secondary`, `1px solid var(--miira-card-edge)`,
+  `border-radius: var(--miira-radius-lg)` and the Miira shelf
+  `box-shadow: 0 2px 0 0 var(--miira-3d-shadow)`.
+- Main buttons: `--miira-accent` background, `--miira-accent-text`, weight 600, radius
+  `--miira-radius-md`, shelf `0 2px 0 0 var(--miira-3d-shadow)`; on hover
+  `translateY(-2px)` with a 4px shelf, on press `translateY(1px)` with 1px.
+- Calm and spacious: generous padding, one accent per view, no gradients, no emoji as
+  icons (draw simple line icons as inline SVG with `stroke="currentColor"`).

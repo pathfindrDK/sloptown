@@ -15,10 +15,11 @@
 	import security_headers
 	header >Content-Security-Policy "frame-ancestors 'self' {$MIIRA_ORIGINS}"
 	route {
+		# Per client IP; a school's pupils and teachers often share one.
 		rate_limit {
 			zone studio_ip {
 				key {remote_host}
-				events 600
+				events 1200
 				window 1m
 			}
 		}
@@ -49,10 +50,12 @@
 	import security_headers
 	header >Content-Security-Policy "frame-ancestors {$STUDIO_ORIGIN} {$MIIRA_ORIGINS}"
 	route {
+		# Per client IP *and* host: a Vibe stuck in a request loop throttles only itself,
+		# not the studio's preview or the other Vibes open in the same school.
 		rate_limit {
 			zone app_ip {
-				key {remote_host}
-				events 1200
+				key "{remote_host} {host}"
+				events 6000
 				window 1m
 			}
 		}

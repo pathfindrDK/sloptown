@@ -54,6 +54,15 @@ write_exclude
 for f in $PLATFORM_FILES; do
   copy_platform "$T/$f" "$f"
 done
+# A "fra bunden" project always has a page (index.html) for the preview, styled with
+# Miira's tokens (miira-tokens.css): older projects without them get the placeholder
+# and the tokens, and the agent then builds the page. Not platform files: they stay
+# the project's own and are committed after the next turn.
+if [ "$T" = /opt/template-scratch ]; then
+  for f in index.html miira-tokens.css; do
+    [ -e "$W/$f" ] || [ ! -f "$T/$f" ] || cp "$T/$f" "$W/$f"
+  done
+fi
 
 # The design system and palette (agentd /design writes the marker "<style> <palette>").
 # No marker: an older Vibe without design files. Ids are checked against the

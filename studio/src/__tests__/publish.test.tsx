@@ -19,7 +19,7 @@ describe("publishState", () => {
 describe("the top bar's publish button", () => {
   const project = (publishedSha: string | null) =>
     ({ id: "p1", title: "Quiz", kind: "webapp", publishedSha, appUrl: publishedSha ? "https://quiz.example/" : null }) as Project;
-  const show = (publishedSha: string | null, headSha = "b", publishing = false) => {
+  const show = (publishedSha: string | null, headSha = "b", publishing = false, checking = false) => {
     const onPublish = vi.fn();
     const onUnpublish = vi.fn();
     render(
@@ -30,6 +30,7 @@ describe("the top bar's publish button", () => {
           headSha={headSha}
           canEdit
           publishing={publishing}
+          checking={checking}
           onBack={() => {}}
           onRename={() => {}}
           onShare={() => {}}
@@ -60,6 +61,13 @@ describe("the top bar's publish button", () => {
   it("says Opdaterer … while updating", () => {
     show("a", "b", true);
     expect((screen.getByRole("button", { name: /Opdaterer/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("says Tjekker appen … while the AI fixes what the pre-publish check found", () => {
+    show("a", "b", true, true);
+    const button = screen.getByRole("button", { name: /Tjekker appen/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute("title")).toMatch(/udgives, når den er færdig/);
   });
 
   it("is a disabled Udgivet when current, and the menu offers Stop udgivelse", () => {

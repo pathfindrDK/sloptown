@@ -1,4 +1,4 @@
-"""Projects (Vibes): list, create (claims a warm-pool container), rename, publish, budget, host sessions.
+"""Projects (Vibes): list, create (claims a warm-pool container), rename, unpublish, budget, host sessions.
 
 A project's id is the Miira file id. Creation requires a teacher who accepted the
 terms and who Miira says owns the file (launch-token `file_role`, or the members API).
@@ -27,7 +27,7 @@ from .errors import ApiError
 from .events import hub
 from .members import MembersUnavailable, get_members, member_by_sub
 from .models import EdgeCode, MembersCache, Project
-from .orchestrator import BuildFailed, get_orchestrator
+from .orchestrator import get_orchestrator
 from .pool import claim
 from .terms import terms_accepted
 from .tokens import dev_token, hash_token, random_token, runtime_token
@@ -266,7 +266,9 @@ async def get_project(pid: str, principal: CurrentPrincipal, db: Db, request: Re
         await _assert_can_create(db, principal, pid)
         raise ApiError(404, "not_started", "Vælg hvad du vil bygge", canStart=True)
     project, role = await require_project(db, principal, pid)
-    return project_json(project, role)
+    from .publishing import pending_fix  # publishing imports this module
+
+    return {**project_json(project, role), "publishPending": await pending_fix(db, pid) is not None}
 
 
 class PatchBody(BaseModel):
@@ -325,36 +327,7 @@ async def change_design(
     hub.publish(f"project:{project.id}", "files.changed", {"paths": out.get("files", [])})
 
 
-class PublishBody(BaseModel):
-    sha: str = Field(pattern=r"^[0-9a-f]{7,40}$")
-
-
-@router.post("/api/projects/{pid}/publish")
-async def publish(pid: str, body: PublishBody, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
-    project, _ = await require_project(db, principal, pid, "editor")
-    require_webapp(project)
-    async with await agentd(project, timeout=120) as client:
-        r = await client.post("/export", json={"sha": body.sha})
-    if r.status_code == 422:  # agentd refuses exports that change platform-owned files
-        detail = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
-        raise ApiError(422, "locked_files_changed", "Versionen ændrer platformens filer og kan ikke udgives", **detail)
-    if r.status_code >= 400:
-        raise_for(r, "Eksport")
-    sha = r.headers.get("x-vibe-sha", body.sha)
-    assert project.token_seed and project.network_name and project.volume_name
-    try:
-        await get_orchestrator().publish(pid, project.network_name, project.volume_name, project.token_seed, sha, r.content)
-    except BuildFailed as e:
-        audit(db, "project.publish_failed", actor_sub=principal.sub, project_id=pid, details={"sha": sha}, request=request)
-        await db.commit()
-        raise ApiError(422, "build_failed", "Appen kunne ikke bygges. Bed AI'en rette fejlen og prøv igen.", log=e.log)
-    project.published_sha = sha
-    project.published_at = datetime.now(UTC)
-    audit(db, "project.publish", actor_sub=principal.sub, project_id=pid, details={"sha": sha}, request=request)
-    await db.commit()
-    url = host_url(project.slug) + "/"
-    hub.publish(f"project:{pid}", "project.published", {"publishedSha": sha, "url": url})
-    return {"publishedSha": sha, "url": url}
+# Publishing (export, the pre-publish check, release) lives in publishing.py.
 
 
 @router.post("/api/projects/{pid}/unpublish")

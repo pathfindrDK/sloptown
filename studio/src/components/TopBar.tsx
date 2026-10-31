@@ -13,6 +13,8 @@ type Props = {
   headSha: string | null;
   canEdit: boolean;
   publishing: boolean;
+  /** The pre-publish check's AI fix is under way. */
+  checking?: boolean;
   onBack: () => void;
   onRename: (title: string) => void;
   onShare: () => void;
@@ -22,7 +24,7 @@ type Props = {
   onDownload: () => void;
 };
 
-export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, onRename, onShare, onPublish, onUnpublish, onDownload }: Props) {
+export function TopBar({ project, budget, headSha, canEdit, publishing, checking, onBack, onRename, onShare, onPublish, onUnpublish, onDownload }: Props) {
   const t = useT();
   const [title, setTitle] = useState(project.title);
   useEffect(() => setTitle(project.title), [project.title]);
@@ -81,10 +83,14 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, onBack, 
             className="btn btn--3d btn--primary"
             onClick={onPublish}
             disabled={!headSha || state === "published" || publishing}
-            title={t(`top.${state}Title`)}
+            title={checking ? t("top.checkingTitle") : t(`top.${state}Title`)}
           >
             <PublishIcon size={16} />{" "}
-            {publishing ? t(state === "update" ? "top.updating" : "top.publishing") : t(`top.${state}`)}
+            {checking
+              ? t("top.checking")
+              : publishing
+                ? t(state === "update" ? "top.updating" : "top.publishing")
+                : t(`top.${state}`)}
           </button>
           {project.publishedSha && (
             <Menu

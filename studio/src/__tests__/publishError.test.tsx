@@ -33,4 +33,18 @@ describe("PublishErrorModal", () => {
     expect(screen.getByText("web/package.json")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Ret fejlen/ })).toBeNull();
   });
+
+  it("lists what the pre-publish check found and drafts a fix for the AI", () => {
+    const findings = [{ rule: "fast-poll", title: "Appen spørger serveren for tit", path: "web/src/App.tsx", line: 4 }];
+    const { onFix } = renderModal(new ApiError(0, "check_failed", "AI'en kunne ikke rette alt.", { findings }));
+    expect(screen.getByText("Appen spørger serveren for tit")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Ret fejlen/ }));
+    expect(onFix).toHaveBeenCalledWith(expect.stringContaining("`web/src/App.tsx:4` (fast-poll)"));
+  });
+
+  it("offers no AI fix when the check was stopped", () => {
+    renderModal(new ApiError(0, "check_stopped", "Udgivelsen blev afbrudt."));
+    expect(screen.getByText("Udgivelsen blev afbrudt.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Ret fejlen/ })).toBeNull();
+  });
 });

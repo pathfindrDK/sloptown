@@ -65,6 +65,25 @@ async def test_concurrent_claims_get_distinct_slots(env):
     assert len(set(names)) == 3
 
 
+async def test_claim_skips_a_slot_that_does_not_come_up(env):
+    """After a reboot the pool's containers are stopped (or gone) but their rows still
+    say ready: a slot that can't be woken is discarded and the next one is used."""
+    from sloptown.db import sessionmaker
+    from sloptown.models import PoolSlot
+    from sloptown.pool import claim, refill_once
+
+    await refill_once()
+    first = (await env.db.execute(select(PoolSlot).order_by(PoolSlot.id).limit(1))).scalar_one()
+    broken = first.container_name
+    env.orch.containers[broken]["broken"] = True
+    async with sessionmaker()() as s:
+        slot = await claim(s, "w1")
+        await s.commit()
+    assert slot.container_name != broken
+    assert broken not in env.orch.containers
+    assert (await env.db.execute(select(PoolSlot).where(PoolSlot.container_name == broken))).first() is None
+
+
 async def test_refill_discards_stale_image(env):
     from sloptown.models import PoolSlot
     from sloptown.orchestrator import slot_tag

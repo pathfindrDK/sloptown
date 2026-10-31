@@ -167,7 +167,12 @@ class TurnManager:
     def running_turn(self, pid: str) -> str | None:
         return self._running.get(pid)
 
-    async def submit(self, db: Any, project: Project, thread: Thread, author: User, text: str, images: list[dict[str, str]]) -> dict[str, Any]:
+    async def submit(
+        self, db: Any, project: Project, thread: Thread, author: User, text: str, images: list[dict[str, str]],
+        publish_attempt: int | None = None,
+    ) -> dict[str, Any]:
+        """Run a turn now, or queue it. A pre-publish fix turn (`publish_attempt`) goes first
+        in the queue and resumes a paused one: publishing is waiting for it."""
         async with self.lock(project.id):
             allowed, retry_at = await budgets.check_build_allowed(db, author.sub)
             if not allowed:
@@ -176,9 +181,10 @@ class TurnManager:
                     retryAt=retry_at.isoformat() if retry_at else None,
                 )
             busy = project.id in self._running
-            if busy and len(await queued_turns(db, project.id)) >= MAX_QUEUED:
+            waiting = await queued_turns(db, project.id) if busy else []
+            if busy and publish_attempt is None and len(waiting) >= MAX_QUEUED:
                 raise ApiError(409, "queue_full", f"Der venter allerede {MAX_QUEUED} beskeder. Vent til nogle er sendt.")
-            if not busy:
+            if not busy or publish_attempt is not None:
                 project.queue_paused = False
             turn = Turn(
                 id=uuid.uuid4().hex,
@@ -188,7 +194,10 @@ class TurnManager:
                 text=text,
                 images=images,
                 status="queued" if busy else "running",
+                publish_attempt=publish_attempt,
             )
+            if publish_attempt is not None and waiting:
+                turn.queued_at = waiting[0].queued_at - timedelta(milliseconds=1)
             db.add(turn)
             await db.commit()
             if busy:
@@ -331,6 +340,12 @@ class TurnManager:
                     hub.publish(channel, "budget", await budgets.budget_status(db, pid, turn.author_sub))
                 except Exception:
                     log.exception("budget status after turn failed")
+                if turn.publish_attempt is not None:
+                    # Still holding the turn slot, so nothing changes the tree while it is
+                    # checked again and published.
+                    from .publishing import after_fix_turn
+
+                    await after_fix_turn(pid, turn_id, status)
         except Exception:
             log.exception("turn %s crashed", turn_id)
             async with sessionmaker()() as db:
@@ -477,20 +492,23 @@ class NewThread(BaseModel):
     title: str | None = Field(default=None, max_length=120)
 
 
+async def new_thread(db: Any, project: Project, owner_sub: str, title: str, request: Request | None = None) -> Thread:
+    async with await opencode(project) as client:
+        session = raise_for(await client.post("/session", json={"title": title}), "OpenCode")
+    thread = Thread(id=uuid.uuid4().hex, project_id=project.id, opencode_session_id=session["id"], title=title, owner_sub=owner_sub)
+    db.add(thread)
+    audit(db, "thread.create", actor_sub=owner_sub, project_id=project.id, details={"thread": thread.id, "title": title}, request=request)
+    await db.commit()
+    await db.refresh(thread)
+    hub.publish(f"project:{project.id}", "thread.updated", thread_json(thread))
+    return thread
+
+
 @router.post("/api/projects/{pid}/threads", status_code=201)
 async def create_thread(pid: str, body: NewThread, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
     project, _ = await require_project(db, principal, pid, "editor")
     title = (body.title or "").strip() or "Ny tråd"
-    async with await opencode(project) as client:
-        session = raise_for(await client.post("/session", json={"title": title}), "OpenCode")
-    thread = Thread(id=uuid.uuid4().hex, project_id=pid, opencode_session_id=session["id"], title=title, owner_sub=principal.sub)
-    db.add(thread)
-    audit(db, "thread.create", actor_sub=principal.sub, project_id=pid, details={"thread": thread.id, "title": title}, request=request)
-    await db.commit()
-    await db.refresh(thread)
-    data = thread_json(thread)
-    hub.publish(f"project:{pid}", "thread.updated", data)
-    return data
+    return thread_json(await new_thread(db, project, principal.sub, title, request))
 
 
 class PatchThread(BaseModel):

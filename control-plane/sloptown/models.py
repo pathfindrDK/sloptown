@@ -131,6 +131,8 @@ class Turn(Base):
     commit_sha: Mapped[str | None] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set on the pre-publish check's fix turns (1, 2, ...): when the turn is done, publish carries on.
+    publish_attempt: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = _now()
 
 

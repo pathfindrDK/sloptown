@@ -1,5 +1,5 @@
 // Reducer for the editor's live state, fed by the project SSE stream.
-import type { BudgetStatus, Commit, Message, Part, ProjectEvent, QueueItem, Thread } from "../api/types";
+import type { BudgetStatus, Commit, Message, Part, ProjectEvent, PublishFailure, PublishFixing, Published, QueueItem, Thread } from "../api/types";
 
 /** True while only the platform has committed (template seed, design starter,
  *  platform updates: all `Vibe-Author: SlopTown`, as agentd's
@@ -32,6 +32,10 @@ export type ProjectState = {
   budget: BudgetStatus | null;
   filesVersion: number; // bumped on files.changed so views refetch
   historyVersion: number; // bumped on turn.finished
+  // Publishing that finishes on the server after the request returned (pre-publish check):
+  publishCheck: PublishFixing | null; // the AI is fixing what the check found
+  published: Published | null; // the latest project.published
+  publishFailure: PublishFailure | null; // the latest publish.failed
 };
 
 export const initialProjectState: ProjectState = {
@@ -46,6 +50,9 @@ export const initialProjectState: ProjectState = {
   budget: null,
   filesVersion: 0,
   historyVersion: 0,
+  publishCheck: null,
+  published: null,
+  publishFailure: null,
 };
 
 export type Action =
@@ -163,11 +170,17 @@ export function projectReducer(state: ProjectState, action: Action): ProjectStat
         changedFiles: state.runningThreadId ? uniq([...state.changedFiles, ...action.data.paths]) : state.changedFiles,
         filesVersion: state.filesVersion + 1,
       };
+    case "publish.checking":
+      return { ...state, publishCheck: action.data, publishFailure: null };
+    case "project.published":
+      return { ...state, publishCheck: null, published: action.data, publishFailure: null };
+    case "publish.failed":
+      return { ...state, publishCheck: null, publishFailure: action.data };
     case "ping":
       return state;
     default:
-      // The stream carries events this reducer has no use for (project.published,
-      // and whatever the control plane adds later); they must not wipe the state.
+      // The stream carries events this reducer has no use for (whatever the control
+      // plane adds later); they must not wipe the state.
       return state;
   }
 }
