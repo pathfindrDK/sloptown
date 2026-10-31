@@ -16,7 +16,7 @@ bad() { echo "  FAIL $*"; fail=$((fail+1)); }
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 
 TLSDIR="$(mktemp -d)"
-cleanup() { podman rm -f edgetest-edge edgetest-tls edgetest-cp edgetest-app >/dev/null 2>&1 || true; podman network rm -f $NET >/dev/null 2>&1 || true; }
+cleanup() { podman rm -f edgetest-edge edgetest-tls edgetest-cp edgetest-app edgetest-slow >/dev/null 2>&1 || true; podman network rm -f $NET >/dev/null 2>&1 || true; }
 trap 'cleanup; rm -rf "$TLSDIR"' EXIT
 cleanup
 
@@ -110,6 +110,17 @@ check "WebSocket upgrade (Vite HMR) passes forward_auth" '[[ "$r" == *"\"upgrade
 r=$(c -H 'Host: myapp.apps.sloptown.localhost:8080' -H 'Cookie: sloptown_gate=123.abc; vibe_app=ok; theme=dark' $E/)
 check "public-test gate cookie never reaches the app" '[[ "$r" != *"sloptown_gate"* && "$r" == *"vibe_app=ok"* && "$r" == *"theme=dark"* ]]'
 check "X-Vibe-View-As not leaked to app" '[[ "$r" != *"x-vibe-view-as"* ]]'
+# A Vibe that was stopped: forward_auth starts it, but it listens only seconds later.
+# The edge must wait for it instead of answering 502 (a blank preview in the studio).
+SLOW="$(mktemp)"
+podman run --rm --network $NET docker.io/curlimages/curl:8.11.1 -s --max-time 40 -o /dev/null -w '%{http_code}' \
+  -H 'Host: preview-slow.apps.sloptown.localhost:8080' $E/ > "$SLOW" &
+slowpid=$!
+sleep 4
+podman run -d --name edgetest-slow --network $NET --network-alias mockslow "${MOCK[@]}" app >/dev/null
+wait $slowpid || true
+check "a Vibe that starts late is waited for, not 502" '[[ "$(cat "$SLOW")" == 200 ]]'
+rm -f "$SLOW"
 
 echo "== wildcard certificate (Caddyfile.public, TLS_MODE=file)"
 podman run -d --name edgetest-tls --network $NET "${ENVS[@]}" "${TLSV[@]}" -e GATE_MODE=off \

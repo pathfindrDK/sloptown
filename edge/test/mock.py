@@ -22,8 +22,10 @@ class CP(BaseHTTPRequestHandler):
                                     "X-Vibe-Classes": "7.A", "X-Vibe-Upstream": "mockapp:9000"})
         if self.path.startswith("/edge/auth/preview"):
             role = h.get("X-Vibe-View-As") or "owner"
+            # preview-slow-*: a Vibe that is still starting (the test starts "mockslow" later).
+            slow = (h.get("X-Forwarded-Host") or h.get("Host") or "").startswith("preview-slow")
             return self.reply(200, {"X-Vibe-Edge-Secret": "edge-secret", "X-Vibe-User": "dev-" + role,
-                                    "X-Vibe-Role": role, "X-Vibe-Upstream": "mockapp:9000"})
+                                    "X-Vibe-Role": role, "X-Vibe-Upstream": "mockslow:9000" if slow else "mockapp:9000"})
         if self.path.startswith("/edge/session"):
             return self.reply(302, {"Location": "/", "Set-Cookie": "vibe_app=ok; HttpOnly", "X-Seen-Path": self.path})
         return self.reply(200, {"Content-Type": "application/json"}, json.dumps({"cp": self.path}).encode())

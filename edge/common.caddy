@@ -95,6 +95,12 @@
 
 		# The control plane names the container (vibe-run-<pid>:8000 or vibe-dev-<pid>:5173).
 		reverse_proxy {http.request.header.X-Vibe-Upstream} {
+			# A stopped Vibe is started by forward_auth above, but Vite (or the published
+			# app) needs a few seconds before it listens. Keep retrying the connection
+			# instead of answering 502, which the studio's preview shows as a blank page.
+			# Only failed connections are retried: nothing reached the Vibe yet.
+			lb_try_duration 60s
+			lb_try_interval 500ms
 			header_up -X-Vibe-Upstream
 			header_up -X-Vibe-View-As
 			# The public test gate's cookie is for the edge only; app code never sees it.

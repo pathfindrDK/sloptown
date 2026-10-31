@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Code2, Eye, GitCompare, Lock } from "lucide-react";
+import { Code2, Eye, FileQuestion, GitCompare, Lock } from "lucide-react";
 import { EditorState, RangeSetBuilder, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { defaultHighlightStyle, syntaxHighlighting, foldGutter } from "@codemirror/language";
@@ -11,6 +11,7 @@ import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
 import { unifiedMergeView } from "@codemirror/merge";
 import { api } from "../api/client";
+import { ApiError } from "../api/types";
 import { changedLines } from "../lib/lineDiff";
 import { useT } from "../lib/i18n";
 import { previewKind } from "../lib/filePreview";
@@ -101,11 +102,14 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
   const [previous, setPrevious] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [diff, setDiff] = useState(false);
-  const [error, setError] = useState(false);
+  // "missing": the file isn't there (deleted, or a project that never got it);
+  // "failed": anything else. Both tell the teacher how to carry on.
+  const [error, setError] = useState<"missing" | "failed" | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
-    setError(false);
+    setError(null);
     api
       .file(projectId, path, sha)
       .then((f) => {
@@ -114,7 +118,7 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
         setBinary(f.content === null);
         setLocked(f.locked);
       })
-      .catch(() => live && setError(true));
+      .catch((e) => live && setError(e instanceof ApiError && e.status === 404 ? "missing" : "failed"));
     if (compareSha) {
       api
         .file(projectId, path, compareSha)
@@ -126,7 +130,7 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
     return () => {
       live = false;
     };
-  }, [projectId, path, sha, compareSha, reloadSignal]);
+  }, [projectId, path, sha, compareSha, reloadSignal, attempt]);
 
   // A binary file (an image, a sound) has no code to show.
   const showPreview = !!kind && (mode === "preview" || binary);
@@ -196,7 +200,18 @@ export function CodeView({ projectId, path, sha, compareSha, highlight, reloadSi
         )}
       </div>
       {error ? (
-        <div className="empty">{t("common.error")}</div>
+        <div className="empty empty--big">
+          <FileQuestion size={32} aria-hidden />
+          <p>
+            <strong>{t(error === "missing" ? "code.missing" : "code.loadFailed")}</strong>
+          </p>
+          <p>{t("code.continueHint")}</p>
+          {error === "failed" && (
+            <button className="btn" onClick={() => setAttempt((n) => n + 1)}>
+              {t("common.retry")}
+            </button>
+          )}
+        </div>
       ) : showPreview && kind ? (
         <div className="codeview__preview">
           <FilePreview
