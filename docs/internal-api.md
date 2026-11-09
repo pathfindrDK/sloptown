@@ -150,9 +150,14 @@ launch token) **or** `Authorization: Bearer <session token>`. Errors:
 | POST | `/api/projects/{pid}/app-session` | → `{ url }` one-time URL that sets the app cookie on the app host |
 | GET | `/api/projects/{pid}/download` | `?sha=` (default HEAD) → `application/zip` of the tree (editors); agentd `/export` repacked |
 
-A `scratch` ("fra bunden") project is never published: `publish` and `app-session`
-answer `409 { error: "not_a_webapp" }`, its `appUrl` is `null`, and the edge
-(`/edge/auth/app`, `/edge/tls-ask`) treats its app host as unknown. It does have the
+A `scratch` ("fra bunden") project is published as its files, nothing built: `publish`
+exports the tree, scans it (every rule for `api/` and JavaScript; other Python only for
+`secret`, since only `api/` runs), keeps `api/` at `api/` (the runtime mounts
+`api/main.py` under `/api`, as for a webapp, so the page may have a server with the SDK),
+moves every other file under `web/dist/` (dropping `AGENTS.md` and links) and starts a
+runtime on that snapshot without `vibe-build`; no `index.html` at the root answers `422 { error: "no_page" }`.
+`public`, `app-session` and the app host work as for a webapp; style and palette
+answer `409 { error: "not_a_webapp" }`. It also has the
 editor-only preview host, like a webapp (`previewUrl`, `preview-session`, which
 ignores `viewAs`): its container runs `vibe-static` on Vite's port instead of Vite and
 the API, serving the workspace as plain files (no dotfiles, no `node_modules`, no
@@ -185,7 +190,8 @@ type BudgetStatus = { enabled: boolean; build: BucketStatus; app: BucketStatus }
 | POST | `/api/projects/{pid}/threads` | `{ title? }` → `Thread` (creates an OpenCode session) |
 | PATCH | `/api/threads/{tid}` | `{ title?, archived? }` |
 | GET | `/api/threads/{tid}/messages` | full transcript `Message[]` |
-| POST | `/api/threads/{tid}/messages` | `{ text, images?: [{ mime, dataUrl }] }` → `{ turnId, queued: boolean }` |
+| POST | `/api/threads/{tid}/messages` | `{ text, images?: [{ mime, dataUrl }], uploads?: string[] }` → `{ turnId, queued: boolean }`. `uploads`: ≤ 5 ids from the upload endpoint, looked up in agentd (`400 unknown_upload` if gone); the agent gets an `[Attachment]` text part per upload (path list), the transcript shows it as `Part { type: "upload", name, fileCount }`, and queue items carry `uploadNames` |
+| POST | `/api/projects/{pid}/uploads?name=` | editor+. Raw body (≤ 25 MB) = one file attached in the chat → agentd `/uploads` → `201 Upload { id, name, kind: "zip"\|"file", dir, bytes, fileCount, files }` (`files` capped at 200). `413 upload_too_large`, `400 bad_upload` (Danish message). Audit `project.upload` |
 | POST | `/api/threads/{tid}/stop` | abort the running turn |
 | GET | `/api/projects/{pid}/events` | SSE, see below |
 
@@ -196,7 +202,8 @@ type Part =
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; title: string; status: "running" | "done" | "error";
       input?: unknown; output?: string }
-  | { type: "image"; mime: string; url: string };
+  | { type: "image"; mime: string; url: string }
+  | { type: "upload"; name: string; fileCount: number };  // a file attached in the chat
 type Message = { id: string; threadId: string; role: "user" | "assistant";
   authorName?: string; parts: Part[]; createdAt: string };
 ```
@@ -242,7 +249,7 @@ type Commit = { sha: string; message: string; authorName: string; threadId: stri
 
 Locked (platform-owned) paths: `AGENTS.md`, `web/package.json`,
 `web/package-lock.json`, `web/vite.config.ts`, `api/requirements.lock`,
-`.opencode/**`, `.data/**`. Hidden: `.git/**`, `node_modules/**`, `.opencode/**`, `.data/**`.
+`.opencode/**`, `.data/**`. Hidden: `.git/**`, `node_modules/**`, `.opencode/**`, `.data/**`, `.uploads/**`.
 
 Commit trailers: every commit made by a turn carries
 `Vibe-Thread: <tid>` and `Vibe-Author: <name>` trailers.
@@ -276,6 +283,14 @@ Without `starter`, the agent's code is untouched, except that a Vibe with no
 design yet gets `./palette.css` and `./design.css` imported in `main.tsx`. `400`
 for ids the catalog doesn't know, `409` in a scratch project. `/export` then also
 checks the three design files against the marker's style and palette.
+`POST /uploads?name=` (raw body ≤ 25 MB) → `{ id, name, kind, dir, bytes, fileCount, files }`:
+stores a chat attachment in `.uploads/<id>/` (hidden from `/files`, git-excluded via
+`.git/info/exclude`, so never committed, exported or published); a `.zip` is unpacked
+there, skipping directories, symlinks, absolute and `..` paths and OS junk
+(`__MACOSX`, `.DS_Store`), at most 2000 files and 200 MB written; the manifest is kept
+as `.uploads/<id>.json`. Errors `413 { detail: too_large | unpacked_too_large |
+too_many_files }`, `400 { detail: bad_zip | encrypted_zip | empty }`.
+`GET /uploads/{id}` → the manifest, `404` if unknown.
 `GET /events` (SSE `files.changed`), `GET /health`.
 
 ### Edge endpoints
@@ -318,6 +333,11 @@ nftables rules in `edge/nftables/sloptown.nft` can match them by `iifname "vb*"`
   platform containers too): the platform containers are disconnected first.
 - Pool slots are tagged `<dev image id>#spec<N>`; bumping `SLOT_SPEC` in
   `orchestrator.py` recycles unclaimed slots built with an older spec.
+- A project's containers share one user namespace: the pool slot's `userns=auto`
+  mapping is reused (explicit `idmappings`) by its runtime, by a replaced editor and
+  by a rolled runtime, because both write `<volume>/.data` with the "U" option.
+- `vibe-dev`'s supervisor tees the API's and Vite's output to
+  `/tmp/vibe-logs/{api,vite}.log` (tmpfs, 1 MB + one rotated file) for the agent.
 
 ### Publish
 
@@ -424,7 +444,7 @@ publishes `members.changed` to subscribers of `/platform/members/events`.
 `threads(id pk, project_id, opencode_session_id, title, owner_sub, archived, created_at)`
 `turns(id pk, project_id, thread_id, author_sub, status: queued|running|done|stopped|error, queued_at, commit_sha, started_at, finished_at, publish_attempt int null)` (`publish_attempt`: set on pre-publish fix turns)
 `members_cache(project_id pk, version, payload jsonb, fetched_at)`
-`usage_events(id, ts, project_id, user_sub, member_id, bucket, model, requested_model, input_tokens, output_tokens, nerfed)`
+`usage_events(id, ts, project_id, user_sub, member_id, bucket, model, requested_model, input_tokens, output_tokens, nerfed, reasoning_tokens, duration_ms)`; `reasoning_tokens` (hidden reasoning share of `output_tokens`, null when the provider omits it) and `duration_ms` (upstream wall time to the last byte) explain slow answers
 `budget_settings(id=1, payload jsonb, updated_at, updated_by)`
 `budget_overrides(id, subject, subject_id, bucket, week_start, reset_at, extra_tokens, created_by, created_at)`
 `audit_log(id, ts, actor_sub, actor_kind: user|admin|system, action, project_id, details jsonb, ip)`

@@ -26,14 +26,14 @@ Contracts (change them first, then the code):
 | `access.py` | Role resolution: owner → launch `file_role` → cached members; `require_project` |
 | `members.py` | Members API fetch + `members_cache` (TTL, stale fallback), `for_app` strips `sub` |
 | `design.py` | Design systems and palettes: the catalog (`template-design/catalog.json`, copied into the image at `design_catalog`; repo copy as fallback), id lists, a random palette for Vibes started without one |
-| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is never published (`require_webapp` on publish and app-session; `edge.py` knows only its preview host, served by `vibe-static`) |
+| `projects.py` | Project CRUD, create = warm-pool claim (+ agentd `/design` with `starter` for a webapp, `/reset-scratch` for `kind="scratch"`); `PATCH` style/palette = agentd `/design` under the turn lock (`409 turn_running`), audit `project.design`; `GET /api/design` serves the catalog; unpublish, budget, one-time host-session URLs, `/download` (.zip). The owner's first open answers `not_started`; a scratch project is published as its files with an optional server (`publishing.static_site_tar`: `api/` stays at `api/`, the rest under `web/dist/`, no build; `require_webapp` only guards style/palette) |
 | `publishing.py` | `POST /api/projects/{pid}/publish`: agentd `/export` → `appcheck` scan → release (orchestrator build + run), or an AI fix turn in the "Tjek før udgivelse" thread (`Turn.publish_attempt`); `after_fix_turn` (called by `TurnManager._run` while it still holds the turn slot) rescans HEAD and releases, retries (`MAX_FIX_ATTEMPTS` = 2) or emits `publish.failed` |
 | `appcheck.py` | The pre-publish static scan of the exported tar: request loops without a delay, `useEffect` without deps, eval/exec, SQL from strings, `shell=True`, keys in code; `fix_prompt` for the AI |
 | `pool.py` | Warm pool: `claim` (`FOR UPDATE SKIP LOCKED`), `refill_once`/`refill_loop` (advisory lock), stale-image discard |
 | `orchestrator.py` | Podman libpod REST (hardened specs, networks, volumes, rename, publish via volume import, runtime roll, editor replace); `FakeOrchestrator` for tests |
 | `containers.py` | httpx clients for vibe-agentd (:4097, bearer) and opencode serve (:4096, basic) in `vibe-dev` |
-| `threads.py` | Threads (= OpenCode sessions) and `TurnManager`: one turn per project, a persistent queue (edit, delete, send now, paused by Stop), event mapping, commit after turn |
-| `files.py` | Files, history, diff, restore via agentd; `/raw` media bytes for the file preview (sandboxed, attachment, nosniff); `commit_turn`; agentd `files.changed` relay |
+| `threads.py` | Threads (= OpenCode sessions) and `TurnManager`: one turn per project, a persistent queue (edit, delete, send now, paused by Stop), event mapping, commit after turn; a turn's `uploads` (manifests) become an `[Attachment]` text part for the agent with `metadata.vibeUpload`, mapped back to an `upload` part |
+| `files.py` | Files, history, diff, restore via agentd; `/raw` media bytes for the file preview (sandboxed, attachment, nosniff); `commit_turn`; agentd `files.changed` relay; chat attachments: `POST /api/projects/{pid}/uploads` (raw bytes ≤ 25 MB → agentd `/uploads`, Danish errors, audit `project.upload`) and `upload_manifests` for the message route |
 | `events.py` | In-process pub/sub (`project:<pid>`, `members:<pid>`) and SSE helpers |
 | `edge.py` | Caddy `forward_auth` (`/edge/auth/app`, `/edge/auth/preview`), `/auth/app-login`, `/edge/session`, `/edge/tls-ask`, dev view-as |
 | `platform.py` | `/platform/*` for app code via egress (members, members SSE, dev whoami) |
@@ -156,6 +156,16 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
   edge/egress/cp to every `vibe-net-*` network every 30 s (and at startup).
 - **Containers are addressed by IP**, resolved per request (`orchestrator.address`), because
   claimed containers are renamed.
+- **One user namespace per project.** The editor and the published app both write
+  `<volume>/.data` (the app's SQLite), and the "U" mount option chowns it to the starting
+  container's host ids. With two auto namespaces each start took `.data` from the other: a
+  publish left the editor's API crashing with "attempt to write a readonly database" and the
+  preview answering 500. So only a new pool slot gets `userns=auto`; `publish`, `roll_runtime`
+  and `replace_dev` pass the mapping of a sibling that still exists (`_project_idmap`, explicit
+  `idmappings` in `hardened_spec`). `replace_dev` creates the new editor before removing the
+  old one, so the range is never free for the auto allocator. `SLOT_SPEC` 4 rolled every
+  runtime onto its editor's ids (its "U" chown repairs a split `.data`). Unit tests:
+  `tests/test_orchestrator_idmap.py` (in-memory libpod); real chown: `test_podman_integration.py`.
 - **userns=auto needs host config**: a `containers` range in `/etc/subuid` and `/etc/subgid`
   (else container create fails with "not enough unused IDs"). `SLOPTOWN_USERNS_AUTO=false`
   turns it off for a dev box only.

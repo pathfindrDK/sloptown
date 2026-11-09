@@ -247,6 +247,8 @@ async def record_usage(
     input_tokens: int,
     output_tokens: int,
     nerfed: bool,
+    reasoning_tokens: int | None = None,
+    duration_ms: int | None = None,
 ) -> None:
     db.add(
         UsageEvent(
@@ -259,6 +261,8 @@ async def record_usage(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             nerfed=nerfed,
+            reasoning_tokens=reasoning_tokens,
+            duration_ms=duration_ms,
         )
     )
     await db.flush()

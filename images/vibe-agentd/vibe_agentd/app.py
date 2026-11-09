@@ -8,14 +8,19 @@ import asyncio
 import fnmatch
 import hashlib
 import hmac
+import io
 import json
 import os
+import secrets
 import shutil
+import stat
 import subprocess
 import time
+import zipfile
 from pathlib import Path, PurePosixPath
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Path as FastAPIPath
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -42,11 +47,11 @@ DESIGN_FILE = ".vibe-design"
 DESIGN_TARGETS = {"DESIGN.md": "DESIGN.md", "design.css": "web/src/design.css"}  # style dir -> workspace
 PALETTE_TARGET = "web/src/palette.css"
 STARTER_FILES = ["web/src/main.tsx", "web/src/App.tsx", "web/src/styles.css"]
-EXCLUDE = ("# managed by vibe-dev\n.data/\n.opencode/\n.vibe-kind\n.vibe-design\n"
+EXCLUDE = ("# managed by vibe-dev\n.data/\n.opencode/\n.uploads/\n.vibe-kind\n.vibe-design\n"
            "node_modules\nweb/dist/\n__pycache__/\n")
 
 HIDDEN = [".git", ".git/**", "node_modules", "node_modules/**", "*/node_modules", "*/node_modules/**",
-          ".opencode", ".opencode/**", ".data", ".data/**", "web/dist", "web/dist/**", KIND_FILE,
+          ".opencode", ".opencode/**", ".data", ".data/**", ".uploads", ".uploads/**", "web/dist", "web/dist/**", KIND_FILE,
           DESIGN_FILE, "**/__pycache__", "**/__pycache__/**"]
 LOCKED = ["AGENTS.md", "web/package.json", "web/package-lock.json", "web/vite.config.ts",
           "api/requirements.lock", "DESIGN.md", "web/src/design.css", "web/src/palette.css",
@@ -529,6 +534,119 @@ def reset_scratch() -> dict:
     git("add", "-A")
     git("commit", "-q", "-F", "-", input=b"Start fra bunden\n\nVibe-Author: SlopTown")
     return {"kind": "scratch", **commit_info("HEAD")}
+
+
+# ---------------------------------------------------------------- uploads
+# Files the teacher attaches in the chat (a .zip is unpacked). They live in the
+# hidden, git-excluded .uploads/<id>/ so they are never committed, exported or
+# published; the agent reads them there and copies what the project needs.
+
+UPLOADS = ".uploads"
+UPLOAD_MAX = 25 * 1024 * 1024  # bytes sent
+UNPACKED_MAX = 200 * 1024 * 1024  # bytes after unpacking a zip
+ENTRIES_MAX = 2000
+UPLOAD_SKIP = ("__MACOSX", ".DS_Store", "Thumbs.db", "desktop.ini")
+UPLOAD_ID = r"^[0-9a-f]{12}$"
+
+
+def _ensure_upload_exclude() -> None:
+    # Older workspaces got their exclude file before .uploads/ existed; the commit after
+    # the turn must never pick an upload up.
+    exclude = WORKSPACE / ".git" / "info" / "exclude"
+    if not (WORKSPACE / ".git").is_dir():
+        return
+    text = exclude.read_text() if exclude.exists() else ""
+    if ".uploads/" not in text.split():
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(text + ("" if text.endswith("\n") or not text else "\n") + ".uploads/\n")
+
+
+def _upload_name(name: str) -> str:
+    name = name.replace("\\", "/").rsplit("/", 1)[-1].strip().strip(".")
+    name = "".join(c for c in name if c.isprintable() and c not in '<>:"|?*')[:120]
+    return name or "fil"
+
+
+def _zip_member(info: zipfile.ZipInfo) -> str | None:
+    """The safe relative path of a zip entry, or None to skip it (dirs, symlinks, OS junk)."""
+    if info.is_dir() or stat.S_ISLNK(info.external_attr >> 16):
+        return None
+    p = PurePosixPath(info.filename.replace("\\", "/"))
+    if p.is_absolute() or ".." in p.parts or not p.parts or any(part in UPLOAD_SKIP for part in p.parts):
+        return None
+    return str(p)
+
+
+def _unzip(data: bytes, dest: Path) -> list[str]:
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "bad_zip")
+    members = [(i, m) for i in zf.infolist() if (m := _zip_member(i))]
+    if len(members) > ENTRIES_MAX:
+        raise HTTPException(413, "too_many_files")
+    if any(i.flag_bits & 0x1 for i, _ in members):
+        raise HTTPException(400, "encrypted_zip")
+    total, files = 0, []
+    for info, rel in members:
+        target = dest / rel
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # Count the bytes actually written: a zip can lie about its sizes.
+            with zf.open(info) as src, open(target, "wb") as out:
+                while chunk := src.read(1 << 16):
+                    total += len(chunk)
+                    if total > UNPACKED_MAX:
+                        raise HTTPException(413, "unpacked_too_large")
+                    out.write(chunk)
+        except (OSError, zipfile.BadZipFile, NotImplementedError):
+            # A file and a folder with the same name, a damaged entry, an unknown compression.
+            raise HTTPException(400, "bad_zip")
+        files.append(rel)
+    return sorted(files)
+
+
+def _manifest(uid: str) -> dict:
+    f = WORKSPACE / UPLOADS / f"{uid}.json"
+    if not f.is_file():
+        raise HTTPException(404, "unknown upload")
+    return json.loads(f.read_text())
+
+
+@app.post("/uploads", dependencies=[Depends(auth)])
+async def upload(request: Request, name: str = Query(min_length=1, max_length=255)) -> dict:
+    """Store one attached file under .uploads/<id>/, unpacking a .zip. → manifest."""
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > UPLOAD_MAX:
+            raise HTTPException(413, "too_large")
+    if not data:
+        raise HTTPException(400, "empty")
+    name = _upload_name(name)
+    uid = secrets.token_hex(6)
+    dest = WORKSPACE / UPLOADS / uid
+    _ensure_upload_exclude()
+    dest.mkdir(parents=True)
+    is_zip = name.lower().endswith(".zip")
+    try:
+        if is_zip:
+            files = await asyncio.to_thread(_unzip, bytes(data), dest)
+        else:
+            (dest / name).write_bytes(data)
+            files = [name]
+    except BaseException:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+    manifest = {"id": uid, "name": name, "kind": "zip" if is_zip else "file", "dir": f"{UPLOADS}/{uid}",
+                "bytes": len(data), "fileCount": len(files), "files": files}
+    (WORKSPACE / UPLOADS / f"{uid}.json").write_text(json.dumps(manifest))
+    return manifest
+
+
+@app.get("/uploads/{uid}", dependencies=[Depends(auth)])
+def get_upload(uid: str = FastAPIPath(pattern=UPLOAD_ID)) -> dict:
+    return _manifest(uid)
 
 
 @app.get("/events", dependencies=[Depends(auth)])

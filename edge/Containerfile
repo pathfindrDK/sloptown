@@ -12,6 +12,10 @@ ARG CADDY_VERSION=v2.11.7
 RUN xcaddy build ${CADDY_VERSION} --with github.com/mholt/caddy-ratelimit@${RATELIMIT_VERSION}
 
 FROM ${CADDY_IMAGE}
+# CVE-2026-98432: the demonstrated remote exploit targets MPTCP listeners, which Go
+# (Caddy) opens by default since 1.24. Plain TCP only; the container's network
+# namespace doesn't inherit the host's net.mptcp.enabled=0.
+ENV GODEBUG=multipathtcp=0
 RUN apk upgrade --no-cache
 COPY --from=build /usr/bin/caddy /usr/bin/caddy
 COPY --from=studio /srv/studio /srv/studio

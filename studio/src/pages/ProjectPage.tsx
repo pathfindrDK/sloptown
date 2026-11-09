@@ -101,7 +101,7 @@ function Viewer({ project, onBack }: { project: Project; onBack: () => void }) {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!project.publishedSha || project.kind === "scratch") return;
+    if (!project.publishedSha) return;
     api
       .appSession(project.id)
       .then((r) => setSrc(r.url))
@@ -127,9 +127,7 @@ function Viewer({ project, onBack }: { project: Project; onBack: () => void }) {
           )}
         </header>
       )}
-      {project.kind === "scratch" ? (
-        <div className="empty empty--big">{t("viewer.scratch")}</div>
-      ) : !project.publishedSha ? (
+      {!project.publishedSha ? (
         <div className="empty empty--big">{t("viewer.notPublished")}</div>
       ) : failed ? (
         <div className="empty">{t("common.error")}</div>

@@ -18,7 +18,7 @@ Read first:
 | `images/` | `vibe-base`, `vibe-dev`, `vibe-runtime` Containerfiles, `vibe-agentd` |
 | `template/` | boilerplate Vibe app, baked into `vibe-dev` at `/opt/template`, with the agent's `AGENTS.md` |
 | `template-design/` | design systems (Miira, Bootstrap, Tailwind, Bulma, Material) and colour palettes for webapps: catalog, per-style files, generated palettes; baked at `/opt/template-design` |
-| `template-scratch/` | the "fra bunden" project (README + the agent's `AGENTS.md`), baked at `/opt/template-scratch`; never published (its optional `index.html` UI shows only on the editor-only preview host) |
+| `template-scratch/` | the "fra bunden" project (README + the agent's `AGENTS.md`), baked at `/opt/template-scratch`, with Miira's tokens as `miira-tokens.css`; its `index.html` page shows on the editor-only preview host, and publishing serves the files as they are (no build); an optional `api/main.py` runs as its server under `/api` with the same SDK as an app (AI, login, members, SQLite). The agent guide shares its backend SDK reference with `template/AGENTS.md` (a test keeps the two copies equal) |
 | `sdk/python/` `sdk/js/` | platform SDK (`miira_vibe`, `@miira/vibe`), installed into `vibe-base` |
 | `edge/` | Caddyfile, `egress.env`, nftables rules |
 | `fake-miira/` | dev-only Miira: OIDC, members API, webhook, launch token |

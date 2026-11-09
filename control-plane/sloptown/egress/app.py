@@ -16,6 +16,7 @@ EGRESS_PROXY_PORT (see connect.py) and is started from the lifespan.
 
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote
@@ -150,12 +151,27 @@ def _usage_tokens(usage: dict[str, Any] | None) -> tuple[int, int] | None:
     return int(inp), int(out)
 
 
-def _usage_from_event(obj: Any) -> tuple[int, int] | None:
+def _reasoning_tokens(usage: dict[str, Any] | None) -> int | None:
+    """Reasoning share of the output (chat: completion_tokens_details, responses: output_tokens_details)."""
+    if not isinstance(usage, dict):
+        return None
+    details = usage.get("completion_tokens_details") or usage.get("output_tokens_details")
+    value = details.get("reasoning_tokens") if isinstance(details, dict) else None
+    return int(value) if isinstance(value, int) else None
+
+
+def _usage_block(obj: Any) -> dict[str, Any] | None:
     if not isinstance(obj, dict):
         return None
     if obj.get("type") == "response.completed":
-        return _usage_tokens((obj.get("response") or {}).get("usage"))
-    return _usage_tokens(obj.get("usage")) if obj.get("usage") else None
+        usage = (obj.get("response") or {}).get("usage")
+    else:
+        usage = obj.get("usage")
+    return usage if isinstance(usage, dict) and usage else None
+
+
+def _usage_from_event(obj: Any) -> tuple[int, int] | None:
+    return _usage_tokens(_usage_block(obj))
 
 
 class SseUsageScanner:
@@ -164,6 +180,7 @@ class SseUsageScanner:
     def __init__(self) -> None:
         self.buf = b""
         self.usage: tuple[int, int] | None = None
+        self.reasoning: int | None = None
 
     def feed(self, chunk: bytes) -> None:
         self.buf += chunk
@@ -184,11 +201,12 @@ class SseUsageScanner:
         if not data or data == b"[DONE]":
             return
         try:
-            found = _usage_from_event(json.loads(data))
+            block = _usage_block(json.loads(data))
         except ValueError:
             return
-        if found:
-            self.usage = found
+        if block:
+            self.usage = _usage_tokens(block)
+            self.reasoning = _reasoning_tokens(block)
 
 
 async def _attribution(caller: Caller, request: Request) -> tuple[str | None, str | None]:
@@ -202,7 +220,8 @@ async def _attribution(caller: Caller, request: Request) -> tuple[str | None, st
     return project.active_turn_sub or project.owner_sub, None
 
 
-async def _record(caller: Caller, user_sub: str | None, member_id: str | None, model: str, requested: str, nerfed: bool, usage: tuple[int, int] | None) -> None:
+async def _record(caller: Caller, user_sub: str | None, member_id: str | None, model: str, requested: str, nerfed: bool, usage: tuple[int, int] | None,
+                  reasoning: int | None = None, duration_ms: int | None = None) -> None:
     if usage is None:
         log.warning("no usage reported for project=%s model=%s", caller.project_id, model)
         return
@@ -219,6 +238,8 @@ async def _record(caller: Caller, user_sub: str | None, member_id: str | None, m
                 input_tokens=usage[0],
                 output_tokens=usage[1],
                 nerfed=nerfed,
+                reasoning_tokens=reasoning,
+                duration_ms=duration_ms,
             )
             await db.commit()
     except Exception:  # never fail the user's response because metering failed
@@ -290,6 +311,7 @@ async def inference(path: str, request: Request) -> Response:
         state.limiter.acquire(caller.project_id)
     except Throttled as t:
         return _throttled(t)
+    started = time.monotonic()
     try:
         upstream = await client().send(upstream_req, stream=True)
     except httpx.HTTPError as exc:
@@ -309,11 +331,13 @@ async def inference(path: str, request: Request) -> Response:
             await upstream.aclose()
             state.limiter.release(caller.project_id)
         if metered and upstream.status_code < 400:
+            elapsed = int((time.monotonic() - started) * 1000)
             try:
-                usage = _usage_tokens(json.loads(content).get("usage"))
+                block = json.loads(content).get("usage")
+                usage, reasoning = _usage_tokens(block), _reasoning_tokens(block)
             except (ValueError, AttributeError):
-                usage = None
-            await _record(caller, user_sub, member_id, model, requested, nerfed, usage)
+                usage, reasoning = None, None
+            await _record(caller, user_sub, member_id, model, requested, nerfed, usage, reasoning, elapsed)
         return Response(content, status_code=upstream.status_code, headers=resp_headers)
 
     scanner = SseUsageScanner()
@@ -329,7 +353,8 @@ async def inference(path: str, request: Request) -> Response:
             state.limiter.release(caller.project_id)
             if metered and upstream.status_code < 400:
                 scanner.close()
-                await _record(caller, user_sub, member_id, model, requested, nerfed, scanner.usage)
+                elapsed = int((time.monotonic() - started) * 1000)
+                await _record(caller, user_sub, member_id, model, requested, nerfed, scanner.usage, scanner.reasoning, elapsed)
 
     return StreamingResponse(relay(), status_code=upstream.status_code, headers=resp_headers)
 

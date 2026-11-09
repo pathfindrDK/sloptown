@@ -114,6 +114,31 @@ async def test_stream_responses_api_usage(setup, db):
 
 
 @respx.mock
+async def test_records_reasoning_tokens_and_duration(setup, db):
+    """Slow answers are usually hidden reasoning; both forms of usage report it."""
+    respx.post(f"{OPENAI}/chat/completions").respond(json={"usage": {
+        "prompt_tokens": 10, "completion_tokens": 40, "completion_tokens_details": {"reasoning_tokens": 30}}})
+    r = await setup.post("/v1/chat/completions", json={"model": "gpt-4.1"}, headers=auth())
+    assert r.status_code == 200
+    sse = (b'data: {"type":"response.completed","response":{"usage":{"input_tokens":2,"output_tokens":9,'
+           b'"output_tokens_details":{"reasoning_tokens":4}}}}\n\n')
+    respx.post(f"{OPENAI}/responses").respond(content=sse, headers={"content-type": "text/event-stream"})
+    r = await setup.post("/v1/responses", json={"model": "gpt-4.1", "stream": True}, headers=auth())
+    assert r.status_code == 200
+    rows = sorted(await usage_rows(db), key=lambda e: e.id)
+    assert [(e.output_tokens, e.reasoning_tokens) for e in rows] == [(40, 30), (9, 4)]
+    assert all(isinstance(e.duration_ms, int) and e.duration_ms >= 0 for e in rows)
+
+
+@respx.mock
+async def test_reasoning_tokens_missing_is_null(setup, db):
+    respx.post(f"{OPENAI}/chat/completions").respond(json={"usage": {"prompt_tokens": 1, "completion_tokens": 2}})
+    await setup.post("/v1/chat/completions", json={"model": "gpt-4.1"}, headers=auth())
+    rows = await usage_rows(db)
+    assert [e.reasoning_tokens for e in rows] == [None]
+
+
+@respx.mock
 async def test_runtime_token_charges_app_bucket_with_member(setup, db):
     respx.post(f"{OPENAI}/chat/completions").respond(json={"usage": {"prompt_tokens": 1, "completion_tokens": 1}})
     r = await setup.post("/v1/chat/completions", json={"model": "gpt-4.1"}, headers={**auth("run-tok"), "X-Vibe-User": "member-9"})

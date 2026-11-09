@@ -3,6 +3,7 @@
 #
 #   deploy/dev-up.sh [--no-build] [--down]
 #   deploy/dev-up.sh --public <domain> [--no-build]
+#   deploy/dev-up.sh --build-only      build the images and stop; the running stack is not touched
 #
 # Builds all images as localhost/sloptown/<name>:dev (unless --no-build), then
 # runs on network `sloptown`: sloptown-db, sloptown-fake-miira, sloptown-cp,
@@ -47,6 +48,7 @@ PLATFORM=(sloptown-edge sloptown-gate sloptown-egress sloptown-cp sloptown-fake-
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-build) BUILD=0 ;;
+    --build-only) BUILD_ONLY=1 ;;
     --public) PUBLIC="${2:?--public needs a domain}"; shift ;;
     --down)
       podman rm -f "${PLATFORM[@]}" >/dev/null 2>&1 || true
@@ -120,6 +122,7 @@ if [ "$BUILD" = 1 ]; then
   b studio deploy/containers/studio.Containerfile
   b edge edge/Containerfile --build-arg STUDIO_IMAGE=$T/studio:dev
 fi
+[ "${BUILD_ONLY:-0}" = 1 ] && { echo "-- images built (--build-only: nothing restarted)"; exit 0; }
 
 podman network exists $NET || podman network create --label sloptown=1 $NET >/dev/null
 podman rm -f "${PLATFORM[@]}" >/dev/null 2>&1 || true

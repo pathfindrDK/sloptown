@@ -95,3 +95,61 @@ async def test_reconnect_platform_reattaches(podman):
         assert await orch.reconnect_platform() == 0 or spec.network_name in await _networks_of(raw, stub)
     finally:
         await orch.discard(spec.container_name, spec.volume_name, spec.network_name)
+
+
+async def test_editor_and_published_app_share_data(podman, monkeypatch):
+    """Both write <volume>/.data: with separate auto namespaces "U" took it from one
+    of them (the editor's API: "attempt to write a readonly database"). Needs a host
+    with userns=auto configured (subuid/subgid); publish runs with build=False."""
+    import io
+    import tarfile
+
+    from sloptown.config import get_settings
+    from sloptown.orchestrator import dev_container_name, runtime_container_name
+
+    orch, raw, _stub = podman
+    s = get_settings()
+    monkeypatch.setattr(s, "userns_auto", True)
+    monkeypatch.setattr(s, "runtime_image", os.environ.get("SLOPTOWN_IT_RUNTIME_IMAGE", "localhost/sloptown/vibe-runtime:dev"))
+
+    async def sh(container: str, cmd: str) -> int:
+        r = await raw.post(f"{API}/containers/{container}/exec", json={"Cmd": ["sh", "-c", cmd], "AttachStdout": True})
+        exec_id = r.json()["Id"]
+        await raw.post(f"{API}/exec/{exec_id}/start", json={"Detach": False})
+        return (await raw.get(f"{API}/exec/{exec_id}/json")).json()["ExitCode"]
+
+    async def ids(container: str):
+        return (await raw.get(f"{API}/containers/{container}/json")).json()["HostConfig"]["IDMappings"]["UidMap"]
+
+    pid = f"it{uuid.uuid4().hex[:6]}"
+    spec = await orch.create_pool_slot()
+    dev, run = dev_container_name(pid), runtime_container_name(pid)
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as t:
+        info = tarfile.TarInfo("README.md")
+        info.size = 2
+        t.addfile(info, io.BytesIO(b"hi"))
+    try:
+        await orch.rename(spec.container_name, dev)
+        assert await sh(dev, "mkdir -p /data && touch /data/from-dev") == 0
+        await orch.publish(pid, spec.network_name, spec.volume_name, spec.token_seed, "a" * 40, buf.getvalue(), build=False)
+        assert await ids(run) == await ids(dev)
+        assert await sh(run, "touch /data/from-run") == 0
+        assert await sh(dev, "touch /data/from-dev-after-publish") == 0, "publish took .data from the editor"
+        await orch.replace_dev(pid, dev, spec.network_name, spec.volume_name, spec.token_seed)
+        await raw.post(f"{API}/containers/{dev}/start")
+        assert await ids(dev) == await ids(run)
+        assert await sh(dev, "touch /data/from-new-dev") == 0
+        assert await sh(run, "touch /data/from-run-after-replace") == 0, "the new editor took .data from the app"
+        # podman's auto allocator must not hand the shared range to anyone else
+        other = await orch.create_pool_slot()
+        try:
+            assert await ids(other.container_name) != await ids(dev)
+        finally:
+            await orch.discard(other.container_name, other.volume_name, other.network_name)
+    finally:
+        await orch.unpublish(pid)
+        for v in (await raw.get(f"{API}/volumes/json")).json():
+            if v["Name"].startswith(f"vibe-pub-{pid}"):
+                await raw.delete(f"{API}/volumes/{v['Name']}", params={"force": "true"})
+        await orch.discard(dev, spec.volume_name, spec.network_name)

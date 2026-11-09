@@ -1,6 +1,6 @@
 // The owner's first open of a new Vibe: choose what it is before anything is
 // created. A webapp gets the template, preview and publish; "fra bunden" is an
-// empty project that is never served on the web (control plane: kind="scratch").
+// empty project whose page (index.html) can be published as it is (kind="scratch").
 // A webapp then gets a name, a design system and a palette (both can change later
 // under Indstillinger), with a preview beside the choices; skipping the palette
 // leaves it to the control plane's random pick.

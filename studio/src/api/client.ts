@@ -10,6 +10,7 @@ import {
   type FileEntry,
   type History,
   type ImageAttachment,
+  type Upload,
   type LaunchResult,
   type Me,
   type Message,
@@ -141,8 +142,20 @@ export const api = {
   updateThread: (tid: string, patch: { title?: string; archived?: boolean }) =>
     req<Thread>("PATCH", `/api/threads/${enc(tid)}`, patch),
   messages: (tid: string) => req<Message[]>("GET", `/api/threads/${enc(tid)}/messages`),
-  send: (tid: string, text: string, images?: ImageAttachment[]) =>
-    req<{ turnId: string; queued: boolean }>("POST", `/api/threads/${enc(tid)}/messages`, { text, images }),
+  send: (tid: string, text: string, images?: ImageAttachment[], uploads?: string[]) =>
+    req<{ turnId: string; queued: boolean }>("POST", `/api/threads/${enc(tid)}/messages`, { text, images, uploads }),
+  /** Attach a file to the next chat message: the raw bytes, so a 25 MB zip isn't base64'd into JSON. */
+  upload: async (pid: string, file: File): Promise<Upload> => {
+    const res = await fetch(`/api/projects/${enc(pid)}/uploads?name=${enc(file.name)}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { ...headers(false), "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, body.error ?? "upload_failed", body.message ?? res.statusText, body);
+    return body as Upload;
+  },
   stop: (tid: string) => req<void>("POST", `/api/threads/${enc(tid)}/stop`),
   queue: (pid: string) => req<QueueState>("GET", `/api/projects/${enc(pid)}/queue`),
   editQueued: (turnId: string, text: string) => req<QueueState>("PATCH", `/api/turns/${enc(turnId)}`, { text }),

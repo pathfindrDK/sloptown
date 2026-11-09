@@ -294,3 +294,55 @@ async def test_queue_needs_an_editor(env):
     stranger = await env.user("s-x")
     assert (await env.client.get("/api/projects/t1/queue", headers=stranger)).status_code in (403, 404)
     assert (await env.client.delete("/api/turns/nope", headers=owner)).status_code == 404
+
+
+async def test_zip_attachment_is_uploaded_audited_and_described_to_the_agent(env):
+    from sqlalchemy import select
+
+    from sloptown.models import AuditLog, Turn
+    from sloptown.threads import map_part, turns
+
+    owner, oc, thread = await setup(env)
+    ad = dev_base("t1", 4097)
+    manifest = {"id": "abcdef012345", "name": "Professor.zip", "kind": "zip", "dir": ".uploads/abcdef012345",
+                "bytes": 1234, "fileCount": 2, "files": ["index.html", "app.js"]}
+    put = env.mock.post(f"{ad}/uploads").respond(json=manifest)
+    env.mock.get(f"{ad}/uploads/abcdef012345").respond(json=manifest)
+    env.mock.get(f"{ad}/uploads/000000000000").respond(404, json={"detail": "unknown upload"})
+
+    r = await env.client.post("/api/projects/t1/uploads?name=Professor.zip", content=b"PK\x03\x04zip", headers=owner)
+    assert r.status_code == 201 and r.json()["id"] == "abcdef012345"
+    assert put.calls.last.request.content == b"PK\x03\x04zip" and put.calls.last.request.url.params["name"] == "Professor.zip"
+    rows = (await env.db.execute(select(AuditLog).where(AuditLog.action == "project.upload"))).scalars().all()
+    assert len(rows) == 1 and rows[0].details["name"] == "Professor.zip" and rows[0].project_id == "t1"
+
+    url = f"/api/threads/{thread['id']}/messages"
+    gone = {"text": "Byg en app", "uploads": ["000000000000"]}
+    assert (await env.client.post(url, json=gone, headers=owner)).json()["error"] == "unknown_upload"
+    assert (await env.client.post(url, json={"text": "x", "uploads": ["../../etc"]}, headers=owner)).status_code == 422
+
+    r = await env.client.post(url, json={"text": "Byg en app ud fra min zip", "uploads": ["abcdef012345"]}, headers=owner)
+    assert r.status_code == 202
+    await until(lambda: len(oc.prompts) == 1)
+    note = oc.prompts[0]["parts"][1]
+    assert ".uploads/abcdef012345/index.html" in note["text"] and "read-only reference" in note["text"]
+    assert map_part(note) == {"type": "upload", "name": "Professor.zip", "fileCount": 2}
+    turn = await env.db.get(Turn, r.json()["turnId"])
+    await env.db.refresh(turn)
+    assert turn.uploads[0]["name"] == "Professor.zip"
+    oc.gates[0].set()
+    await turns.wait_idle("t1")
+
+
+async def test_upload_errors_and_access(env):
+    owner, oc, thread = await setup(env)
+    ad = dev_base("t1", 4097)
+    env.mock.post(f"{ad}/uploads").respond(400, json={"detail": "encrypted_zip"})
+    r = await env.client.post("/api/projects/t1/uploads?name=x.zip", content=b"PK", headers=owner)
+    assert r.status_code == 400 and "adgangskode" in r.json()["message"]
+    big = b"x" * (25 * 1024 * 1024 + 1)
+    r = await env.client.post("/api/projects/t1/uploads?name=x.zip", content=big, headers=owner)
+    assert r.status_code == 413 and r.json()["error"] == "upload_too_large"
+    await env.share("t1", "s-v", "viewer")
+    viewer = await env.user("s-v", role="elev")
+    assert (await env.client.post("/api/projects/t1/uploads?name=x.zip", content=b"PK", headers=viewer)).status_code == 403

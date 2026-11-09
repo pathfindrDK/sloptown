@@ -28,6 +28,24 @@ table inet sloptown_vibe
 delete table inet sloptown_vibe
 
 table inet sloptown_vibe {
+	# CVE-2026-98432 (Linux IPv4 TCP use-after-free of inet_opt/ireq_opt, CVSS 9.8,
+	# remote; fixed in 5.10.272 / 5.15.223 / 6.1.190 / 6.6.159 / 6.12.113 / 6.18.56 /
+	# 7.2.10). Interim until the host runs a fixed kernel (Ubuntu 26.04: pending in
+	# 7.0.0-43): the bug needs a TCP packet with IPv4 options, which nothing legitimate
+	# sends, so drop every such packet before routing, whatever it is addressed to
+	# (host services and published container ports alike; one kernel serves them all).
+	# Intra-bridge L2 traffic between containers is not seen here (no br_netfilter).
+	# Remove once `uname -r` is a fixed kernel.
+	chain prerouting_cve_2026_98432 {
+		type filter hook prerouting priority raw; policy accept;
+		meta nfproto ipv4 ip hdrlength != 5 meta l4proto tcp counter drop comment "CVE-2026-98432: TCP with IPv4 options"
+	}
+
+	chain output_cve_2026_98432 {
+		type filter hook output priority raw; policy accept;
+		meta nfproto ipv4 ip hdrlength != 5 meta l4proto tcp counter drop comment "CVE-2026-98432: local TCP with IPv4 options"
+	}
+
 	chain input {
 		type filter hook input priority filter - 10; policy accept;
 		iifname "vb*" udp dport 53 accept comment "aardvark-dns"

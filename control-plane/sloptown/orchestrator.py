@@ -8,6 +8,14 @@ is used when `orchestrator_enabled` is false (tests, studio-only dev).
 Every project container is hardened the same way: all capabilities dropped,
 no-new-privileges, read-only root, memory/CPU/pids limits, userns=auto, an
 internal network with no default route, and optionally gVisor (`oci_runtime`).
+
+One user namespace per project: the editor and the published app both write the
+project volume's `.data` (the app's SQLite), and the "U" mount option chowns it to
+the starting container's host ids. Two auto namespaces would take `.data` from each
+other (a publish left the editor's API with "attempt to write a readonly database",
+the preview answering 500). So a project's containers adopt the mapping of a sibling
+that still exists (`_project_idmap`); only a new pool slot gets a fresh auto range.
+While one container holds the range, podman's auto allocator never hands it out.
 """
 
 import asyncio
@@ -62,7 +70,7 @@ class Orchestrator(Protocol):
     async def reconnect_platform(self) -> int: ...
     async def address(self, container: str, network: str) -> str: ...
     async def container_ips(self, containers: list[str]) -> set[str]: ...
-    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes) -> str: ...
+    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes, build: bool = True) -> str: ...
     async def unpublish(self, project_id: str) -> None: ...
     async def container_image(self, container: str) -> str | None: ...
     async def replace_dev(self, project_id: str, container: str, network: str, volume: str, seed: str) -> str: ...
@@ -74,7 +82,7 @@ class Orchestrator(Protocol):
 # like on a new image.
 # v2: project networks get DNS (the libpod API defaults dns_enabled to false).
 # v3: a per-Vibe edge secret in the environment.
-SLOT_SPEC = 3
+SLOT_SPEC = 4  # 4: one user namespace per project (rolls runtimes onto the editor's ids)
 
 
 def slot_tag(image_id: str) -> str:
@@ -149,7 +157,21 @@ def _memory_bytes(value: str) -> int:
     return int(value)
 
 
-def hardened_spec(name: str, image: str, env: dict[str, str], labels: dict[str, str], network: str) -> dict[str, Any]:
+# podman inspect's HostConfig.IDMappings: {"UidMap": ["0:<host id>:<size>"], "GidMap": [...]}
+IdMap = dict[str, list[str]]
+
+
+def _id_entries(entries: list[str]) -> list[dict[str, int]]:
+    out = []
+    for e in entries:
+        c, h, n = (int(x) for x in e.split(":"))
+        out.append({"container_id": c, "host_id": h, "size": n})
+    return out
+
+
+def hardened_spec(
+    name: str, image: str, env: dict[str, str], labels: dict[str, str], network: str, idmap: IdMap | None = None
+) -> dict[str, Any]:
     s = get_settings()
     spec: dict[str, Any] = {
         "name": name,
@@ -169,7 +191,11 @@ def hardened_spec(name: str, image: str, env: dict[str, str], labels: dict[str, 
         },
         "restart_policy": "always",
     }
-    if s.userns_auto:
+    if s.userns_auto and idmap:
+        # The project's existing range (see the module docstring), as the CLI's --uidmap/--gidmap.
+        spec["userns"] = {"nsmode": "private"}
+        spec["idmappings"] = {"UIDMap": _id_entries(idmap["UidMap"]), "GIDMap": _id_entries(idmap["GidMap"])}
+    elif s.userns_auto:
         # Both are needed over the API (the CLI's --userns=auto sets both). Needs a
         # `containers` range in /etc/subuid and /etc/subgid (deploy/ bootstrap).
         spec["userns"] = {"nsmode": "auto"}
@@ -198,6 +224,20 @@ class PodmanOrchestrator:
     async def image_id(self, image: str) -> str:
         r = await self._req("GET", f"/images/{image}/json")
         return r.json()["Id"]
+
+    async def _idmap_of(self, container: str) -> IdMap | None:
+        r = await self._client.get(f"{API}/containers/{container}/json")
+        if r.status_code != 200:
+            return None
+        m = (r.json().get("HostConfig") or {}).get("IDMappings") or {}
+        return {"UidMap": m["UidMap"], "GidMap": m["GidMap"]} if m.get("UidMap") and m.get("GidMap") else None
+
+    async def _project_idmap(self, *containers: str) -> IdMap | None:
+        """The id mapping of the first of `containers` that exists (None: none does, or no userns)."""
+        for c in containers:
+            if m := await self._idmap_of(c):
+                return m
+        return None
 
     async def _connect_platform(self, network: str) -> None:
         """Attach edge, egress and the control plane so they can reach the project's containers."""
@@ -236,7 +276,10 @@ class PodmanOrchestrator:
                     log.warning("reconnect %s to %s: %s %s", c, net, cr.status_code, cr.text[:200])
         return made
 
-    async def _create_dev(self, name: str, network: str, volume: str, seed: str, project_id: str = "", start: bool = True) -> None:
+    async def _create_dev(
+        self, name: str, network: str, volume: str, seed: str, project_id: str = "", start: bool = True,
+        idmap: IdMap | None = None,
+    ) -> None:
         s = get_settings()
         spec = hardened_spec(
             name,
@@ -244,6 +287,7 @@ class PodmanOrchestrator:
             container_env(token=dev_token(seed), seed=seed, mode="dev", project_id=project_id),
             {"sloptown": "1", "sloptown.kind": "dev"},
             network,
+            idmap,
         )
         # "U" chowns the volume to the container's (auto) user namespace on start.
         spec["volumes"] = [{"Name": volume, "Dest": "/workspace", "Options": ["U"]}]
@@ -356,7 +400,9 @@ class PodmanOrchestrator:
             raise OrchestratorError(f"{container} has no address on {network}")
         return ip
 
-    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes) -> str:
+    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes, build: bool = True) -> str:
+        """Run the snapshot `tar` as the published app. build=False: it already holds
+        web/dist (a "fra bunden" site), so vibe-build is skipped."""
         name = runtime_container_name(project_id)
         pub_vol = f"vibe-pub-{project_id}-{sha[:7]}"
         old = await self._client.get(f"{API}/containers/{name}/json")
@@ -372,14 +418,16 @@ class PodmanOrchestrator:
                 "POST", f"/volumes/{pub_vol}/import", content=tar, headers={"Content-Type": "application/x-tar"}
             )
             try:
-                await self._build(project_id, pub_vol)
+                if build:
+                    await self._build(project_id, pub_vol)
             except BaseException:
                 await self._client.delete(f"{API}/volumes/{pub_vol}", params={"force": "true"})
                 raise
         # The runtime mounts <volume>/.data as /data; podman refuses a missing subpath.
         await self.exec(dev_container_name(project_id), ["mkdir", "-p", "/workspace/.data"])
+        idmap = await self._project_idmap(dev_container_name(project_id), name)  # before the old runtime goes
         await self._client.delete(f"{API}/containers/{name}", params={"force": "true", "t": 10})
-        await self._create_runtime(name, project_id, network, volume, pub_vol, seed, sha)
+        await self._create_runtime(name, project_id, network, volume, pub_vol, seed, sha, idmap)
         if old_vol and old_vol != pub_vol:
             await self._client.delete(f"{API}/volumes/{old_vol}", params={"force": "true"})
         return name
@@ -418,7 +466,10 @@ class PodmanOrchestrator:
         if code:
             raise OrchestratorError(f"{cmd!r} in {container} exited {code}")
 
-    async def _create_runtime(self, name: str, project_id: str, network: str, volume: str, pub_vol: str, seed: str, sha: str) -> None:
+    async def _create_runtime(
+        self, name: str, project_id: str, network: str, volume: str, pub_vol: str, seed: str, sha: str,
+        idmap: IdMap | None = None,
+    ) -> None:
         s = get_settings()
         spec = hardened_spec(
             name,
@@ -432,7 +483,10 @@ class PodmanOrchestrator:
                 "sloptown.tag": slot_tag(await self.image_id(s.runtime_image)),
             },
             network,
+            idmap,
         )
+        # "U" chowns .data to this container's ids: with the editor's mapping that is a
+        # no-op, and it hands back a .data an older, separate namespace took.
         spec["volumes"] = [
             {"Name": pub_vol, "Dest": "/srv/app", "Options": ["ro"]},
             {"Name": volume, "Dest": "/data", "Options": ["U"], "SubPath": ".data"},
@@ -455,8 +509,16 @@ class PodmanOrchestrator:
         """
         old = await self._client.get(f"{API}/containers/{container}/json")
         running = old.status_code == 200 and bool((old.json().get("State") or {}).get("Running"))
+        # Keep the project's ids. The new container exists before the old one goes, so the
+        # range is never free for the auto allocator to hand to another project.
+        idmap = await self._project_idmap(container, runtime_container_name(project_id))
+        nxt = f"{container}-next"
+        await self._client.delete(f"{API}/containers/{nxt}", params={"force": "true"})
+        await self._create_dev(nxt, network, volume, seed, project_id, start=False, idmap=idmap)
         await self._client.delete(f"{API}/containers/{container}", params={"force": "true", "t": 10})
-        await self._create_dev(container, network, volume, seed, project_id, start=running)
+        await self.rename(nxt, container)
+        if running:
+            await self._req("POST", f"/containers/{container}/start", ok=(204, 304))
         if running and not await self._healthy(container, network, timeout=120, port=4097, path="/health"):
             log.warning("%s replaced but agentd is not healthy yet", container)
         return slot_tag(await self.image_id(get_settings().dev_image))
@@ -477,7 +539,8 @@ class PodmanOrchestrator:
             raise OrchestratorError(f"{name} has no published volume")
         nxt = f"{name}-next"
         await self._client.delete(f"{API}/containers/{nxt}", params={"force": "true"})
-        await self._create_runtime(nxt, project_id, network, volume, pub_vol, seed, sha)
+        idmap = await self._project_idmap(dev_container_name(project_id), name)
+        await self._create_runtime(nxt, project_id, network, volume, pub_vol, seed, sha, idmap)
         if not await self._healthy(nxt, network):
             await self._client.delete(f"{API}/containers/{nxt}", params={"force": "true"})
             raise OrchestratorError(f"{nxt} did not become healthy; kept the old container")
@@ -513,6 +576,7 @@ class FakeOrchestrator:
         self.image = "sha256:fake-image-1"
         self.runtime_image = "sha256:fake-runtime-1"
         self.build_error: str | None = None  # set to make the next publish fail its build
+        self.published_snapshots: dict[str, tuple[bool, bytes]] = {}  # pid -> (built?, snapshot tar)
         self._n = 0
 
     async def image_id(self, image: str) -> str:
@@ -555,8 +619,9 @@ class FakeOrchestrator:
     async def container_ips(self, containers: list[str]) -> set[str]:
         return {self.platform_ips[c] for c in containers if c in self.platform_ips}
 
-    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes) -> str:
-        if self.build_error is not None:
+    async def publish(self, project_id: str, network: str, volume: str, seed: str, sha: str, tar: bytes, build: bool = True) -> str:
+        self.published_snapshots[project_id] = (build, tar)
+        if build and self.build_error is not None:
             raise BuildFailed(self.build_error)
         name = runtime_container_name(project_id)
         self.published[project_id] = {"sha": sha, "size": len(tar)}

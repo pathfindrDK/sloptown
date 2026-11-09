@@ -77,7 +77,7 @@ export function TopBar({ project, budget, headSha, canEdit, publishing, checking
       <button className="btn btn--3d" onClick={onShare}>
         <Share2 size={16} /> {t("top.share")}
       </button>
-      {canEdit && project.kind !== "scratch" && (
+      {canEdit && (
         <div className="topbar__publish">
           <button
             className="btn btn--3d btn--primary"

@@ -267,7 +267,7 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const toolbarKey = JSON.stringify({
     canEdit,
     publish:
-      canEdit && webapp
+      canEdit
         ? {
             state: pubState,
             published: upToDate,
@@ -292,8 +292,8 @@ export function Editor({ project: initial, onBack }: { project: Project; onBack:
   const onAction = useRef<(action: ToolbarAction) => void>(() => {});
   onAction.current = (action) => {
     if (action === "download" && canEdit && headSha) download();
-    if (action === "publish" && canEdit && webapp && headSha && !upToDate && !busy) publish(headSha);
-    if (action === "unpublish" && canEdit && webapp && project.publishedSha && !busy) askUnpublish();
+    if (action === "publish" && canEdit && headSha && !upToDate && !busy) publish(headSha);
+    if (action === "unpublish" && canEdit && project.publishedSha && !busy) askUnpublish();
   };
   useEffect(
     () => shell.onAction((fileId, action) => fileId === project.id && onAction.current(action)),

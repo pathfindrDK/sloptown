@@ -40,6 +40,9 @@ ADDED_COLUMNS = [
     "ALTER TABLE projects ADD COLUMN IF NOT EXISTS palette varchar",
     "ALTER TABLE turns ADD COLUMN IF NOT EXISTS queued_at timestamptz NOT NULL DEFAULT now()",
     "ALTER TABLE turns ADD COLUMN IF NOT EXISTS publish_attempt integer",
+    "ALTER TABLE turns ADD COLUMN IF NOT EXISTS uploads jsonb NOT NULL DEFAULT '[]'::jsonb",
+    "ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS reasoning_tokens integer",
+    "ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS duration_ms integer",
 ]
 
 

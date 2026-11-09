@@ -127,7 +127,7 @@ async def test_owner_opening_a_new_vibe_chooses_before_anything_is_created(env):
     assert (await env.client.get("/api/projects/f9", headers=no_terms)).json()["error"] == "terms_required"
 
 
-async def test_scratch_project_is_never_published_but_has_a_preview(env):
+async def test_scratch_project_has_a_preview_and_publishes_later(env):
     import io
     import tarfile
     import zipfile
@@ -141,13 +141,11 @@ async def test_scratch_project_is_never_published_but_has_a_preview(env):
     p = r.json()
     assert reset.called and p["kind"] == "scratch" and p["appUrl"] is None
     assert p["previewUrl"].startswith("http://preview-" + p["slug"])
-    for path in ("publish", "app-session"):
-        r = await env.client.post(f"/api/projects/fs/{path}", json={"sha": "abc1234"}, headers=h)
-        assert r.status_code == 409 and r.json()["error"] == "not_a_webapp", path
-    # No app host at all.
+    # Not published yet: nothing to open on its app host.
+    r = await env.client.post("/api/projects/fs/app-session", headers=h)
+    assert r.status_code == 409 and r.json()["error"] == "not_published"
     app_host = f"{p['slug']}.apps.sloptown.localhost"
-    assert (await env.client.get("/edge/tls-ask", params={"domain": app_host})).status_code == 404
-    assert (await env.client.get("/edge/auth/app", headers=fwd(app_host))).status_code == 404
+    assert (await env.client.get("/edge/auth/app", headers=fwd(app_host))).json()["error"] == "not_published"
     # The editor-only preview host: its files, from vibe-static on Vite's port. viewAs is ignored.
     phost = f"preview-{p['slug']}.apps.sloptown.localhost"
     assert (await env.client.get("/edge/tls-ask", params={"domain": phost})).status_code == 200
@@ -387,3 +385,93 @@ async def test_older_webapp_without_design_gets_one_on_first_change(env):
     assert p["style"] is None and p["palette"] is None
     p = (await env.client.patch("/api/projects/fo", json={"palette": "hav"}, headers=owner)).json()
     assert p["style"] == "miira" and p["palette"] == "hav", "agentd answers with the style it kept"
+
+
+def _tar(files: dict[str, str]) -> bytes:
+    import io
+    import tarfile
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        for name, text in files.items():
+            data = text.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+        link = tarfile.TarInfo("etc-passwd")
+        link.type, link.linkname = tarfile.SYMTYPE, "/etc/passwd"
+        tar.addfile(link)
+    return buf.getvalue()
+
+
+async def _scratch(env, pid):
+    h = await env.user("s-t", file_id=pid, file_role="owner")
+    env.mock.post(f"{dev_base(pid, 4097)}/reset-scratch").respond(200, json={"kind": "scratch"})
+    r = await env.client.post("/api/projects", json={"fileId": pid, "kind": "scratch", "title": "Trafiklys"}, headers=h)
+    assert r.status_code == 201, r.text
+    return h, r.json()
+
+
+async def test_scratch_project_publishes_its_files_as_they_are(env):
+    """"Fra bunden" publishes its files as they are: no build, the page under web/dist, its
+    server (api/) where the runtime mounts it, and the platform's AGENTS.md left out."""
+    import io
+    import tarfile
+
+    from .test_edge import fwd
+
+    h, p = await _scratch(env, "fp")
+    files = {
+        "index.html": "<h1>Trafiklys</h1>",
+        "miira-tokens.css": ":root{}",
+        "AGENTS.md": "# platform",
+        "trafiklys/trafiklys.ino": "void setup() {}",
+        "api/main.py": "from miira_vibe import setup\nfrom fastapi import FastAPI\napp = setup(FastAPI())\n",
+        # Python is only there to download: a request loop in it is no reason for a fix turn.
+        "maaling.py": "import requests\nwhile True:\n    requests.get('http://x')\n",
+    }
+    env.mock.post(f"{dev_base('fp', 4097)}/export").respond(200, content=_tar(files), headers={"x-vibe-sha": "d" * 40})
+    r = await env.client.post("/api/projects/fp/publish", json={"sha": "d" * 7}, headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["url"] == f"http://{p['slug']}.apps.sloptown.localhost:8080/"
+    built, snapshot = env.orch.published_snapshots["fp"]
+    assert built is False
+    with tarfile.open(fileobj=io.BytesIO(snapshot)) as tar:
+        names = set(tar.getnames())
+        assert tar.extractfile("web/dist/index.html").read() == b"<h1>Trafiklys</h1>"
+    assert names == {
+        "web/dist/index.html", "web/dist/miira-tokens.css", "web/dist/trafiklys/trafiklys.ino",
+        "api/main.py", "web/dist/maaling.py",
+    }
+    # Shared like an app: a one-time session for members, and a public switch.
+    assert (await env.client.post("/api/projects/fp/app-session", headers=h)).status_code == 200
+    r = await env.client.patch("/api/projects/fp", json={"public": True}, headers=h)
+    assert r.status_code == 200 and r.json()["public"] is True
+    app_host = f"{p['slug']}.apps.sloptown.localhost"
+    assert (await env.client.get("/edge/tls-ask", params={"domain": app_host})).status_code == 200
+    r = await env.client.get("/edge/auth/app", headers=fwd(app_host))
+    assert r.status_code == 200 and r.headers["x-vibe-upstream"].endswith(":8000")
+    # Design stays a webapp thing.
+    r = await env.client.patch("/api/projects/fp", json={"palette": "hav"}, headers=h)
+    assert r.status_code == 409 and r.json()["error"] == "not_a_webapp"
+
+
+async def test_scratch_server_gets_the_full_check(env):
+    """api/ runs on the server, so the pre-publish check covers it like a webapp's backend."""
+    h, _ = await _scratch(env, "fk")
+    files = {"index.html": "<h1>x</h1>",
+             "api/main.py": "import subprocess\nsubprocess.run('ls', shell=True)\n",
+             "script.py": "import subprocess\nsubprocess.run('ls', shell=True)\n"}
+    from sloptown.publishing import scan
+    from sloptown.models import Project
+
+    findings = scan(await env.db.get(Project, "fk"), _tar(files))
+    assert [f.path for f in findings] == ["api/main.py"]
+
+
+async def test_scratch_project_without_a_page_is_not_published(env):
+    h, _ = await _scratch(env, "fn")
+    env.mock.post(f"{dev_base('fn', 4097)}/export").respond(200, content=_tar({"README.md": "# x"}), headers={"x-vibe-sha": "e" * 40})
+    r = await env.client.post("/api/projects/fn/publish", json={"sha": "e" * 7}, headers=h)
+    assert r.status_code == 422 and r.json()["error"] == "no_page"
+    assert "fn" not in env.orch.published

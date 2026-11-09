@@ -133,51 +133,47 @@ export function SettingsPanel({ project, onChange, onAskAi, onUnpublish }: Props
         </ConfirmModal>
       )}
 
-      {project.kind !== "scratch" && (
-        <section className="settings__section">
-          <h3>{t("settings.publication")}</h3>
-          {project.publishedSha && project.appUrl ? (
-            <>
-              <p>
-                {t("settings.publishedAt")}{" "}
-                <a href={project.appUrl} target="_blank" rel="noopener" className="settings__app-link">
-                  {project.appUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")} <ExternalLink size={12} aria-hidden />
-                </a>
-              </p>
-              <button className="btn btn--3d btn--small" onClick={onUnpublish}>
-                <CircleStop size={14} /> {t("unpublish.action")}
-              </button>
-            </>
-          ) : (
-            <p className="muted">{t("settings.notPublished")}</p>
-          )}
-        </section>
-      )}
+      <section className="settings__section">
+        <h3>{t("settings.publication")}</h3>
+        {project.publishedSha && project.appUrl ? (
+          <>
+            <p>
+              {t("settings.publishedAt")}{" "}
+              <a href={project.appUrl} target="_blank" rel="noopener" className="settings__app-link">
+                {project.appUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")} <ExternalLink size={12} aria-hidden />
+              </a>
+            </p>
+            <button className="btn btn--3d btn--small" onClick={onUnpublish}>
+              <CircleStop size={14} /> {t("unpublish.action")}
+            </button>
+          </>
+        ) : (
+          <p className="muted">{t("settings.notPublished")}</p>
+        )}
+      </section>
 
-      {project.kind !== "scratch" && (
-        <section className="settings__section">
-          <h3 id="settings-access">{t("settings.access")}</h3>
-          <div className="choice-cards" role="radiogroup" aria-labelledby="settings-access">
-            {([false, true] as const).map((pub) => (
-              <button
-                key={String(pub)}
-                role="radio"
-                aria-checked={project.public === pub}
-                disabled={!owner || saving}
-                className={`choice-card${project.public === pub ? " is-active" : ""}`}
-                onClick={() => project.public !== pub && save({ public: pub })}
-              >
-                {pub ? <Globe size={18} aria-hidden /> : <Lock size={18} aria-hidden />}
-                <span>
-                  <strong>{t(pub ? "settings.public" : "settings.private")}</strong>
-                  <span className="muted">{t(pub ? "settings.publicBody" : "settings.privateBody")}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-          {!owner && <p className="muted">{t("settings.ownerOnly")}</p>}
-        </section>
-      )}
+      <section className="settings__section">
+        <h3 id="settings-access">{t("settings.access")}</h3>
+        <div className="choice-cards" role="radiogroup" aria-labelledby="settings-access">
+          {([false, true] as const).map((pub) => (
+            <button
+              key={String(pub)}
+              role="radio"
+              aria-checked={project.public === pub}
+              disabled={!owner || saving}
+              className={`choice-card${project.public === pub ? " is-active" : ""}`}
+              onClick={() => project.public !== pub && save({ public: pub })}
+            >
+              {pub ? <Globe size={18} aria-hidden /> : <Lock size={18} aria-hidden />}
+              <span>
+                <strong>{t(pub ? "settings.public" : "settings.private")}</strong>
+                <span className="muted">{t(pub ? "settings.publicBody" : "settings.privateBody")}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        {!owner && <p className="muted">{t("settings.ownerOnly")}</p>}
+      </section>
 
       <section className="settings__section">
         <h3>

@@ -75,7 +75,9 @@ export type Thread = {
 export type Part =
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; title: string; status: "running" | "done" | "error"; input?: unknown; output?: string }
-  | { type: "image"; mime: string; url: string };
+  | { type: "image"; mime: string; url: string }
+  /** A file the teacher attached (a .zip is unpacked for the AI). */
+  | { type: "upload"; name: string; fileCount: number };
 
 export type Message = {
   id: string;
@@ -104,6 +106,8 @@ export type Diff = { sha: string; files: { path: string; status: string; patch: 
 export type LaunchResult = { token: string; user: Me["user"]; fileId: string; fileRole: Role };
 
 export type ImageAttachment = { mime: string; dataUrl: string };
+/** A file stored in the project's hidden `.uploads/` (POST /api/projects/{pid}/uploads); sent by id. */
+export type Upload = { id: string; name: string; kind: "zip" | "file"; dir: string; bytes: number; fileCount: number; files: string[] };
 
 /** A message waiting for the project's AI (the control plane keeps the queue). */
 export type QueueItem = {
@@ -111,6 +115,8 @@ export type QueueItem = {
   threadId: string;
   text: string;
   imageCount: number;
+  /** Names of attached files (absent from older control planes). */
+  uploadNames?: string[];
   authorSub: string;
   queuedAt: string | null;
 };

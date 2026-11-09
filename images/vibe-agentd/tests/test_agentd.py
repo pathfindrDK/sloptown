@@ -270,3 +270,51 @@ def test_raw_media_for_the_file_preview(client, tmp_path):
     (tmp_path / "web" / "escape.png").symlink_to("/etc/hostname")
     assert client.get("/raw/web/escape.png").status_code == 404
     assert TestClient(agentd.app).get("/raw/web/logo.png").status_code == 401
+
+
+def _zip(entries: dict[str, bytes], symlink: str | None = None) -> bytes:
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in entries.items():
+            zf.writestr(name, data)
+        if symlink:
+            info = zipfile.ZipInfo(symlink)
+            info.external_attr = (0o120777 << 16)
+            zf.writestr(info, "/etc/passwd")
+    return buf.getvalue()
+
+
+def test_upload_zip_unpacks_hidden_and_uncommitted(client, tmp_path):
+    data = _zip({"projekt/index.html": b"<h1>hej</h1>", "projekt/app.js": b"1", "__MACOSX/projekt/._app.js": b"x",
+                 "../evil.txt": b"x", "/abs.txt": b"x", "projekt/.DS_Store": b"x"}, symlink="projekt/link")
+    r = client.post("/uploads", params={"name": "C:\\Users\\line\\Professor.zip"}, content=data)
+    assert r.status_code == 200, r.text
+    m = r.json()
+    assert m["name"] == "Professor.zip" and m["kind"] == "zip" and m["fileCount"] == 2
+    assert m["files"] == ["projekt/app.js", "projekt/index.html"] and m["dir"] == f".uploads/{m['id']}"
+    assert (tmp_path / m["dir"] / "projekt" / "index.html").read_bytes() == b"<h1>hej</h1>"
+    assert not (tmp_path / "evil.txt").exists() and not (tmp_path / m["dir"] / "projekt" / "link").exists()
+    assert client.get(f"/uploads/{m['id']}").json() == m
+    # Hidden from the studio and never committed by the turn.
+    assert not any(f["path"].startswith(".uploads") for f in client.get("/files").json()["files"])
+    assert client.get(f"/files/{m['dir']}/projekt/app.js").status_code == 404
+    assert client.post("/commit", json={"message": "turn", "trailers": {}}).json()["sha"] is None
+    assert ".uploads/" in (tmp_path / ".git" / "info" / "exclude").read_text()
+
+
+def test_upload_plain_file_and_errors(client, tmp_path, monkeypatch):
+    m = client.post("/uploads", params={"name": "opgaver.txt"}, content=b"y' = 3x + 5").json()
+    assert m["kind"] == "file" and m["files"] == ["opgaver.txt"]
+    assert (tmp_path / m["dir"] / "opgaver.txt").read_text() == "y' = 3x + 5"
+    assert client.post("/uploads", params={"name": "x.zip"}, content=b"not a zip").status_code == 400
+    assert client.post("/uploads", params={"name": "x.txt"}, content=b"").status_code == 400
+    assert client.get("/uploads/000000000000").status_code == 404
+    assert client.get("/uploads/..%2f..").status_code in (404, 422)
+    monkeypatch.setattr(agentd, "UNPACKED_MAX", 10)
+    assert client.post("/uploads", params={"name": "big.zip"}, content=_zip({"a": b"x" * 100})).status_code == 413
+    monkeypatch.setattr(agentd, "UPLOAD_MAX", 5)
+    assert client.post("/uploads", params={"name": "y.txt"}, content=b"123456").status_code == 413
+    # Failed uploads leave nothing behind.
+    assert sorted(p.name for p in (tmp_path / ".uploads").iterdir()) == sorted([m["id"], f"{m['id']}.json"])
+    assert TestClient(agentd.app).post("/uploads", params={"name": "a.txt"}, content=b"x").status_code == 401

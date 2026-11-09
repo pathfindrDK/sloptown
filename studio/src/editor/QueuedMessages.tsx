@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUp, ImageIcon, Pencil, Trash2 } from "lucide-react";
+import { ArrowUp, ImageIcon, Paperclip, Pencil, Trash2 } from "lucide-react";
 import type { QueueItem } from "../api/types";
 import { useT } from "../lib/i18n";
 
@@ -56,6 +56,11 @@ export function QueuedMessages({ messages, paused, busy, onSendNow, onEdit, onDe
             ) : (
               <span className="queue__text">
                 {m.imageCount > 0 && <ImageIcon size={14} aria-label={t("chat.attach")} />}
+                {(m.uploadNames ?? []).map((n) => (
+                  <span className="queue__file" key={n}>
+                    <Paperclip size={14} aria-hidden /> {n}
+                  </span>
+                ))}
                 {m.text}
               </span>
             )}

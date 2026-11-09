@@ -1489,6 +1489,53 @@ textarea.field {
   box-shadow: var(--miira-shadow-sm);
 }
 
+.composer__files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--miira-space-2);
+  margin: 0 0 var(--miira-space-2);
+  padding: 0;
+  list-style: none;
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--miira-space-1);
+  max-width: 100%;
+  padding: var(--miira-space-1) var(--miira-space-2);
+  border: 1px solid var(--miira-color-border);
+  border-radius: var(--miira-radius-sm);
+  background: var(--miira-color-surface-2);
+  font-size: var(--miira-font-size-sm);
+}
+.file-chip--sent {
+  margin-top: var(--miira-space-1);
+}
+.file-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.file-chip__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--miira-space-1);
+  color: var(--miira-color-text-subtle);
+  white-space: nowrap;
+}
+.file-chip .icon-btn {
+  width: 20px;
+  height: 20px;
+}
+.queue__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: var(--miira-space-1);
+  color: var(--miira-color-text-subtle);
+}
+
 /* Files */
 .tree {
   list-style: none;

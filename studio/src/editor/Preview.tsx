@@ -30,7 +30,7 @@ export function parsePreviewError(data: unknown): PreviewError | null {
 type Props = {
   project: Project;
   reloadSignal: number;
-  /** A "fra bunden" project's UI: plain files, no SDK (no roles, no vibe:ready). */
+  /** A "fra bunden" project's UI: plain files (with its server under /api, if any); no vibe:ready, no view-as. */
   staticSite?: boolean;
   /** Nothing built yet (only platform commits): invite the teacher to the chat. */
   empty: boolean;

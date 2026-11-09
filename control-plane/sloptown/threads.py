@@ -22,11 +22,11 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import select, update
 
 from . import budgets
@@ -37,7 +37,7 @@ from .containers import opencode, raise_for
 from .db import sessionmaker
 from .errors import ApiError, not_found
 from .events import hub, iter_sse
-from .files import commit_turn
+from .files import UPLOAD_ID_RE, commit_turn, upload_manifests
 from .models import Project, Thread, Turn, User
 
 log = logging.getLogger(__name__)
@@ -58,6 +58,9 @@ def map_part(part: dict[str, Any]) -> dict[str, Any] | None:
     """OpenCode Part -> studio Part (docs/internal-api.md). None for parts the studio doesn't show."""
     t = part.get("type")
     if t == "text":
+        upload = (part.get("metadata") or {}).get("vibeUpload")
+        if upload:
+            return {"type": "upload", "name": upload.get("name", ""), "fileCount": upload.get("fileCount", 0)}
         if part.get("synthetic") or part.get("ignored"):
             return None
         return {"type": "text", "text": part.get("text", "")}
@@ -79,6 +82,18 @@ def map_part(part: dict[str, Any]) -> dict[str, Any] | None:
     if t == "file" and str(part.get("mime", "")).startswith("image/"):
         return {"type": "image", "mime": part["mime"], "url": part.get("url", "")}
     return None
+
+
+def upload_note(up: dict[str, Any]) -> str:
+    """What the agent reads about a file the teacher attached (see the agents' AGENTS.md)."""
+    what = f"the zip file `{up['name']}`, unpacked" if up["kind"] == "zip" else f"the file `{up['name']}`"
+    lines = [f"[Attachment] The teacher attached {what} into `{up['dir']}/` ({up['fileCount']} files):"]
+    lines += [f"- {up['dir']}/{f}" for f in up["files"]]
+    if up["fileCount"] > len(up["files"]):
+        lines.append(f"- ... and {up['fileCount'] - len(up['files'])} more (list them with ls -R)")
+    lines.append("This folder is read-only reference material and is not part of the project: "
+                 "copy or rewrite what the project needs into the project's own files.")
+    return "\n".join(lines)
 
 
 def map_message(item: dict[str, Any], thread_id: str) -> dict[str, Any]:
@@ -132,6 +147,7 @@ def queue_item(t: Turn) -> dict[str, Any]:
         "threadId": t.thread_id,
         "text": t.text,
         "imageCount": len(t.images or []),
+        "uploadNames": [u["name"] for u in t.uploads or []],
         "authorSub": t.author_sub,
         "queuedAt": t.queued_at.isoformat() if t.queued_at else None,
     }
@@ -169,7 +185,7 @@ class TurnManager:
 
     async def submit(
         self, db: Any, project: Project, thread: Thread, author: User, text: str, images: list[dict[str, str]],
-        publish_attempt: int | None = None,
+        publish_attempt: int | None = None, uploads: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Run a turn now, or queue it. A pre-publish fix turn (`publish_attempt`) goes first
         in the queue and resumes a paused one: publishing is waiting for it."""
@@ -193,6 +209,7 @@ class TurnManager:
                 author_sub=author.sub,
                 text=text,
                 images=images,
+                uploads=uploads or [],
                 status="queued" if busy else "running",
                 publish_attempt=publish_attempt,
             )
@@ -393,6 +410,9 @@ class TurnManager:
         ]
         for img in turn.images or []:
             parts.append({"type": "file", "mime": img["mime"], "url": img["dataUrl"], "filename": "billede"})
+        for up in turn.uploads or []:
+            parts.append({"type": "text", "text": upload_note(up),
+                          "metadata": {"vibeUpload": {"name": up["name"], "fileCount": up["fileCount"]}}})
         part_index: dict[str, list[str]] = {}
         seen_messages: set[str] = set()
         status = "done"
@@ -551,6 +571,8 @@ class ImageIn(BaseModel):
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     images: list[ImageIn] = Field(default_factory=list, max_length=6)
+    # Ids from POST /api/projects/{pid}/uploads.
+    uploads: list[Annotated[str, StringConstraints(pattern=UPLOAD_ID_RE)]] = Field(default_factory=list, max_length=5)
 
 
 @router.post("/api/threads/{tid}/messages", status_code=202)
@@ -561,7 +583,9 @@ async def post_message(tid: str, body: MessageIn, principal: CurrentPrincipal, d
     for img in body.images:
         if not img.dataUrl.startswith(f"data:{img.mime};base64,"):
             raise ApiError(400, "bad_image", "Billedet skal være en data-URL")
-    return await turns.submit(db, project, thread, principal.user, body.text, [i.model_dump() for i in body.images])
+    uploads = await upload_manifests(project, list(dict.fromkeys(body.uploads)))
+    return await turns.submit(db, project, thread, principal.user, body.text, [i.model_dump() for i in body.images],
+                              uploads=uploads)
 
 
 @router.get("/api/projects/{pid}/queue")

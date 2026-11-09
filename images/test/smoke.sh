@@ -6,7 +6,7 @@
 #   VIBE_DEV_IMAGE=... VIBE_RUNTIME_IMAGE=... images/test/smoke.sh   (pipeline)
 #
 # scratch: agentd /reset-scratch, then vibe-static serves the files on :5173
-#          (no dotfiles) instead of Vite.
+#          (no dotfiles) instead of Vite, and /api/* reaches api/main.py once it exists.
 # dev:     seeds /workspace, git history, locked platform files, agentd /health
 #          and /files, Vite serves the app (incl. @miira/vibe), API on :8000,
 #          opencode serve answers.
@@ -71,6 +71,7 @@ dep=$(grep -oE '/node_modules/\.vite/deps/@miira_vibe[^"'"'"']*' <<<"$r" | head 
 r=$(get $P-dev http://127.0.0.1:5173/node_modules/@miira/vibe/dist/theme.css 50)
 check "vite serves @miira/vibe/theme.css" '[[ "$r" == 200* ]]'
 check "api :8000 up" 'wait_for $P-dev http://127.0.0.1:8000/docs 60'
+check "api output reaches /tmp/vibe-logs/api.log" 'podman exec $P-dev grep -q "Uvicorn running\|Application startup complete" /tmp/vibe-logs/api.log'
 OC_AUTH="Basic $(printf opencode:smoke-token | base64)"
 check "opencode serve :4096 up (basic auth)" 'AUTH="$OC_AUTH" wait_for $P-dev http://127.0.0.1:4096/config 60'
 check "opencode rejects missing auth" '[[ "$(AUTH=none get $P-dev http://127.0.0.1:4096/config 20)" == 401* ]]'
@@ -84,6 +85,15 @@ check "platform files read-only" '! podman exec $P-dev sh -c "echo x >> /workspa
 check "root filesystem read-only" '! podman exec $P-dev touch /opt/vibe/x 2>/dev/null'
 check "/data is the project volume" 'podman exec $P-dev sh -c "echo 1 > /data/probe && test -f /workspace/.data/probe"'
 check "git status clean after start" '[ -z "$(podman exec $P-dev git -C /workspace status --porcelain)" ]'
+# A chat attachment: a zip unpacked into the hidden, git-excluded .uploads/.
+r=$(podman exec $P-dev python -c "
+import io, json, urllib.request, zipfile
+b = io.BytesIO(); z = zipfile.ZipFile(b, 'w'); z.writestr('gammel/index.html', '<h1>hej</h1>'); z.writestr('../ud.txt', 'x'); z.close()
+req = urllib.request.Request('http://127.0.0.1:4097/uploads?name=gammel.zip', data=b.getvalue(), method='POST',
+    headers={'Authorization': 'Bearer smoke-token'})
+print(json.load(urllib.request.urlopen(req, timeout=30))['dir'])")
+check "agentd /uploads unpacks a zip into .uploads/" '[[ "$r" == .uploads/* ]] && podman exec $P-dev test -f "/workspace/$r/gammel/index.html" && ! podman exec $P-dev test -e /workspace/ud.txt'
+check "uploads are not tracked, not listed" '[ -z "$(podman exec $P-dev git -C /workspace status --porcelain)" ] && [[ "$(get $P-dev http://127.0.0.1:4097/files 4000)" != *.uploads* ]]'
 podman restart -t 5 $P-dev >/dev/null
 check "opencode stays up (no crash loop)" '[ "$(podman logs $P-dev 2>&1 | grep -c "opencode: exited")" = 0 ]'
 check "restart keeps history (no reseed)" 'wait_for $P-dev http://127.0.0.1:4097/health 60 && [ "$(podman exec $P-dev git -C /workspace rev-list --count HEAD)" = 1 ]'
@@ -152,7 +162,9 @@ podman exec $P-scr sh -c 'printf "<h1>Trafiklys</h1>" > /workspace/index.html; p
 check "vibe-static serves index.html on :5173 (Vite stopped)" 'wait_for $P-scr http://127.0.0.1:5173/ 30 && [[ "$(get $P-scr http://127.0.0.1:5173/ 100)" == "200 <h1>Trafiklys</h1>"* ]]'
 check "vibe-static serves the page's files" '[[ "$(get $P-scr http://127.0.0.1:5173/style.css 20)" == "200 h1{}"* ]]'
 check "vibe-static hides .git and .opencode" '[[ "$(get $P-scr http://127.0.0.1:5173/.git/HEAD 20)" == 404* && "$(get $P-scr http://127.0.0.1:5173/.opencode/ 20)" == 404* ]]'
-check "Vite and the API are gone" '[ -z "$(podman exec $P-scr sh -c "grep -lE \"[v]ite.js|[m]ain:app\" /proc/[0-9]*/cmdline 2>/dev/null")" ]'
+check "Vite is gone, no server without api/main.py" '[ -z "$(podman exec $P-scr sh -c "grep -lE \"[v]ite.js\" /proc/[0-9]*/cmdline 2>/dev/null")" ] && [[ "$(get $P-scr http://127.0.0.1:5173/api/hej 200)" == 502*no_server* ]]'
+podman exec $P-scr sh -c 'mkdir -p /workspace/api && printf "from fastapi import FastAPI\napp = FastAPI()\n\n@app.get(\"/hej\")\ndef hej():\n    return {\"hej\": \"fra serveren\"}\n" > /workspace/api/main.py'
+check "api/main.py starts the server, /api/* reaches it" 'wait_for $P-scr http://127.0.0.1:5173/api/hej 40 && [[ "$(get $P-scr http://127.0.0.1:5173/api/hej 100)" == *"fra serveren"* ]]'
 check "agentd /raw refuses text" '[[ "$(get $P-scr http://127.0.0.1:4097/raw/index.html 20)" == 415* ]]'
 
 echo "== $pass passed, $fail failed"

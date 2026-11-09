@@ -7,7 +7,8 @@
 #
 #   1. nftables: project bridges reach no host service but aardvark-dns, and
 #      nothing leaves or enters them through the host (edge/nftables/sloptown.nft,
-#      loaded by its own unit like bootstrap does)
+#      loaded by its own unit like bootstrap does); interim CVE-2026-98432
+#      mitigation: that table drops TCP with IPv4 options, and MPTCP is turned off
 #   2. a `containers` subuid/subgid range, so every Vibe gets its own user
 #      namespace (SLOPTOWN_USERNS_AUTO): root or uid 1000 in a Vibe is nobody on
 #      the host; podman's temp dir gets search permission for those ids
@@ -39,6 +40,12 @@ run install -m 0644 "$REPO/deploy/systemd/sloptown-nft.service" /etc/systemd/sys
 run systemctl daemon-reload
 run systemctl enable sloptown-nft.service
 run systemctl restart sloptown-nft.service
+
+say "1b. CVE-2026-98432 interim: MPTCP off (the nftables chain drops TCP with IPv4 options)"
+# The demonstrated exploit needs an MPTCP listener. Host namespace only; the edge
+# image sets GODEBUG=multipathtcp=0 for Caddy. Remove both once the kernel is fixed.
+run sh -c "echo 'net.mptcp.enabled = 0' > /etc/sysctl.d/90-sloptown-cve-2026-98432.conf"
+run sysctl -q -w net.mptcp.enabled=0
 
 say "2. subuid/subgid for userns=auto"
 for f in /etc/subuid /etc/subgid; do

@@ -10,6 +10,7 @@ MAX_FIX_ATTEMPTS), or publish gives up (`publish.failed`). The previously publis
 version keeps running until a release succeeds.
 """
 
+import io
 import logging
 import tarfile
 from datetime import UTC, datetime
@@ -29,7 +30,7 @@ from .errors import ApiError
 from .events import hub
 from .models import Project, Thread, Turn, User
 from .orchestrator import BuildFailed, get_orchestrator
-from .projects import host_url, require_webapp
+from .projects import host_url, is_webapp
 from .threads import new_thread, turns
 
 log = logging.getLogger(__name__)
@@ -61,12 +62,43 @@ async def head_sha(project: Project) -> str | None:
     return commits[0]["sha"] if commits else None
 
 
-def scan(tar: bytes) -> list[Finding]:
+def scan(project: Project, tar: bytes) -> list[Finding]:
     try:
-        return scan_tar(tar)
+        findings = scan_tar(tar)
     except tarfile.TarError:
         log.warning("export is not a tar archive; publishing without the check")
         return []
+    if not is_webapp(project):
+        # In a "fra bunden" project only api/ runs on the server; other Python (a script
+        # to download) never runs, so only a leaked key in it matters. Its JavaScript runs
+        # in visitors' browsers and gets every rule.
+        findings = [f for f in findings if f.path.startswith("api/") or not f.path.endswith(".py") or f.rule == "secret"]
+    return findings
+
+
+# Files of a "fra bunden" project that are the platform's, not part of its site.
+STATIC_SKIP = {"AGENTS.md"}
+
+
+def static_site_tar(tar: bytes) -> bytes:
+    """A "fra bunden" project's exported tree as a published snapshot, nothing built: its
+    server (api/, if any) stays at api/, where the runtime mounts it under /api like a
+    webapp's, and every other file goes under web/dist/, where the runtime serves the
+    page as it is. The server's code is not served as files. Needs index.html."""
+    out = io.BytesIO()
+    has_page = False
+    with tarfile.open(fileobj=io.BytesIO(tar), mode="r:") as src, tarfile.open(fileobj=out, mode="w") as dst:
+        for m in src:
+            name = m.name.removeprefix("./")
+            if not name or name in STATIC_SKIP or not (m.isfile() or m.isdir()):
+                continue  # links could point outside the site
+            has_page = has_page or (m.isfile() and name == "index.html")
+            fh = src.extractfile(m) if m.isfile() else None
+            m.name = name if name == "api" or name.startswith("api/") else f"web/dist/{name}"
+            dst.addfile(m, fh)
+    if not has_page:
+        raise ApiError(422, "no_page", "Projektet har ingen side (index.html) at udgive. Bed AI'en lave siden først.")
+    return out.getvalue()
 
 
 def findings_json(findings: list[Finding]) -> list[dict[str, Any]]:
@@ -74,11 +106,15 @@ def findings_json(findings: list[Finding]) -> list[dict[str, Any]]:
 
 
 async def release(db: Any, project: Project, actor_sub: str, sha: str, tar: bytes, request: Request | None = None) -> dict[str, Any]:
-    """Build the exported tree and run it as the published app."""
+    """Build the exported tree and run it as the published app. A "fra bunden" project
+    is published as its files, as they are: nothing to build."""
     pid = project.id
     assert project.token_seed and project.network_name and project.volume_name
+    build = is_webapp(project)
+    if not build:
+        tar = static_site_tar(tar)
     try:
-        await get_orchestrator().publish(pid, project.network_name, project.volume_name, project.token_seed, sha, tar)
+        await get_orchestrator().publish(pid, project.network_name, project.volume_name, project.token_seed, sha, tar, build=build)
     except BuildFailed as e:
         audit(db, "project.publish_failed", actor_sub=actor_sub, project_id=pid, details={"sha": sha}, request=request)
         await db.commit()
@@ -119,11 +155,10 @@ async def start_fix(
 @router.post("/api/projects/{pid}/publish")
 async def publish(pid: str, body: PublishBody, principal: CurrentPrincipal, db: Db, request: Request, response: Response) -> dict[str, Any]:
     project, _ = await require_project(db, principal, pid, "editor")
-    require_webapp(project)
     if await pending_fix(db, pid):
         raise ApiError(409, "publish_pending", "Appen bliver allerede tjekket og udgivet")
     sha, tar = await export_tree(project, body.sha)
-    findings = scan(tar)
+    findings = scan(project, tar)
     if not findings:
         return await release(db, project, principal.sub, sha, tar, request)
     if sha != await head_sha(project):
@@ -155,7 +190,7 @@ async def after_fix_turn(pid: str, turn_id: str, status: str) -> None:
             if head is None:
                 raise ApiError(409, "check_stopped", "Der er ingen version at udgive.")
             sha, tar = await export_tree(project, head)
-            findings = scan(tar)
+            findings = scan(project, tar)
             if not findings:
                 await release(db, project, turn.author_sub, sha, tar)
             elif attempt < MAX_FIX_ATTEMPTS:

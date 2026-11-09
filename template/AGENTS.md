@@ -54,7 +54,14 @@ by itself when Python files change.
 9. **Privacy.** Store only what the app needs. Do not log personal data. Do not
    send student data to the AI unless that is the point of the feature.
 10. Keep the app working after every turn. If the preview shows an error, fix it
-    before doing anything else.
+    before doing anything else. When the teacher reports an error ("fejl 500",
+    a blank page, "virker ikke"), look at the running app, not only the tests:
+    read the end of `/tmp/vibe-logs/api.log` (the backend's output: tracebacks,
+    "Application startup failed") and `/tmp/vibe-logs/vite.log`, and call the
+    route with `curl -s localhost:8000/api/...`. Passing tests are no proof: they
+    use a fresh database. If the log shows a problem outside the app's code (e.g.
+    "attempt to write a readonly database" on `/data`), say so plainly and tell
+    the teacher to contact support; don't rewrite working code.
 11. **Be gentle with the server.** A whole class uses the app at once, from one
     school network. Fetch data when the page opens and after the user acts; if
     the app must follow changes (a game, a live score), poll **at most every
@@ -74,6 +81,19 @@ changing what the app does. If a flagged line is really fine, add a comment with
 `vibe-check: ok` and the reason on the line before it (not possible for keys,
 eval, SQL or shell).
 
+## Files the teacher attaches
+
+A message may end with an `[Attachment]` note: the teacher attached a file in the chat
+and it is in `.uploads/<id>/` (a `.zip` is already unpacked there), with the list of
+files. Typical case: the files of an older project they want to build on. Read them
+with your tools; they are not part of the app. `.uploads/` is never committed, published
+or shown to the teacher, so copy or rewrite what the app needs into `web/` and `api/`
+(content that belongs in the database: seed it from `api/main.py`). Do not edit or
+delete anything in `.uploads/`. If an attachment is something you can't read (e.g. a
+Word file), say so and ask for the text or a screenshot. Old code from a plain HTML
+page usually has to be rebuilt as React components; keep its texts, tasks and data.
+
+<!-- shared: sdk-backend (template/AGENTS.md = template-scratch/AGENTS.md; a test checks) -->
 ## SDK reference — backend (`miira_vibe`)
 
 ```python
@@ -100,6 +120,23 @@ app = setup(FastAPI())          # required: mounts /_vibe/* routes for the front
 | `with db.session() as conn:` | `sqlite3` connection to `/data/app.sqlite`; rows behave like dicts (`dict(row)`); commits and closes |
 
 `User.id` and `Member.id` are the same stable id for a person in this app.
+
+### Fast AI answers
+
+The default model reasons silently before it answers. That hidden reasoning is most of the
+wait, and the user sees nothing while it happens, streamed or not. Measured on a real app (Nov 2026):
+four structured suggestions took ~40–57 s at the default effort and ~11–14 s with
+`reasoning_effort="none"`, and the faster answers passed the app's checks more often.
+
+- Interactive help (suggestions, feedback, short explanations): pass
+  `ai.chat(..., reasoning_effort="none")` (or `"low"`). Extra keyword arguments go to the model
+  as-is. Supported values: `none`, `low`, `medium`. `minimal` is rejected.
+- Ask only for what the screen shows. Every output token is waiting time.
+- If the reply fails your own format check, retry once on the server before you send
+  "prøv igen" to the user. A failed answer costs the user the whole wait again.
+- Free text the user reads as it arrives: use `ai.stream` / `useAi().stream`. Structured JSON you
+  validate first can't be shown half done, so show what is happening instead of a bare spinner.
+<!-- /shared: sdk-backend -->
 
 ## SDK reference — frontend (`@miira/vibe`)
 

@@ -62,7 +62,8 @@ class Project(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)  # Miira file id
     title: Mapped[str] = mapped_column(String, default="Ny Vibe")
     # "webapp": the template app with preview and publish. "scratch" ("fra bunden"):
-    # an empty workspace for code that is never served on the web (Arduino, scripts).
+    # an empty workspace (Arduino, scripts, plain-HTML apps) whose page, index.html, is
+    # published as its files, with an optional server (api/main.py) like a webapp's.
     kind: Mapped[str] = mapped_column(String, default="webapp", server_default="webapp")
     slug: Mapped[str] = mapped_column(String, unique=True)
     owner_sub: Mapped[str] = mapped_column(ForeignKey("users.sub"))
@@ -125,6 +126,8 @@ class Turn(Base):
     author_sub: Mapped[str] = mapped_column(String)
     text: Mapped[str] = mapped_column(Text, default="")
     images: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    # Files attached in the chat, as agentd upload manifests (files.upload_summary); stored in .uploads/.
+    uploads: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     status: Mapped[str] = mapped_column(String, default="queued")  # queued|running|done|stopped|error
     # Queue order; "Send nu" moves a turn ahead of the others by giving it an earlier time.
     queued_at: Mapped[datetime] = _now()
@@ -157,6 +160,10 @@ class UsageEvent(Base):
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     nerfed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Hidden reasoning share of output_tokens, when the provider reports it.
+    reasoning_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Upstream wall time from sending the request to the last byte of the answer.
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("ix_usage_bucket_user_ts", "bucket", "user_sub", "ts"),

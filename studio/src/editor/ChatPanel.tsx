@@ -6,8 +6,10 @@ import {
   ArrowUp,
   ChevronRight,
   Clock,
+  FileArchive,
   FileText,
   MoreHorizontal,
+  Paperclip,
   Pencil,
   Plus,
   Square,
@@ -17,11 +19,18 @@ import {
 import { api } from "../api/client";
 import { LoadingTiles } from "../components/Loading";
 import { QueuedMessages } from "./QueuedMessages";
-import { ApiError, type ImageAttachment, type Message, type Part, type QueueItem, type Thread } from "../api/types";
+import { ApiError, type ImageAttachment, type Message, type Part, type QueueItem, type Thread, type Upload } from "../api/types";
 import type { Action, ProjectState } from "../lib/projectState";
 import { useT } from "../lib/i18n";
 import { Menu } from "../components/Menu";
 import { Modal } from "../components/Modal";
+
+// Files attached in the chat go to the project's hidden .uploads/ (a .zip is unpacked) and the
+// AI is told where they are. Limits match the control plane's.
+export const UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const MAX_UPLOADS = 5;
+const ATTACH_ACCEPT = "image/*,.zip,application/zip,.txt,.md,.csv,.json,.html,.htm,.css,.js,.ts,.tsx,.py,.ino,.svg,.xml";
+type Attached = { key: string; name: string; upload?: Upload };
 
 type Props = {
   projectId: string;
@@ -196,6 +205,7 @@ function RenameModal({ thread, onClose, onSave }: { thread: Thread; onClose: () 
 }
 
 function Conversation({
+  projectId,
   state,
   thread,
   messages,
@@ -224,6 +234,7 @@ function Conversation({
   const t = useT();
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [attached, setAttached] = useState<Attached[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -254,8 +265,34 @@ function Conversation({
   const otherRunning = !!state.runningThreadId && !running;
   const busy = !!state.runningThreadId;
 
+  const uploading = attached.some((a) => !a.upload);
+
+  const uploadFile = async (f: File, key: string) => {
+    try {
+      const up = await api.upload(projectId, f);
+      setAttached((cur) => cur.map((a) => (a.key === key ? { ...a, upload: up } : a)));
+    } catch (e) {
+      setAttached((cur) => cur.filter((a) => a.key !== key));
+      setError(e instanceof Error ? e.message : t("common.error"));
+    }
+  };
+
   const addFiles = async (files: FileList | File[]) => {
-    const imgs = Array.from(files).filter((f) => f.type.startsWith("image/")).slice(0, 4);
+    setError(null);
+    const all = Array.from(files);
+    const others = all.filter((f) => !f.type.startsWith("image/"));
+    const room = MAX_UPLOADS - attached.length;
+    if (others.length > room) setError(t("chat.upload.tooMany"));
+    for (const f of others.slice(0, Math.max(0, room))) {
+      if (f.size > UPLOAD_MAX_BYTES) {
+        setError(t("chat.upload.tooLarge"));
+        continue;
+      }
+      const key = `${Date.now()}-${Math.random()}`;
+      setAttached((cur) => [...cur, { key, name: f.name }]);
+      void uploadFile(f, key);
+    }
+    const imgs = all.filter((f) => f.type.startsWith("image/")).slice(0, 4);
     const read = await Promise.all(
       imgs.map(
         (f) =>
@@ -271,16 +308,18 @@ function Conversation({
   };
 
   const send = async () => {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sending || uploading) return;
     if (blocked) return onBlocked();
     setSending(true);
     setError(null);
     try {
       const th = thread ?? (await createThread(text.trim()));
       // While the AI works the control plane queues the message (and keeps it if the page closes).
-      await api.send(th.id, text.trim(), images.length ? images : undefined);
+      const ids = attached.flatMap((a) => (a.upload ? [a.upload.id] : []));
+      await api.send(th.id, text.trim(), images.length ? images : undefined, ids.length ? ids : undefined);
       setText("");
       setImages([]);
+      setAttached([]);
     } catch (e) {
       if (e instanceof ApiError && e.code === "budget_blocked") onBlocked();
       else if (e instanceof ApiError && e.code === "queue_full") setError(t("chat.queueFull"));
@@ -345,6 +384,33 @@ function Conversation({
               ))}
             </div>
           )}
+          {attached.length > 0 && (
+            <ul className="composer__files" aria-label={t("chat.upload.list")}>
+              {attached.map((a) => (
+                <li className="file-chip" key={a.key}>
+                  {a.name.toLowerCase().endsWith(".zip") ? <FileArchive size={14} /> : <Paperclip size={14} />}
+                  <span className="file-chip__name">{a.name}</span>
+                  <span className="file-chip__meta">
+                    {a.upload ? (
+                      a.upload.kind === "zip" ? `${a.upload.fileCount} ${t("chat.upload.files")}` : null
+                    ) : (
+                      <>
+                        <LoadingTiles size="xs" /> {t("chat.upload.uploading")}
+                      </>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`${t("chat.upload.remove")} ${a.name}`}
+                    onClick={() => setAttached((xs) => xs.filter((x) => x.key !== a.key))}
+                  >
+                    <X size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <textarea
             ref={input}
             className="composer__input"
@@ -367,7 +433,17 @@ function Conversation({
             }}
           />
           <div className="composer__row">
-            <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+            <input
+              ref={fileInput}
+              type="file"
+              accept={ATTACH_ACCEPT}
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) void addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
             <button
               type="button"
               className="composer__icon-btn"
@@ -391,7 +467,7 @@ function Conversation({
               <button
                 type="submit"
                 className="composer__send"
-                disabled={!text.trim() || sending}
+                disabled={!text.trim() || sending || uploading}
                 title={t(busy ? "chat.queue.add" : "chat.send")}
                 aria-label={t(busy ? "chat.queue.add" : "chat.send")}
               >
@@ -437,6 +513,8 @@ function PartView({ part, markdown }: { part: Part; markdown: boolean }) {
       );
     case "image":
       return <img className="msg__image" src={part.url} alt="" />;
+    case "upload":
+      return <UploadChip part={part} />;
     case "tool": {
       const Icon = /bash|run|shell|command/i.test(part.tool) ? Terminal : FileText;
       return (
@@ -456,4 +534,16 @@ function PartView({ part, markdown }: { part: Part; markdown: boolean }) {
       );
     }
   }
+}
+
+function UploadChip({ part }: { part: Extract<Part, { type: "upload" }> }) {
+  const t = useT();
+  const zip = part.name.toLowerCase().endsWith(".zip");
+  return (
+    <div className="file-chip file-chip--sent">
+      {zip ? <FileArchive size={14} /> : <Paperclip size={14} />}
+      <span className="file-chip__name">{part.name}</span>
+      {zip && <span className="file-chip__meta">{`${part.fileCount} ${t("chat.upload.files")}`}</span>}
+    </div>
+  );
 }

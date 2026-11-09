@@ -28,7 +28,7 @@ git_c() { git -C "$W" -c user.name=SlopTown -c user.email=vibe@sloptown.invalid 
 # projects too and the agent's .gitignore edits cannot un-ignore them.
 # "node_modules" has no trailing slash: web/node_modules is a symlink.
 write_exclude() {
-  printf '%s\n' "# managed by vibe-dev" .data/ .opencode/ .vibe-kind .vibe-design node_modules web/dist/ __pycache__/ > "$W/.git/info/exclude"
+  printf '%s\n' "# managed by vibe-dev" .data/ .opencode/ .uploads/ .vibe-kind .vibe-design node_modules web/dist/ __pycache__/ > "$W/.git/info/exclude"
 }
 
 if [ ! -d "$W/.git" ]; then

@@ -52,10 +52,11 @@ def is_webapp(p: Project) -> bool:
 
 
 def require_webapp(p: Project) -> None:
-    """A "fra bunden" project is never published: no app host, no publish. It does
-    have the editor-only preview host (its files, served as they are)."""
+    """Only a webapp has a design system (style and palette). A "fra bunden" project
+    is published as its files, with its server if it has api/ (publishing.release), and
+    has no design."""
     if not is_webapp(p):
-        raise ApiError(409, "not_a_webapp", "Projektet er ikke en webapp og kan ikke vises eller udgives")
+        raise ApiError(409, "not_a_webapp", "Projektet er ikke en webapp og har intet designsystem")
 
 
 def project_json(p: Project, role: str) -> dict[str, Any]:
@@ -292,7 +293,6 @@ async def patch_project(pid: str, body: PatchBody, principal: CurrentPrincipal, 
         project.description = body.description.strip()
         audit(db, "project.describe", actor_sub=principal.sub, project_id=pid, details={"length": len(project.description)}, request=request)
     if body.public is not None and body.public != project.public:
-        require_webapp(project)
         project.public = body.public
         audit(db, "project.visibility", actor_sub=principal.sub, project_id=pid, details={"public": project.public}, request=request)
     if (body.style is not None and body.style != project.style) or (
@@ -385,7 +385,6 @@ async def preview_session(
 @router.post("/api/projects/{pid}/app-session")
 async def app_session(pid: str, principal: CurrentPrincipal, db: Db) -> dict[str, Any]:
     project, _ = await require_project(db, principal, pid)
-    require_webapp(project)
     if not project.published_sha:
         raise ApiError(409, "not_published", "Vibe er ikke udgivet endnu")
     code = await mint_edge_code(db, project, principal.sub, "app")

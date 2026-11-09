@@ -27,7 +27,7 @@ from .models import Project, Thread, User
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-HIDDEN_PREFIXES = (".git/", "node_modules/", ".opencode/", ".data/")
+HIDDEN_PREFIXES = (".git/", "node_modules/", ".opencode/", ".data/", ".uploads/")
 SHA_RE = r"^[0-9a-f]{7,40}$"
 
 
@@ -167,6 +167,64 @@ async def restore(pid: str, body: RestoreBody, principal: CurrentPrincipal, db: 
     await db.commit()
     hub.publish(f"project:{pid}", "files.changed", {"paths": commit.get("files", [])})
     return commit
+
+
+# ---------------------------------------------------------------- chat attachments
+
+UPLOAD_MAX = 25 * 1024 * 1024  # agentd checks the same limit
+UPLOAD_ID_RE = r"^[0-9a-f]{12}$"
+UPLOAD_ERRORS = {
+    "too_large": (413, "upload_too_large", "Filen er for stor. Den må højst fylde 25 MB."),
+    "unpacked_too_large": (413, "upload_too_large", "Zip-filen fylder for meget, når den er pakket ud (højst 200 MB)."),
+    "too_many_files": (413, "upload_too_large", "Zip-filen indeholder for mange filer (højst 2000)."),
+    "bad_zip": (400, "bad_upload", "Zip-filen kunne ikke åbnes. Prøv at pakke den igen."),
+    "encrypted_zip": (400, "bad_upload", "Zip-filen er beskyttet med adgangskode. Pak den uden adgangskode."),
+    "empty": (400, "bad_upload", "Filen er tom."),
+}
+
+
+def upload_summary(m: dict[str, Any]) -> dict[str, Any]:
+    """The part of an agentd upload manifest the studio and the turn keep (file list capped)."""
+    return {k: m[k] for k in ("id", "name", "kind", "dir", "bytes", "fileCount")} | {"files": m["files"][:200]}
+
+
+@router.post("/api/projects/{pid}/uploads", status_code=201)
+async def upload(pid: str, name: str, principal: CurrentPrincipal, db: Db, request: Request) -> dict[str, Any]:
+    """A file attached in the chat: stored (a .zip unpacked) in the project's hidden `.uploads/`."""
+    project, _ = await require_project(db, principal, pid, "editor")
+    if int(request.headers.get("content-length") or 0) > UPLOAD_MAX:
+        raise ApiError(*UPLOAD_ERRORS["too_large"])
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > UPLOAD_MAX:
+            raise ApiError(*UPLOAD_ERRORS["too_large"])
+    if not body:
+        raise ApiError(*UPLOAD_ERRORS["empty"])
+    async with await agentd(project, timeout=120) as client:
+        r = await client.post("/uploads", params={"name": name[:255]}, content=bytes(body))
+    if r.status_code in (400, 413):
+        detail = (r.json() if r.headers.get("content-type", "").startswith("application/json") else {}).get("detail")
+        raise ApiError(*UPLOAD_ERRORS.get(detail, UPLOAD_ERRORS["bad_zip"]))
+    manifest = upload_summary(raise_for(r, "Upload"))
+    audit(db, "project.upload", actor_sub=principal.sub, project_id=pid, request=request,
+          details={"id": manifest["id"], "name": manifest["name"], "bytes": manifest["bytes"], "fileCount": manifest["fileCount"]})
+    await db.commit()
+    return manifest
+
+
+async def upload_manifests(project: Project, ids: list[str]) -> list[dict[str, Any]]:
+    """Look up attached uploads by id (from the message body) in the project's container."""
+    if not ids:
+        return []
+    out = []
+    async with await agentd(project) as client:
+        for uid in ids:
+            r = await client.get(f"/uploads/{uid}")
+            if r.status_code == 404:
+                raise ApiError(400, "unknown_upload", "En vedhæftet fil findes ikke længere. Vedhæft den igen.")
+            out.append(upload_summary(raise_for(r, "Upload")))
+    return out
 
 
 # ---------------------------------------------------------------- live file events
