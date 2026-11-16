@@ -263,6 +263,31 @@ async def test_refill_discards_slots_when_the_agent_model_changes(env, monkeypat
     assert after and not (before & after), "slots carry the model in their environment"
 
 
+async def test_refill_discards_slots_when_the_apps_domain_changes(env, monkeypatch):
+    # Vite in a dev container only accepts Host headers under the apps domain it was
+    # started with, so a domain move must replace every container.
+    from sloptown.config import get_settings
+    from sloptown.models import PoolSlot
+    from sloptown.pool import refill_once
+
+    await refill_once()
+    before = set((await env.db.execute(select(PoolSlot.container_name))).scalars().all())
+    monkeypatch.setattr(get_settings(), "apps_domain", "apps.miira.example")
+    await refill_once()
+    env.db.expire_all()
+    after = set((await env.db.execute(select(PoolSlot.container_name))).scalars().all())
+    assert after and not (before & after)
+
+
+async def test_slug_avoids_sign_in_lookalikes():
+    from sloptown.projects import make_slug
+
+    for title in ("UniLogin log ind", "MitID", "Miira konto", "Skift password"):
+        assert make_slug(title).rsplit("-", 1)[0] == "vibe", title
+    assert make_slug("Brøkquiz 7.A").startswith("broekquiz-7-a-")
+    assert make_slug("Logbog for 8.B").startswith("logbog-for-8-b-")
+
+
 async def test_design_catalog_matches_template_design(env):
     import json
     from pathlib import Path

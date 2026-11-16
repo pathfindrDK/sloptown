@@ -14,12 +14,13 @@ Apps only ever see the per-Vibe member id, never the service-level `sub`.
 """
 
 import hashlib
+import html
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
 
 from fastapi import APIRouter, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import delete, select
 
 from .access import ROLE_RANK, role_for, role_for_sub
@@ -47,10 +48,10 @@ VIEW_AS_NAMES = {"owner": "Test-ejer", "editor": "Test-redaktør", "viewer": "Te
 RESERVED_LABELS = frozenset({"studio", "miira", "www", "admin", "api", "preview"})
 
 
-def parse_host(host: str) -> tuple[str, str] | None:
+def parse_host(host: str, apps_domain: str | None = None) -> tuple[str, str] | None:
     """`<slug>.APPS` -> ("app", slug); `preview-<slug>.APPS` -> ("preview", slug)."""
     host = host.split(":")[0].lower()
-    suffix = "." + get_settings().apps_domain
+    suffix = "." + (apps_domain or get_settings().apps_domain)
     if not host.endswith(suffix):
         return None
     label = host[: -len(suffix)]
@@ -186,14 +187,46 @@ async def tls_ask(db: Db, domain: str = "") -> Response:
     where Caddy treats studio.<apps> as covered by the on-demand *.<apps> site)."""
     s = get_settings()
     platform_hosts = {urlparse(o).hostname for o in [s.studio_origin, *s.miira_origins]}
+    platform_hosts |= {h.lower() for h in s.legacy_studio_hosts}
     if domain.lower() in platform_hosts:
         return Response(status_code=200)
-    parsed = parse_host(domain)
+    # Old hosts only redirect, but they still need a valid certificate to do so.
+    hosts = (parse_host(domain, d) for d in [s.apps_domain, *s.legacy_apps_domains])
+    parsed = next((p for p in hosts if p is not None), None)
     if parsed is None:
         return Response(status_code=404)
     q = select(Project.id).where(Project.slug == parsed[1])
     found = (await db.execute(q)).first()
     return Response(status_code=200 if found else 404)
+
+
+FRAME_DESTS = {"iframe", "frame"}
+
+OPEN_IN_TAB_HTML = """<!doctype html>
+<html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Åbn appen</title></head>
+<body style="font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 90vh; margin: 0; text-align: center">
+<main style="max-width: 28rem; padding: 1rem">
+<p>Din browser tillader ikke, at appen logger ind her inde i Miira.</p>
+<p><a href="{url}" target="_blank" rel="noopener" style="display: inline-block; padding: .6rem 1.2rem; border: 1px solid currentColor; border-radius: .5rem">Åbn appen i et nyt faneblad</a></p>
+<p lang="en" style="opacity: .7; font-size: .9em">Your browser blocks signing in to the app inside Miira. Open it in a new tab.</p>
+</main></body></html>"""
+
+
+def _open_in_tab_page(url: str) -> HTMLResponse:
+    """Shown instead of the OIDC login when app-login runs inside an iframe.
+
+    The app frame sits in the studio frame inside Miira. Browsers that drop its
+    partitioned host cookie (Safari before 26.2, or once ITP flags the site) send every
+    app request here without a session, and an OIDC login in a cross-site frame can
+    never finish: the `SameSite=Lax` flow cookie is not stored, so the callback answers
+    `login_expired`. The same login works in a top-level tab.
+    """
+    return HTMLResponse(
+        OPEN_IN_TAB_HTML.replace("{url}", html.escape(url, quote=True)),
+        status_code=401,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/auth/app-login")
@@ -202,6 +235,12 @@ async def app_login(request: Request, db: Db, project: str, kind: str = "app", n
     if kind not in COOKIE:
         raise ApiError(400, "bad_kind", "Ugyldig forespørgsel")
     principal = await optional_principal(request, db)
+    nxt = next if next.startswith("/") and not next.startswith("//") else "/"
+    if principal is None and request.headers.get("sec-fetch-dest") in FRAME_DESTS:
+        p = await db.get(Project, project)
+        if p is None:
+            raise ApiError(404, "not_found", "Vibe findes ikke")
+        return _open_in_tab_page(host_url(p.slug, preview=kind == "preview") + nxt)
     if principal is None:
         here = f"/auth/app-login?{urlencode({'project': project, 'kind': kind, 'next': next})}"
         return RedirectResponse(f"/auth/login?{urlencode({'next': here})}", status_code=302)
@@ -212,7 +251,6 @@ async def app_login(request: Request, db: Db, project: str, kind: str = "app", n
     if role is None or (kind == "preview" and ROLE_RANK[role] < ROLE_RANK["editor"]):
         raise ApiError(403, "forbidden", "Du har ikke adgang til denne Vibe")
     code = await mint_edge_code(db, p, principal.sub, kind)
-    nxt = next if next.startswith("/") and not next.startswith("//") else "/"
     q = urlencode({"code": code, "next": nxt})
     return RedirectResponse(f"{host_url(p.slug, preview=kind == 'preview')}/_vibe/session?{q}", status_code=302)
 

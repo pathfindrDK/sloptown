@@ -86,13 +86,15 @@ SLOT_SPEC = 4  # 4: one user namespace per project (rolls runtimes onto the edit
 
 
 def slot_tag(image_id: str) -> str:
-    """What a Vibe container is compared on: its image, SLOT_SPEC, the model settings
-    baked into its environment and how it is isolated (user namespace, OCI runtime).
-    Any change recycles pool slots, rolls published apps and replaces idle editors."""
+    """What a Vibe container is compared on: its image, SLOT_SPEC, the settings baked
+    into its environment (models, and the apps domain Vite accepts as Host) and how it
+    is isolated (user namespace, OCI runtime). Any change recycles pool slots, rolls
+    published apps and replaces idle editors; a domain move relies on that."""
     s = get_settings()
-    models = hashlib.sha256(f"{s.agent_model}|{s.agent_small_model}|{s.app_ai_model}".encode()).hexdigest()[:8]
+    baked = f"{s.agent_model}|{s.agent_small_model}|{s.app_ai_model}|{s.apps_domain}|{s.apps_scheme}{s.apps_port}"
+    env = hashlib.sha256(baked.encode()).hexdigest()[:8]
     isolation = f"{'userns' if s.userns_auto else 'hostns'}-{s.oci_runtime or 'default'}"
-    return f"{image_id}#spec{SLOT_SPEC}#{models}#{isolation}"
+    return f"{image_id}#spec{SLOT_SPEC}#{env}#{isolation}"
 
 
 def image_of(tag: str | None) -> str | None:

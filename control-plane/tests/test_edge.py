@@ -120,6 +120,23 @@ async def test_edge_login_without_session_goes_to_oidc(env):
     assert r.status_code == 302 and r.headers["location"].startswith("/auth/login?next=")
 
 
+async def test_edge_login_in_iframe_offers_a_new_tab(env):
+    # In a frame the OIDC flow cookie (SameSite=Lax) is never stored, so the callback
+    # would answer login_expired; the user gets a link to the app in a top-level tab.
+    p, _ = await published(env)
+    params = {"project": "e1", "kind": "app", "next": "/quiz"}
+    r = await env.client.get("/auth/app-login", params=params, headers={"Sec-Fetch-Dest": "iframe"})
+    assert r.status_code == 401 and r.headers["content-type"].startswith("text/html")
+    assert f'href="http://{p["slug"]}.{APPS}' in r.text and '/quiz" target="_blank"' in r.text
+
+    r = await env.client.get("/auth/app-login", params={**params, "next": "//evil.example"}, headers={"Sec-Fetch-Dest": "iframe"})
+    assert "evil.example" not in r.text
+
+    # A top-level navigation still goes through OIDC.
+    r = await env.client.get("/auth/app-login", params=params, headers={"Sec-Fetch-Dest": "document"})
+    assert r.status_code == 302 and r.headers["location"].startswith("/auth/login?next=")
+
+
 async def test_tls_ask(env):
     owner = await env.user("s-t")
     p = await env.project("e4", "s-t", owner)
@@ -135,6 +152,28 @@ async def test_tls_ask(env):
     studio_host = urlparse(get_settings().studio_origin).hostname
     assert (await env.client.get("/edge/tls-ask", params={"domain": studio_host})).status_code == 200
     assert (await env.client.get("/edge/tls-ask", params={"domain": f"www.{APPS}"})).status_code == 404
+
+
+async def test_tls_ask_vouches_for_legacy_hosts_after_a_domain_move(env, monkeypatch):
+    from sloptown.config import get_settings
+
+    owner = await env.user("s-t")
+    p = await env.project("e5", "s-t", owner)
+    s = get_settings()
+    ask = lambda d: env.client.get("/edge/tls-ask", params={"domain": d})  # noqa: E731
+    assert (await ask(f"{p['slug']}.old-apps.example")).status_code == 404
+    assert (await ask("studio.old-apps.example")).status_code == 404
+
+    monkeypatch.setattr(s, "legacy_apps_domains", ["old-apps.example"])
+    monkeypatch.setattr(s, "legacy_studio_hosts", ["studio.old-apps.example"])
+    assert (await ask(f"{p['slug']}.old-apps.example")).status_code == 200
+    assert (await ask(f"preview-{p['slug']}.old-apps.example")).status_code == 200
+    assert (await ask("studio.old-apps.example")).status_code == 200
+    assert (await ask("nope-123.old-apps.example")).status_code == 404
+    # The current domain still works, and an old host never authenticates an app.
+    assert (await ask(f"{p['slug']}.{APPS}")).status_code == 200
+    r = await env.client.get("/edge/auth/app", headers=fwd(f"{p['slug']}.old-apps.example"))
+    assert r.status_code == 404
 
 
 async def test_preview_session_binds_view_as(env):
