@@ -299,9 +299,9 @@ too_many_files }`, `400 { detail: bad_zip | encrypted_zip | empty }`.
 |---|---|---|
 | GET | `/edge/auth/app` | `forward_auth` for app hosts. 200 + `X-Vibe-*` + `X-Vibe-Upstream`, or 302 to login, or 403 |
 | GET | `/edge/auth/preview` | same for preview hosts; owner/editor only; upstream is `vibe-dev-<pid>:5173` |
-| GET | `/auth/app-login?project=&kind=app\|preview&next=` | studio host: needs a studio session (else → `/auth/login`), checks the role, mints a one-time code and 302s to `<host>/_vibe/session?code=&next=`. `forward_auth` redirects here when the host cookie is missing |
+| GET | `/auth/app-login?project=&kind=app\|preview&next=` | studio host: needs a studio session (else → `/auth/login`; inside a frame, `Sec-Fetch-Dest: iframe`, instead `401` + a page with an "Åbn appen i et nyt faneblad" link, because the OIDC flow cookie is `SameSite=Lax` and never survives a cross-site frame: the callback would answer `login_expired`), checks the role, mints a one-time code and 302s to `<host>/_vibe/session?code=&next=`. `forward_auth` redirects here when the host cookie is missing |
 | GET | `/edge/session?code=&next=&viewAs=` | served on app/preview hosts via edge; sets host-only cookie `vibe_app` / `vibe_preview` (`Secure; HttpOnly; SameSite=None; Partitioned`); on preview hosts `viewAs` (bound to the code, not trusted from the query alone) sets `vibe_view_as` the same way |
-| GET | `/edge/tls-ask?domain=` | Caddy on-demand TLS check (`TLS_MODE=acme` only; unused with the wildcard certificate): 200 if `domain` is `<slug>.APPS` or `preview-<slug>.APPS` of an existing project, else 404 |
+| GET | `/edge/tls-ask?domain=` | Caddy on-demand TLS check (`TLS_MODE=acme` only; unused with the wildcard certificate): 200 if `domain` is `<slug>.APPS` or `preview-<slug>.APPS` of an existing project, the studio or a Miira host, or the same under an old name (`SLOPTOWN_LEGACY_APPS_DOMAINS`, `SLOPTOWN_LEGACY_STUDIO_HOSTS`: the edge only redirects those, but their certificates must renew), else 404 |
 
 The edge passes the original host in `X-Forwarded-Host`. It strips
 `Connection`, `Upgrade` and `Sec-WebSocket-*` from the `forward_auth`

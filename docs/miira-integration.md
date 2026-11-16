@@ -292,6 +292,29 @@ Defaults on first boot: `enabled: false`, all limits `null` (nothing blocks).
 - SlopTown sends `frame-ancestors MIIRA` (plus STUDIO for apps embedded in the
   studio viewer and preview) on every HTML response.
 
+### 9a. Domains: STUDIO and APPS live under Miira's site
+
+`STUDIO` is `https://studio.apps.miira.dk` and `APPS` is `apps.miira.dk` (until 2026-11:
+`studio.miira-apps.dk` and `*.miira-apps.dk`, now 308-redirected by the edge).
+
+Why: a published app runs in a frame (Miira → studio → app) and knows the student by
+a host cookie. On another site that cookie is a third-party cookie, which Safari drops,
+and every student on an iPad got `login_expired`. On Miira's own site the frame chain
+is same-site and the cookie is first-party.
+
+What that costs, and what each side must keep true, because app code is written by
+teachers and the AI and must be treated as hostile:
+
+| Rule | Owner | Why |
+|---|---|---|
+| Miira's session cookie is scoped to `.hej.miira.dk` (never `.miira.dk`), and copies on `.miira.dk` are expired | Miira | otherwise every request to an app carries the student's Miira login |
+| The edge strips `MIIRA_SESSION_COOKIE` before any request reaches a Vibe or the control plane | SlopTown | old `.miira.dk` copies may survive in browsers |
+| Miira refuses state-changing requests whose `Origin` is not Miira's own | Miira | same-site, so `SameSite=Lax` no longer stops an app from POSTing as the student |
+| Miira ignores a session cookie that arrives twice with different values, and expires the parent-domain copy | Miira | an app can set `miira_session` on `.miira.dk` (cookie tossing) to swap a student into another account |
+| Miira's WebSockets and CORS trust exact origins / `.hej.miira.dk`, never `.miira.dk` | Miira | sockets have no CORS; a suffix of `.miira.dk` would let apps in |
+| Every SlopTown cookie is `__Host-` | SlopTown | apps on sibling hosts cannot plant or overwrite them |
+| New slugs never contain sign-in words (`login`, `unilogin`, `mitid`, `miira`, ...) | SlopTown | a host under `miira.dk` looks official |
+
 ## 10. What Miira builds (checklist)
 
 All in miira3 `feat/sloptown-vibe`:
