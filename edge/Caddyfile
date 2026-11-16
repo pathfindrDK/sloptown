@@ -1,6 +1,7 @@
 # Production edge. Env (see deploy/quadlet/sloptown-edge.container):
 #   STUDIO_HOST, APPS_DOMAIN, STUDIO_ORIGIN, MIIRA_ORIGINS, CP_UPSTREAM,
-#   ADMIN_ALLOWED_IPS, ACME_EMAIL, TLS_MODE (acme|file, default acme)
+#   ADMIN_ALLOWED_IPS, ACME_EMAIL, TLS_MODE (acme|file, default acme),
+#   LEGACY_MODE (on|off, default off) with LEGACY_STUDIO_HOST, LEGACY_APPS_DOMAIN
 {
 	email {$ACME_EMAIL}
 	order rate_limit before basic_auth
@@ -13,6 +14,7 @@
 
 import /etc/caddy/common.caddy
 import /etc/caddy/tls-{$TLS_MODE:acme}.caddy
+import /etc/caddy/legacy-{$LEGACY_MODE:off}.caddy
 
 {$STUDIO_HOST} {
 	import studio

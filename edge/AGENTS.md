@@ -13,6 +13,7 @@ in this directory belongs to the egress proxy (see `control-plane/AGENTS.md`).
 | `Caddyfile.public` | public *test* on a real domain (`dev-up.sh --public`): Let's Encrypt, fake Miira on `miira.<domain>`, every host behind `gate.py`. Studio and miira hosts use `apps_tls` too, because Caddy treats them as covered by the `*.<domain>` site (in acme mode cp `/edge/tls-ask` approves them); the apex uses `apex_tls` |
 | `gate-on.caddy` / `gate-off.caddy` | the `gate` snippet `Caddyfile.public` imports per `GATE_MODE` (default `on`). On: `forward_auth` to `gate.py` for everything but `/hooks/*` and `/admin/v1/*` (Miira's server calls, which carry their own HMAC/JWT auth). Off: nothing, for a real Miira as IdP (`dev-up.sh` with `SLOPTOWN_MIIRA_ORIGIN`), where a gate cookie would never reach a studio framed by Miira's site |
 | `tls-acme.caddy` / `tls-file.caddy` | the `apps_tls` and `apex_tls` snippets both Caddyfiles import per `TLS_MODE` (default `acme`). Acme: `tls { on_demand }` for app hosts, Let's Encrypt (50 new certificates per week per domain). File: one wildcard certificate for `*.APPS_DOMAIN` and `APPS_DOMAIN` from `/etc/caddy/tls/{fullchain.pem,priv.pem}` (mounted read-only from `/etc/sloptown/tls`), nothing requested from Let's Encrypt |
+| `legacy-on.caddy` / `legacy-off.caddy` | imported by `Caddyfile` per `LEGACY_MODE` (default `off`). On: sites for `LEGACY_STUDIO_HOST` and `*.LEGACY_APPS_DOMAIN` that only 308 to the same path on `STUDIO_HOST` / `<label>.APPS_DOMAIN`, with on-demand certificates (cp `/edge/tls-ask` vouches via `SLOPTOWN_LEGACY_*`). For the 2026-11 move from `miira-apps.dk` to `apps.miira.dk` |
 | `gate.py` | stdlib password gate for the public test: one login sets a `Domain=<domain>` cookie checked by `forward_auth` on every host (basic auth can't work across subdomains and iframes). `common.caddy` strips its cookie before requests reach apps |
 | `Containerfile` | xcaddy build with `caddy-ratelimit`, the studio SPA from `STUDIO_IMAGE`, the Caddyfiles |
 | `nftables/sloptown.nft` | table `inet sloptown_vibe`: project bridges (`vb*`) may reach only aardvark-dns on the host; temporary chains `*_cve_2026_98432` drop every TCP packet carrying IPv4 options (interim mitigation until the host kernel is fixed; remove then, together with `GODEBUG=multipathtcp=0` in the `Containerfile` and the MPTCP sysctl in `deploy/harden-host.sh`) |
@@ -23,7 +24,12 @@ in this directory belongs to the egress proxy (see `control-plane/AGENTS.md`).
 Env used by the Caddyfiles: `STUDIO_HOST`, `APPS_DOMAIN`, `STUDIO_ORIGIN`,
 `MIIRA_ORIGINS` (space separated), `CP_UPSTREAM` (`sloptown-cp:8000`),
 `ADMIN_ALLOWED_IPS` (space separated CIDRs), `ACME_EMAIL`, `TLS_MODE` (`acme`|`file`),
-`FAKE_MIIRA_UPSTREAM` (dev).
+`FAKE_MIIRA_UPSTREAM` (dev), `MIIRA_SESSION_COOKIE` (default `miira_session`),
+`LEGACY_MODE`, `LEGACY_STUDIO_HOST`, `LEGACY_APPS_DOMAIN`.
+
+Miira's session cookie is stripped (`strip_miira_cookie`) from every request the edge
+proxies to the control plane or a Vibe: studio and apps share Miira's site, and a
+browser may still hold a copy scoped to `.miira.dk`.
 
 ## Routing
 

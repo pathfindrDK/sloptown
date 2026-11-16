@@ -37,6 +37,8 @@
 #   SLOPTOWN_DEV_MODE=false          turns off dev-only features ("view as" in previews). Default true.
 #   SLOPTOWN_RESTART_POLICY=on-failure  podman restarts a platform container that crashes.
 #                                    Default: none. Survives nothing across a reboot (the vault is locked).
+#   SLOPTOWN_LEGACY_DOMAIN=miira-apps.dk  after moving to another --public domain: the old
+#                                    studio, apex and app hosts 308 to the new ones.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -154,6 +156,14 @@ CP_ENV=(
   -e SLOPTOWN_OPENAI_BASE_URL="${SLOPTOWN_OPENAI_BASE_URL:-https://api.openai.com/v1}"
   -e SLOPTOWN_EGRESS_ENV_FILE=/etc/sloptown/egress.env
 )
+# After a domain move (2026-11: miira-apps.dk -> apps.miira.dk) the old public domain
+# keeps answering with 308 redirects to the new names (edge/legacy-on.caddy). The
+# control plane must still vouch for the old hosts so their certificates renew.
+LEGACY_DOMAIN="${SLOPTOWN_LEGACY_DOMAIN:-}"
+if [ -n "$LEGACY_DOMAIN" ]; then
+  CP_ENV+=(-e "SLOPTOWN_LEGACY_APPS_DOMAINS=[\"$LEGACY_DOMAIN\"]"
+    -e "SLOPTOWN_LEGACY_STUDIO_HOSTS=[\"studio.$LEGACY_DOMAIN\",\"$LEGACY_DOMAIN\"]")
+fi
 
 echo "-- sloptown-db"
 podman run -d --name sloptown-db "${RESTART[@]}" --network $NET --label sloptown=1 \
@@ -205,6 +215,10 @@ TLS_DIR="${SLOPTOWN_TLS_DIR-/etc/sloptown/tls}"
 if [ -n "$PUBLIC" ] && [ -n "$TLS_DIR" ] && [ -r "$TLS_DIR/fullchain.pem" ] && [ -r "$TLS_DIR/priv.pem" ]; then
   echo "-- edge uses the wildcard certificate in $TLS_DIR"
   EDGE_ENV+=(-e TLS_MODE=file -v "$TLS_DIR:/etc/caddy/tls:ro,z")
+fi
+if [ -n "$LEGACY_DOMAIN" ]; then
+  echo "-- edge redirects the old names under $LEGACY_DOMAIN"
+  EDGE_ENV+=(-e LEGACY_MODE=on -e LEGACY_APPS_DOMAIN="$LEGACY_DOMAIN" -e LEGACY_STUDIO_HOST="studio.$LEGACY_DOMAIN")
 fi
 
 echo "-- sloptown-edge (${EDGE_PORTS[*]})"

@@ -269,7 +269,7 @@ export function Preview({ project, reloadSignal, staticSite = false, empty, buil
               src={src}
               title={t("preview.tab")}
               onLoad={onFrameLoad}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
             />
           </div>
         )}
