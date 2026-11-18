@@ -1,28 +1,28 @@
 # Old Vibe hosts after a domain move (LEGACY_MODE=on). Teachers handed out app links
-# and the studio was framed under the old names, so both keep answering, with a 308
+# and the studio was framed under the old names, so both keep answering with a 307
 # (method and body kept) to the same path on the new name. Nothing is served here.
+# Temporary on purpose: browsers do not remember a 307, so if the move has to be
+# undone the old names serve again at once. Switch to 308 once the move has held.
 # Env: LEGACY_STUDIO_HOST, LEGACY_APPS_DOMAIN (one each), STUDIO_HOST, APPS_DOMAIN.
-# Certificates: on demand, vouched for by cp /edge/tls-ask (SLOPTOWN_LEGACY_*), so
-# they keep renewing whatever TLS_MODE the new names use.
+# Certificates: legacy-tls-{LEGACY_TLS_MODE}.caddy, the old wildcard (file) while it
+# is valid, otherwise on demand.
+
+import /etc/caddy/legacy-tls-{$LEGACY_TLS_MODE:acme}.caddy
 
 # More specific than the wildcard below, which would otherwise send the old studio
 # (studio.<old apps domain> in the first deployment) to a non-existent app host.
 # The old apex (the public layout's gate/landing host) goes to the studio as well.
 {$LEGACY_STUDIO_HOST}, {$LEGACY_APPS_DOMAIN} {
 	import security_headers
-	tls {
-		on_demand
-	}
-	redir https://{$STUDIO_HOST}{uri} 308
+	import legacy_tls
+	redir https://{$STUDIO_HOST}{uri} 307
 }
 
 *.{$LEGACY_APPS_DOMAIN} {
 	import security_headers
-	tls {
-		on_demand
-	}
+	import legacy_tls
 	# <slug>.OLD and preview-<slug>.OLD keep their first label.
 	@host header_regexp old Host ^([a-z0-9-]+)\.
-	redir @host https://{re.old.1}.{$APPS_DOMAIN}{uri} 308
+	redir @host https://{re.old.1}.{$APPS_DOMAIN}{uri} 307
 	respond 404
 }

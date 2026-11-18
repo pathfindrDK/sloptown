@@ -295,7 +295,7 @@ Defaults on first boot: `enabled: false`, all limits `null` (nothing blocks).
 ### 9a. Domains: STUDIO and APPS live under Miira's site
 
 `STUDIO` is `https://studio.apps.miira.dk` and `APPS` is `apps.miira.dk` (until 2026-11:
-`studio.miira-apps.dk` and `*.miira-apps.dk`, now 308-redirected by the edge).
+`studio.miira-apps.dk` and `*.miira-apps.dk`, now 307-redirected by the edge).
 
 Why: a published app runs in a frame (Miira → studio → app) and knows the student by
 a host cookie. On another site that cookie is a third-party cookie, which Safari drops,

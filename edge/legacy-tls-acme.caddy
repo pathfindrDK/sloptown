@@ -1,0 +1,8 @@
+# Old names (legacy-on.caddy) with on-demand certificates, vouched for by
+# cp /edge/tls-ask (SLOPTOWN_LEGACY_*). One per old host that is visited, within
+# the old domain's own Let's Encrypt limit of 50 new certificates per week.
+(legacy_tls) {
+	tls {
+		on_demand
+	}
+}
