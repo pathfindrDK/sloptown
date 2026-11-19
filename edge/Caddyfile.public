@@ -24,6 +24,10 @@ import /etc/caddy/gate-{$GATE_MODE:on}.caddy
 # or tls-file.caddy (the wildcard certificate in /etc/caddy/tls), picked by TLS_MODE.
 import /etc/caddy/tls-{$TLS_MODE:acme}.caddy
 
+# Old names after a domain move (LEGACY_MODE=on, dev-up.sh SLOPTOWN_LEGACY_DOMAIN):
+# 308 redirects only, see legacy-on.caddy.
+import /etc/caddy/legacy-{$LEGACY_MODE:off}.caddy
+
 {$GATE_DOMAIN} {
 	import apex_tls
 	import security_headers

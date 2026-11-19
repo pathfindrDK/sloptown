@@ -1,0 +1,7 @@
+# Old names (legacy-on.caddy) served with the old wildcard certificate, mounted
+# read-only at /etc/caddy/tls-legacy (fullchain.pem, priv.pem). Nothing is
+# requested from Let's Encrypt, so a busy first week after the move cannot run
+# into the 50 certificates/week limit. Once it expires, use legacy-tls-acme.caddy.
+(legacy_tls) {
+	tls /etc/caddy/tls-legacy/fullchain.pem /etc/caddy/tls-legacy/priv.pem
+}

@@ -10,6 +10,15 @@
 	}
 }
 
+# Miira's session cookie must never reach a Vibe: under Miira's own domain an app's
+# server code (written by a teacher or the AI) would otherwise receive a student's
+# Miira login whenever that cookie is scoped to a parent of the apps domain (Miira
+# set it on .miira.dk until the 2026-11 move to .hej.miira.dk; old copies live on in
+# browsers). Used inside reverse_proxy blocks. MIIRA_SESSION_COOKIE: Miira's name.
+(strip_miira_cookie) {
+	header_up Cookie "(^|;\s*){$MIIRA_SESSION_COOKIE:miira_session}=[^;]*" ""
+}
+
 # Studio host: SPA + control plane API.
 (studio) {
 	import security_headers
@@ -35,6 +44,7 @@
 		reverse_proxy @cp {$CP_UPSTREAM} {
 			# SSE streams (/api/projects/*/events) must not be buffered.
 			flush_interval -1
+			import strip_miira_cookie
 		}
 
 		root * /srv/studio
@@ -105,6 +115,7 @@
 			header_up -X-Vibe-View-As
 			# The public test gate's cookie is for the edge only; app code never sees it.
 			header_up Cookie "sloptown_gate=[^;]*;?\s*" ""
+			import strip_miira_cookie
 			flush_interval -1
 		}
 	}

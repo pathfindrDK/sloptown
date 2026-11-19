@@ -139,7 +139,7 @@ function Viewer({ project, onBack }: { project: Project; onBack: () => void }) {
             src={src}
             title={project.title}
             onLoad={() => setLoaded(true)}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
           />
         </div>
       ) : (

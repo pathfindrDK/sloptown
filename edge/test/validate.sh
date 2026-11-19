@@ -51,6 +51,12 @@ if podman run --rm "${ENVS[@]}" -e GATE_MODE=off "$IMG" caddy validate --adapter
 else
   bad "validate Caddyfile.public with GATE_MODE=off"
 fi
+LEGACY=(-e LEGACY_MODE=on -e LEGACY_STUDIO_HOST=studio.old-apps.example -e LEGACY_APPS_DOMAIN=old-apps.example)
+if podman run --rm "${ENVS[@]}" "${LEGACY[@]}" "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+  ok "validate Caddyfile with LEGACY_MODE=on (old names redirect)"
+else
+  bad "validate Caddyfile with LEGACY_MODE=on"
+fi
 
 # Self-signed stand-in for the real wildcard certificate (TLS_MODE=file).
 podman run --rm -v "$TLSDIR:/out:z" docker.io/alpine/openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
@@ -65,6 +71,13 @@ for f in Caddyfile Caddyfile.public; do
     bad "validate $f with TLS_MODE=file"; podman run --rm "${ENVS[@]}" "${TLSV[@]}" "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/$f 2>&1 | tail -5
   fi
 done
+# The switch-day layout: new names on one wildcard, old names on the old one.
+LEGACYV=("${LEGACY[@]}" -e LEGACY_TLS_MODE=file -v "$TLSDIR:/etc/caddy/tls-legacy:ro,z")
+if podman run --rm "${ENVS[@]}" "${TLSV[@]}" "${LEGACYV[@]}" -e GATE_MODE=off "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.public >/dev/null 2>&1; then
+  ok "validate Caddyfile.public with LEGACY_TLS_MODE=file (old names on the old wildcard)"
+else
+  bad "validate Caddyfile.public with LEGACY_TLS_MODE=file"; podman run --rm "${ENVS[@]}" "${TLSV[@]}" "${LEGACYV[@]}" -e GATE_MODE=off "$IMG" caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile.public 2>&1 | tail -5
+fi
 
 echo "== behaviour (Caddyfile.dev against mocks)"
 podman network create $NET >/dev/null

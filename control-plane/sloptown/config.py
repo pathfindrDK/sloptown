@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     apps_scheme: str = "http"
     apps_port: str = ":8080"  # appended to app/preview URLs; "" in prod
     miira_origins: list[str] = ["http://miira.sloptown.localhost:8080"]
+    # Where Vibes lived before a domain move. The edge 307-redirects these hosts to
+    # the new ones (edge/legacy-on.caddy), so the old links teachers handed out keep
+    # working; /edge/tls-ask vouches for them when they use on-demand certificates.
+    legacy_apps_domains: list[str] = []
+    legacy_studio_hosts: list[str] = []
 
     # Database
     database_url: str = "postgresql+asyncpg://sloptown:sloptown@localhost:5432/sloptown"

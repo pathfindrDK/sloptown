@@ -80,11 +80,21 @@ def project_json(p: Project, role: str) -> dict[str, Any]:
     }
 
 
+# Apps live under Miira's own domain, so a host like `unilogin-log-ind-1a2b3c.apps.miira.dk`
+# would look like a real sign-in page. Titles with these words get a neutral host name.
+MISLEADING_SLUG_WORDS = frozenset({
+    "login", "logind", "signin", "unilogin", "mitid", "nemid", "miira", "hej",
+    "password", "adgangskode", "kodeord", "konto", "account", "support", "admin", "sikkerhed", "security",
+})
+
+
 def make_slug(title: str) -> str:
     base = title.lower()
     for a, b in (("æ", "ae"), ("ø", "oe"), ("å", "aa")):
         base = base.replace(a, b)
     base = re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:24].strip("-") or "vibe"
+    if MISLEADING_SLUG_WORDS & set(base.split("-")) or "log-ind" in base or "sign-in" in base:
+        base = "vibe"
     if base.startswith("preview"):
         base = "vibe-" + base
     return f"{base}-{secrets.token_hex(3)}"
