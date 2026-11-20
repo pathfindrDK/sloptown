@@ -649,6 +649,68 @@ def get_upload(uid: str = FastAPIPath(pattern=UPLOAD_ID)) -> dict:
     return _manifest(uid)
 
 
+# The public library: a sent attachment the app can show as it is (image, sound,
+# video, PDF) is also copied into the project's public folder, which is served and
+# published with the app: web/public/ in a webapp (Vite serves it at /<name> and
+# copies it into dist), public/ in a "fra bunden" project (served as public/<name>).
+# Zips and text/code files stay reference material in .uploads/ only.
+PUBLIC_DIRS = {"webapp": "web/public", "scratch": "public"}
+PUBLIC_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico", ".bmp",
+              ".mp3", ".wav", ".ogg", ".oga", ".m4a", ".aac", ".flac", ".opus",
+              ".mp4", ".webm", ".ogv", ".mov", ".m4v", ".pdf"}
+
+
+def _public_name(name: str) -> str:
+    """A name that works in a URL as it is: no spaces or URL syntax, lower-case extension."""
+    p = PurePosixPath(name)
+    stem = "".join(c if c.isalnum() or c in "-_." else "-" for c in p.stem)
+    stem = "-".join(s for s in stem.split("-") if s).strip(".") or "fil"
+    return f"{stem[:80]}{p.suffix.lower()}"
+
+
+def _copy_public(src: Path, name: str) -> str:
+    folder = PUBLIC_DIRS[kind()]
+    root = WORKSPACE.resolve()
+    dest_dir = (WORKSPACE / folder).resolve()
+    if not dest_dir.is_relative_to(root):
+        raise OSError("public folder outside the workspace")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    stem, suffix = PurePosixPath(name).stem, PurePosixPath(name).suffix
+    data = src.read_bytes()
+    for n in range(1, 1000):
+        candidate = name if n == 1 else f"{stem}-{n}{suffix}"
+        target = dest_dir / candidate
+        try:
+            with open(target, "xb") as out:
+                out.write(data)
+            return f"{folder}/{candidate}"
+        except FileExistsError:
+            if target.is_file() and not target.is_symlink() and target.read_bytes() == data:
+                return f"{folder}/{candidate}"  # the same file sent again
+    raise OSError("no free name")
+
+
+@app.post("/uploads/{uid}/public", dependencies=[Depends(auth)])
+def publish_upload(uid: str = FastAPIPath(pattern=UPLOAD_ID)) -> dict:
+    """Copy a sent attachment into the public library (once) → its manifest with `public`.
+
+    `public` is the workspace path, or null for a zip, a type the app can't show as it
+    is, or a public folder that can't be written (the agent then copies it itself)."""
+    m = _manifest(uid)
+    if "public" in m and (m["public"] is None or (WORKSPACE / m["public"]).is_file()):
+        return m
+    public = None
+    if m["kind"] == "file" and PurePosixPath(m["name"]).suffix.lower() in PUBLIC_EXT:
+        src = WORKSPACE / UPLOADS / uid / m["name"]
+        try:
+            public = _copy_public(src, _public_name(m["name"]))
+        except OSError:
+            public = None
+    m["public"] = public
+    (WORKSPACE / UPLOADS / f"{uid}.json").write_text(json.dumps(m))
+    return m
+
+
 @app.get("/events", dependencies=[Depends(auth)])
 async def events() -> StreamingResponse:
     async def gen():

@@ -101,6 +101,17 @@ never committed, published or shown to the teacher, so copy what the project nee
 into its own files. Do not edit or delete anything in `.uploads/`. If an attachment is
 something you can't read (e.g. a Word file), say so and ask for the text or a screenshot.
 
+An image, sound, video or PDF the teacher attaches is also put in the project's
+`public/` folder, and the note says where (e.g. `public/klassens-billede.png`). That
+copy is part of the project and published with it, so use it directly from the page
+(`<img src="public/klassens-billede.png" alt="...">`) instead of copying it again.
+
+You can see the images in a message (PNG, JPEG, GIF, WebP). A teacher often sends a
+sketch, a screenshot, a design proposal or a photo of a circuit: look at it closely
+and build what it shows (layout, texts, colours, which wire goes where), and say
+briefly what you took from it. You can also open an image file with your read tool,
+but only a small one (under 1 MB): a large image is sent with every later request.
+
 ## The project page: index.html (always)
 
 Every project has a page, `index.html` at the root. It is what the teacher sees first

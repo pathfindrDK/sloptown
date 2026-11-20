@@ -76,8 +76,8 @@ export type Part =
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; title: string; status: "running" | "done" | "error"; input?: unknown; output?: string }
   | { type: "image"; mime: string; url: string }
-  /** A file the teacher attached (a .zip is unpacked for the AI). */
-  | { type: "upload"; name: string; fileCount: number };
+  /** A file the teacher attached (a .zip is unpacked for the AI); `public`: its path in the app's public library. */
+  | { type: "upload"; name: string; fileCount: number; public?: string };
 
 export type Message = {
   id: string;
@@ -106,8 +106,20 @@ export type Diff = { sha: string; files: { path: string; status: string; patch: 
 export type LaunchResult = { token: string; user: Me["user"]; fileId: string; fileRole: Role };
 
 export type ImageAttachment = { mime: string; dataUrl: string };
-/** A file stored in the project's hidden `.uploads/` (POST /api/projects/{pid}/uploads); sent by id. */
-export type Upload = { id: string; name: string; kind: "zip" | "file"; dir: string; bytes: number; fileCount: number; files: string[] };
+/**
+ * A file stored in the project's hidden `.uploads/` (POST /api/projects/{pid}/uploads); sent by id.
+ * `public`: where sending the message put it in the app's public library (images, sound, video, PDF).
+ */
+export type Upload = {
+  id: string;
+  name: string;
+  kind: "zip" | "file";
+  dir: string;
+  bytes: number;
+  fileCount: number;
+  files: string[];
+  public?: string | null;
+};
 
 /** A message waiting for the project's AI (the control plane keeps the queue). */
 export type QueueItem = {

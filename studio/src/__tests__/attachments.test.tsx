@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
-import type { QueueItem, Thread, Upload } from "../api/types";
+import type { Message, QueueItem, Thread, Upload } from "../api/types";
 import { ChatPanel } from "../editor/ChatPanel";
 import { QueuedMessages } from "../editor/QueuedMessages";
 import { LocaleProvider } from "../lib/i18n";
@@ -71,6 +71,73 @@ describe("attaching files in the chat", () => {
     fireEvent.change(picker, { target: { files: [new File(["x"], "ødelagt.zip")] } });
     expect(await screen.findByText(/kunne ikke åbnes/)).toBeTruthy();
     expect(screen.queryByText("ødelagt.zip")).toBeNull();
+  });
+
+  it("uploads an image too, so sending it puts it in the app's library", async () => {
+    let finish!: (u: Upload) => void;
+    const up = vi.spyOn(api, "upload").mockReturnValue(new Promise((r) => (finish = r)));
+    const send = vi.spyOn(api, "send").mockResolvedValue({ turnId: "x", queued: false });
+    const picker = renderChat();
+    const png = new File(["\x89PNG"], "Klassens billede.png", { type: "image/png" });
+    fireEvent.change(picker, { target: { files: [png] } });
+    await waitFor(() => expect(up).toHaveBeenCalledWith("p1", png));
+    fireEvent.change(screen.getByPlaceholderText(/Beskriv/), { target: { value: "Vis billedet" } });
+    const sendBtn = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+    expect(sendBtn.disabled).toBe(true);
+    finish({ ...upload, id: "0123456789ab", name: "Klassens billede.png", kind: "file", fileCount: 1 });
+    await waitFor(() => expect(sendBtn.disabled).toBe(false));
+    fireEvent.click(sendBtn);
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith(
+        "t1",
+        "Vis billedet",
+        [{ mime: "image/png", dataUrl: expect.stringMatching(/^data:image\/png;base64,/) }],
+        ["0123456789ab"],
+      ),
+    );
+  });
+
+  it("still sends an image to the AI when its upload fails, and attaches an SVG as a file", async () => {
+    const up = vi.spyOn(api, "upload").mockRejectedValue(new Error("Filen er for stor."));
+    const send = vi.spyOn(api, "send").mockResolvedValue({ turnId: "x", queued: false });
+    const picker = renderChat();
+    fireEvent.change(picker, { target: { files: [new File(["x"], "a.png", { type: "image/png" })] } });
+    expect(await screen.findByText("Filen er for stor.")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/Beskriv/), { target: { value: "Se her" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(send).toHaveBeenCalledWith("t1", "Se her", [expect.objectContaining({ mime: "image/png" })], undefined));
+    up.mockResolvedValue({ ...upload, id: "0123456789ab", name: "logo.svg", kind: "file", fileCount: 1 });
+    fireEvent.change(picker, { target: { files: [new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" })] } });
+    expect(await screen.findByText("logo.svg")).toBeTruthy();
+    expect(document.querySelectorAll(".composer__thumb")).toHaveLength(0);
+  });
+
+  it("marks a sent file that was added to the app", () => {
+    const msg: Message = {
+      id: "m1",
+      threadId: "t1",
+      role: "user",
+      parts: [{ type: "upload", name: "Klassens billede.png", fileCount: 1, public: "web/public/Klassens-billede.png" }],
+      createdAt: "",
+    };
+    const state = { ...initialProjectState, threads: [thread], messages: { t1: [msg] } };
+    render(
+      <LocaleProvider locale="da">
+        <ChatPanel
+          projectId="p1"
+          state={state}
+          dispatch={() => {}}
+          activeThreadId="t1"
+          setActiveThreadId={() => {}}
+          draft={null}
+          clearDraft={() => {}}
+          blocked={false}
+          onBlocked={() => {}}
+        />
+      </LocaleProvider>,
+    );
+    const chip = screen.getByText("Lagt i appen");
+    expect(chip.getAttribute("title")).toContain("web/public/Klassens-billede.png");
   });
 
   it("shows attached files on a waiting message", () => {

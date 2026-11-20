@@ -19,6 +19,11 @@
         "{env:VIBE_AGENT_MODEL}": {
           "name": "Vibe agent",
           "tool_call": true,
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
           "limit": {
             "context": 200000,
             "output": 32000
@@ -27,6 +32,11 @@
         "{env:VIBE_AGENT_SMALL_MODEL}": {
           "name": "Vibe agent (small)",
           "tool_call": true,
+          "attachment": true,
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          },
           "limit": {
             "context": 200000,
             "output": 16000

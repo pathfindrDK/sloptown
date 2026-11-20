@@ -190,8 +190,8 @@ type BudgetStatus = { enabled: boolean; build: BucketStatus; app: BucketStatus }
 | POST | `/api/projects/{pid}/threads` | `{ title? }` → `Thread` (creates an OpenCode session) |
 | PATCH | `/api/threads/{tid}` | `{ title?, archived? }` |
 | GET | `/api/threads/{tid}/messages` | full transcript `Message[]` |
-| POST | `/api/threads/{tid}/messages` | `{ text, images?: [{ mime, dataUrl }], uploads?: string[] }` → `{ turnId, queued: boolean }`. `uploads`: ≤ 5 ids from the upload endpoint, looked up in agentd (`400 unknown_upload` if gone); the agent gets an `[Attachment]` text part per upload (path list), the transcript shows it as `Part { type: "upload", name, fileCount }`, and queue items carry `uploadNames` |
-| POST | `/api/projects/{pid}/uploads?name=` | editor+. Raw body (≤ 25 MB) = one file attached in the chat → agentd `/uploads` → `201 Upload { id, name, kind: "zip"\|"file", dir, bytes, fileCount, files }` (`files` capped at 200). `413 upload_too_large`, `400 bad_upload` (Danish message). Audit `project.upload` |
+| POST | `/api/threads/{tid}/messages` | `{ text, images?: [{ mime, dataUrl }], uploads?: string[] }` → `{ turnId, queued: boolean }`. `images` (≤ 6; png/jpeg/gif/webp, data URL ≤ 8 MB) go to OpenCode as `file` parts the agent model sees (vibe-dev's `opencode.json` declares image input); the studio sends a copy scaled to ≤ 1600 px, since every later model call of the thread resends it through egress (8 MB per request). `uploads`: ≤ 11 ids from the upload endpoint (the studio's ≤ 5 files plus its images, which it uploads too), each sent to agentd `POST /uploads/{id}/public` (an agentd without it: `GET /uploads/{id}`), `400 unknown_upload` if gone; an upload copied into the public library is audited `project.upload.public` `{ id, name, path }`. The agent gets an `[Attachment]` text part per upload (path list, and the library path and URL when there is one), the transcript shows it as `Part { type: "upload", name, fileCount, public? }`, and queue items carry `uploadNames` |
+| POST | `/api/projects/{pid}/uploads?name=` | editor+. Raw body (≤ 25 MB) = one file attached in the chat → agentd `/uploads` → `201 Upload { id, name, kind: "zip"\|"file", dir, bytes, fileCount, files, public: null }` (`files` capped at 200; `public` is set once the message is sent). `413 upload_too_large`, `400 bad_upload` (Danish message). Audit `project.upload` |
 | POST | `/api/threads/{tid}/stop` | abort the running turn |
 | GET | `/api/projects/{pid}/events` | SSE, see below |
 
@@ -203,7 +203,8 @@ type Part =
   | { type: "tool"; tool: string; title: string; status: "running" | "done" | "error";
       input?: unknown; output?: string }
   | { type: "image"; mime: string; url: string }
-  | { type: "upload"; name: string; fileCount: number };  // a file attached in the chat
+  | { type: "upload"; name: string; fileCount: number;     // a file attached in the chat
+      public?: string };  // its path in the app's public library, e.g. "web/public/kort.png"
 type Message = { id: string; threadId: string; role: "user" | "assistant";
   authorName?: string; parts: Part[]; createdAt: string };
 ```
@@ -291,6 +292,15 @@ there, skipping directories, symlinks, absolute and `..` paths and OS junk
 as `.uploads/<id>.json`. Errors `413 { detail: too_large | unpacked_too_large |
 too_many_files }`, `400 { detail: bad_zip | encrypted_zip | empty }`.
 `GET /uploads/{id}` → the manifest, `404` if unknown.
+`POST /uploads/{id}/public` → the manifest with `public`: when its message is sent, a
+single file the app can show as it is (image, sound, video, PDF by extension; never a
+zip or text/code) is copied once into the **public library**, `web/public/` in a webapp
+(Vite serves it at `/<name>` and copies it into `dist`) or `public/` in a "fra bunden"
+project; `public` is that workspace path, or `null`. The name is made URL-safe
+(`Klassens billede.PNG` → `Klassens-billede.png`); a different file of the same name
+gets `-2`, `-3`, …, the same bytes reuse the file. The copy is an ordinary project file
+(listed, committed with the turn, published); a public folder that resolves outside the
+workspace or can't be written gives `null`. Repeat calls return the stored result.
 `GET /events` (SSE `files.changed`), `GET /health`.
 
 ### Edge endpoints

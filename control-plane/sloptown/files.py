@@ -185,7 +185,8 @@ UPLOAD_ERRORS = {
 
 def upload_summary(m: dict[str, Any]) -> dict[str, Any]:
     """The part of an agentd upload manifest the studio and the turn keep (file list capped)."""
-    return {k: m[k] for k in ("id", "name", "kind", "dir", "bytes", "fileCount")} | {"files": m["files"][:200]}
+    return ({k: m[k] for k in ("id", "name", "kind", "dir", "bytes", "fileCount")}
+            | {"files": m["files"][:200], "public": m.get("public")})
 
 
 @router.post("/api/projects/{pid}/uploads", status_code=201)
@@ -213,17 +214,32 @@ async def upload(pid: str, name: str, principal: CurrentPrincipal, db: Db, reque
     return manifest
 
 
-async def upload_manifests(project: Project, ids: list[str]) -> list[dict[str, Any]]:
-    """Look up attached uploads by id (from the message body) in the project's container."""
+def _detail(r: httpx.Response) -> Any:
+    try:
+        return r.json().get("detail")
+    except (ValueError, AttributeError):
+        return None
+
+
+async def upload_manifests(db: Any, actor_sub: str, project: Project, ids: list[str]) -> list[dict[str, Any]]:
+    """The attached uploads of a message being sent (ids from its body), each copied into the
+    project's public library when the app can show it as it is (agentd decides, once)."""
     if not ids:
         return []
     out = []
     async with await agentd(project) as client:
         for uid in ids:
-            r = await client.get(f"/uploads/{uid}")
+            r = await client.post(f"/uploads/{uid}/public")
+            if r.status_code in (404, 405) and _detail(r) != "unknown upload":
+                r = await client.get(f"/uploads/{uid}")  # an agentd from before the library
             if r.status_code == 404:
                 raise ApiError(400, "unknown_upload", "En vedhæftet fil findes ikke længere. Vedhæft den igen.")
-            out.append(upload_summary(raise_for(r, "Upload")))
+            m = upload_summary(raise_for(r, "Upload"))
+            if m["public"]:
+                audit(db, "project.upload.public", actor_sub=actor_sub, project_id=project.id,
+                      details={"id": m["id"], "name": m["name"], "path": m["public"]})
+            out.append(m)
+    await db.commit()
     return out
 
 

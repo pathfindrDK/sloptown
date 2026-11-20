@@ -307,8 +307,8 @@ async def test_zip_attachment_is_uploaded_audited_and_described_to_the_agent(env
     manifest = {"id": "abcdef012345", "name": "Professor.zip", "kind": "zip", "dir": ".uploads/abcdef012345",
                 "bytes": 1234, "fileCount": 2, "files": ["index.html", "app.js"]}
     put = env.mock.post(f"{ad}/uploads").respond(json=manifest)
-    env.mock.get(f"{ad}/uploads/abcdef012345").respond(json=manifest)
-    env.mock.get(f"{ad}/uploads/000000000000").respond(404, json={"detail": "unknown upload"})
+    env.mock.post(f"{ad}/uploads/abcdef012345/public").respond(json=manifest | {"public": None})
+    env.mock.post(f"{ad}/uploads/000000000000/public").respond(404, json={"detail": "unknown upload"})
 
     r = await env.client.post("/api/projects/t1/uploads?name=Professor.zip", content=b"PK\x03\x04zip", headers=owner)
     assert r.status_code == 201 and r.json()["id"] == "abcdef012345"
@@ -326,10 +326,54 @@ async def test_zip_attachment_is_uploaded_audited_and_described_to_the_agent(env
     await until(lambda: len(oc.prompts) == 1)
     note = oc.prompts[0]["parts"][1]
     assert ".uploads/abcdef012345/index.html" in note["text"] and "read-only reference" in note["text"]
+    assert "public library" not in note["text"]
     assert map_part(note) == {"type": "upload", "name": "Professor.zip", "fileCount": 2}
     turn = await env.db.get(Turn, r.json()["turnId"])
     await env.db.refresh(turn)
     assert turn.uploads[0]["name"] == "Professor.zip"
+    oc.gates[0].set()
+    await turns.wait_idle("t1")
+
+
+async def test_sent_image_goes_into_the_public_library(env):
+    from sqlalchemy import select
+
+    from sloptown.models import AuditLog
+    from sloptown.threads import map_part, turns
+
+    owner, oc, thread = await setup(env)
+    ad = dev_base("t1", 4097)
+    manifest = {"id": "0123456789ab", "name": "Klassens billede.png", "kind": "file", "dir": ".uploads/0123456789ab",
+                "bytes": 5, "fileCount": 1, "files": ["Klassens billede.png"], "public": "web/public/Klassens-billede.png"}
+    pub = env.mock.post(f"{ad}/uploads/0123456789ab/public").respond(json=manifest)
+    r = await env.client.post(f"/api/threads/{thread['id']}/messages",
+                              json={"text": "Vis billedet på forsiden", "uploads": ["0123456789ab"]}, headers=owner)
+    assert r.status_code == 202 and pub.called
+    await until(lambda: len(oc.prompts) == 1)
+    note = oc.prompts[0]["parts"][1]
+    assert "`web/public/Klassens-billede.png`" in note["text"] and '<img src="/Klassens-billede.png">' in note["text"]
+    assert map_part(note) == {"type": "upload", "name": "Klassens billede.png", "fileCount": 1,
+                              "public": "web/public/Klassens-billede.png"}
+    rows = (await env.db.execute(select(AuditLog).where(AuditLog.action == "project.upload.public"))).scalars().all()
+    assert len(rows) == 1 and rows[0].details["path"] == "web/public/Klassens-billede.png"
+    oc.gates[0].set()
+    await turns.wait_idle("t1")
+
+
+async def test_upload_from_an_agentd_without_the_library(env):
+    from sloptown.threads import turns
+
+    owner, oc, thread = await setup(env)
+    ad = dev_base("t1", 4097)
+    manifest = {"id": "0123456789ab", "name": "lyd.mp3", "kind": "file", "dir": ".uploads/0123456789ab",
+                "bytes": 3, "fileCount": 1, "files": ["lyd.mp3"]}
+    env.mock.post(f"{ad}/uploads/0123456789ab/public").respond(404, json={"detail": "Not Found"})
+    env.mock.get(f"{ad}/uploads/0123456789ab").respond(json=manifest)
+    r = await env.client.post(f"/api/threads/{thread['id']}/messages",
+                              json={"text": "Brug lyden", "uploads": ["0123456789ab"]}, headers=owner)
+    assert r.status_code == 202
+    await until(lambda: len(oc.prompts) == 1)
+    assert "public library" not in oc.prompts[0]["parts"][1]["text"]
     oc.gates[0].set()
     await turns.wait_idle("t1")
 

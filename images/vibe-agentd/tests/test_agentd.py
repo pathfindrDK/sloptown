@@ -318,3 +318,45 @@ def test_upload_plain_file_and_errors(client, tmp_path, monkeypatch):
     # Failed uploads leave nothing behind.
     assert sorted(p.name for p in (tmp_path / ".uploads").iterdir()) == sorted([m["id"], f"{m['id']}.json"])
     assert TestClient(agentd.app).post("/uploads", params={"name": "a.txt"}, content=b"x").status_code == 401
+
+
+def test_sent_upload_goes_into_the_public_library(client, tmp_path):
+    m = client.post("/uploads", params={"name": "Klassens billede (2).PNG"}, content=b"\x89PNGa").json()
+    r = client.post(f"/uploads/{m['id']}/public")
+    assert r.status_code == 200, r.text
+    assert r.json()["public"] == "web/public/Klassens-billede-2.png"
+    assert (tmp_path / "web/public/Klassens-billede-2.png").read_bytes() == b"\x89PNGa"
+    # Once only: sending the message again (or from the queue) doesn't copy it twice.
+    assert client.post(f"/uploads/{m['id']}/public").json()["public"] == "web/public/Klassens-billede-2.png"
+    assert client.get(f"/uploads/{m['id']}").json()["public"] == "web/public/Klassens-billede-2.png"
+    assert sorted(p.name for p in (tmp_path / "web/public").iterdir()) == ["Klassens-billede-2.png"]
+    # Visible in the studio and committed with the turn, unlike .uploads/.
+    assert any(f["path"] == "web/public/Klassens-billede-2.png" for f in client.get("/files").json()["files"])
+    assert client.post("/commit", json={"message": "turn", "trailers": {}}).json()["sha"]
+    # Another file with the same name gets its own; the same bytes reuse the file.
+    other = client.post("/uploads", params={"name": "Klassens billede (2).png"}, content=b"\x89PNGb").json()
+    assert client.post(f"/uploads/{other['id']}/public").json()["public"] == "web/public/Klassens-billede-2-2.png"
+    same = client.post("/uploads", params={"name": "Klassens billede (2).png"}, content=b"\x89PNGa").json()
+    assert client.post(f"/uploads/{same['id']}/public").json()["public"] == "web/public/Klassens-billede-2.png"
+
+
+def test_public_library_skips_zips_and_text_and_follows_the_kind(client, tmp_path):
+    z = client.post("/uploads", params={"name": "billeder.zip"}, content=_zip({"a.png": b"x"})).json()
+    assert client.post(f"/uploads/{z['id']}/public").json()["public"] is None
+    t = client.post("/uploads", params={"name": "elevliste.csv"}, content=b"navn\nLine").json()
+    assert client.post(f"/uploads/{t['id']}/public").json()["public"] is None
+    assert not (tmp_path / "web" / "public").exists()
+    assert client.post("/uploads/000000000000/public").status_code == 404
+    (tmp_path / ".vibe-kind").write_text("scratch\n")
+    s = client.post("/uploads", params={"name": "lyd.MP3"}, content=b"ID3").json()
+    assert client.post(f"/uploads/{s['id']}/public").json()["public"] == "public/lyd.mp3"
+    assert (tmp_path / "public" / "lyd.mp3").read_bytes() == b"ID3"
+    # A public folder that points out of the workspace is never written through.
+    (tmp_path / "public" / "lyd.mp3").unlink()
+    (tmp_path / "public").rmdir()
+    outside = tmp_path.parent / (tmp_path.name + "-outside")
+    outside.mkdir()
+    (tmp_path / "public").symlink_to(outside)
+    v = client.post("/uploads", params={"name": "film.mp4"}, content=b"mp4").json()
+    assert client.post(f"/uploads/{v['id']}/public").json()["public"] is None
+    assert list(outside.iterdir()) == []

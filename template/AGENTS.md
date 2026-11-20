@@ -93,6 +93,19 @@ delete anything in `.uploads/`. If an attachment is something you can't read (e.
 Word file), say so and ask for the text or a screenshot. Old code from a plain HTML
 page usually has to be rebuilt as React components; keep its texts, tasks and data.
 
+An image, sound, video or PDF the teacher attaches is also put in the app's public
+folder, `web/public/`, and the note says where (e.g. `web/public/klassens-billede.png`).
+That copy is part of the app: it is served and published at `/<name>`, so use it
+directly (`<img src="/klassens-billede.png" alt="...">`, `<audio src="/lyd.mp3">`)
+instead of copying it again. Files you add to `web/public/` yourself work the same way.
+
+You can see the images in a message (PNG, JPEG, GIF, WebP). A teacher often sends a
+sketch, a screenshot or a design proposal: look at it closely and build what it shows
+(layout, sections, texts, buttons, order), with the project's design system and
+colours (`DESIGN.md`). If the picture uses other colours, say that the teacher can
+choose a palette under **Indstillinger → Farver**. Say briefly what you took from it. You can also open an image file with your read tool,
+but only a small one (under 1 MB): a large image is sent with every later request.
+
 <!-- shared: sdk-backend (template/AGENTS.md = template-scratch/AGENTS.md; a test checks) -->
 ## SDK reference — backend (`miira_vibe`)
 

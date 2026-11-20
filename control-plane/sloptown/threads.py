@@ -60,7 +60,10 @@ def map_part(part: dict[str, Any]) -> dict[str, Any] | None:
     if t == "text":
         upload = (part.get("metadata") or {}).get("vibeUpload")
         if upload:
-            return {"type": "upload", "name": upload.get("name", ""), "fileCount": upload.get("fileCount", 0)}
+            out = {"type": "upload", "name": upload.get("name", ""), "fileCount": upload.get("fileCount", 0)}
+            if upload.get("public"):
+                out["public"] = upload["public"]
+            return out
         if part.get("synthetic") or part.get("ignored"):
             return None
         return {"type": "text", "text": part.get("text", "")}
@@ -93,6 +96,12 @@ def upload_note(up: dict[str, Any]) -> str:
         lines.append(f"- ... and {up['fileCount'] - len(up['files'])} more (list them with ls -R)")
     lines.append("This folder is read-only reference material and is not part of the project: "
                  "copy or rewrite what the project needs into the project's own files.")
+    public = up.get("public")
+    if public:
+        url = "/" + public.removeprefix("web/public/") if public.startswith("web/public/") else public
+        lines.append(f"The file is also in the project's public library as `{public}`: it is part of the "
+                     f"project and published with it, so the page can show or use it directly at "
+                     f"`{url}` (e.g. `<img src=\"{url}\">`). Don't copy it again.")
     return "\n".join(lines)
 
 
@@ -412,7 +421,8 @@ class TurnManager:
             parts.append({"type": "file", "mime": img["mime"], "url": img["dataUrl"], "filename": "billede"})
         for up in turn.uploads or []:
             parts.append({"type": "text", "text": upload_note(up),
-                          "metadata": {"vibeUpload": {"name": up["name"], "fileCount": up["fileCount"]}}})
+                          "metadata": {"vibeUpload": {"name": up["name"], "fileCount": up["fileCount"],
+                                                      "public": up.get("public")}}})
         part_index: dict[str, list[str]] = {}
         seen_messages: set[str] = set()
         status = "done"
@@ -571,8 +581,8 @@ class ImageIn(BaseModel):
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     images: list[ImageIn] = Field(default_factory=list, max_length=6)
-    # Ids from POST /api/projects/{pid}/uploads.
-    uploads: list[Annotated[str, StringConstraints(pattern=UPLOAD_ID_RE)]] = Field(default_factory=list, max_length=5)
+    # Ids from POST /api/projects/{pid}/uploads: up to 5 files and the images (also uploaded).
+    uploads: list[Annotated[str, StringConstraints(pattern=UPLOAD_ID_RE)]] = Field(default_factory=list, max_length=11)
 
 
 @router.post("/api/threads/{tid}/messages", status_code=202)
@@ -583,7 +593,7 @@ async def post_message(tid: str, body: MessageIn, principal: CurrentPrincipal, d
     for img in body.images:
         if not img.dataUrl.startswith(f"data:{img.mime};base64,"):
             raise ApiError(400, "bad_image", "Billedet skal være en data-URL")
-    uploads = await upload_manifests(project, list(dict.fromkeys(body.uploads)))
+    uploads = await upload_manifests(db, principal.sub, project, list(dict.fromkeys(body.uploads)))
     return await turns.submit(db, project, thread, principal.user, body.text, [i.model_dump() for i in body.images],
                               uploads=uploads)
 

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import { LoadingTiles } from "../components/Loading";
+import { imageForAi } from "../lib/imageForAi";
 import { QueuedMessages } from "./QueuedMessages";
 import { ApiError, type ImageAttachment, type Message, type Part, type QueueItem, type Thread, type Upload } from "../api/types";
 import type { Action, ProjectState } from "../lib/projectState";
@@ -31,6 +32,11 @@ export const UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const MAX_UPLOADS = 5;
 const ATTACH_ACCEPT = "image/*,.zip,application/zip,.txt,.md,.csv,.json,.html,.htm,.css,.js,.ts,.tsx,.py,.ino,.svg,.xml";
 type Attached = { key: string; name: string; upload?: Upload };
+// An image goes to the AI as a data URL and is also uploaded, so sending it puts it in the
+// app's public library; one that fails to upload still goes to the AI.
+type AttachedImage = ImageAttachment & { key: string; upload?: Upload; failed?: boolean };
+// The image types the AI can look at; other images (e.g. SVG) are attached as files.
+const VISION_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 type Props = {
   projectId: string;
@@ -233,7 +239,7 @@ function Conversation({
 }) {
   const t = useT();
   const [text, setText] = useState("");
-  const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [images, setImages] = useState<AttachedImage[]>([]);
   const [attached, setAttached] = useState<Attached[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -265,7 +271,7 @@ function Conversation({
   const otherRunning = !!state.runningThreadId && !running;
   const busy = !!state.runningThreadId;
 
-  const uploading = attached.some((a) => !a.upload);
+  const uploading = attached.some((a) => !a.upload) || images.some((i) => !i.upload && !i.failed);
 
   const uploadFile = async (f: File, key: string) => {
     try {
@@ -277,10 +283,21 @@ function Conversation({
     }
   };
 
+  const uploadImage = async (f: File, key: string) => {
+    try {
+      const up = await api.upload(projectId, f);
+      setImages((cur) => cur.map((i) => (i.key === key ? { ...i, upload: up } : i)));
+    } catch (e) {
+      setImages((cur) => cur.map((i) => (i.key === key ? { ...i, failed: true } : i)));
+      setError(e instanceof Error ? e.message : t("common.error"));
+    }
+  };
+
   const addFiles = async (files: FileList | File[]) => {
     setError(null);
     const all = Array.from(files);
-    const others = all.filter((f) => !f.type.startsWith("image/"));
+    const isImage = (f: File) => VISION_TYPES.includes(f.type);
+    const others = all.filter((f) => !isImage(f));
     const room = MAX_UPLOADS - attached.length;
     if (others.length > room) setError(t("chat.upload.tooMany"));
     for (const f of others.slice(0, Math.max(0, room))) {
@@ -292,19 +309,12 @@ function Conversation({
       setAttached((cur) => [...cur, { key, name: f.name }]);
       void uploadFile(f, key);
     }
-    const imgs = all.filter((f) => f.type.startsWith("image/")).slice(0, 4);
-    const read = await Promise.all(
-      imgs.map(
-        (f) =>
-          new Promise<ImageAttachment>((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve({ mime: f.type, dataUrl: String(r.result) });
-            r.onerror = reject;
-            r.readAsDataURL(f);
-          }),
-      ),
+    const imgs = all.filter(isImage).slice(0, Math.max(0, 4 - images.length));
+    const read: AttachedImage[] = await Promise.all(
+      imgs.map(async (f) => ({ key: `${Date.now()}-${Math.random()}`, ...(await imageForAi(f)) })),
     );
     setImages((cur) => [...cur, ...read].slice(0, 4));
+    read.forEach((img, i) => void uploadImage(imgs[i], img.key));
   };
 
   const send = async () => {
@@ -315,8 +325,9 @@ function Conversation({
     try {
       const th = thread ?? (await createThread(text.trim()));
       // While the AI works the control plane queues the message (and keeps it if the page closes).
-      const ids = attached.flatMap((a) => (a.upload ? [a.upload.id] : []));
-      await api.send(th.id, text.trim(), images.length ? images : undefined, ids.length ? ids : undefined);
+      const ids = [...images, ...attached].flatMap((a) => (a.upload ? [a.upload.id] : []));
+      const sent = images.map(({ mime, dataUrl }) => ({ mime, dataUrl }));
+      await api.send(th.id, text.trim(), sent.length ? sent : undefined, ids.length ? ids : undefined);
       setText("");
       setImages([]);
       setAttached([]);
@@ -369,14 +380,19 @@ function Conversation({
         >
           {images.length > 0 && (
             <div className="composer__images">
-              {images.map((img, i) => (
-                <div className="composer__thumb" key={i}>
+              {images.map((img) => (
+                <div className="composer__thumb" key={img.key}>
                   <img src={img.dataUrl} alt="" />
+                  {!img.upload && !img.failed && (
+                    <span className="composer__thumb-busy" aria-label={t("chat.upload.uploading")}>
+                      <LoadingTiles size="xs" />
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="icon-btn"
                     aria-label={t("common.close")}
-                    onClick={() => setImages((xs) => xs.filter((_, j) => j !== i))}
+                    onClick={() => setImages((xs) => xs.filter((x) => x.key !== img.key))}
                   >
                     <X size={12} />
                   </button>
@@ -544,6 +560,11 @@ function UploadChip({ part }: { part: Extract<Part, { type: "upload" }> }) {
       {zip ? <FileArchive size={14} /> : <Paperclip size={14} />}
       <span className="file-chip__name">{part.name}</span>
       {zip && <span className="file-chip__meta">{`${part.fileCount} ${t("chat.upload.files")}`}</span>}
+      {part.public && (
+        <span className="file-chip__meta" title={t("chat.upload.publicTitle").replace("{path}", part.public)}>
+          {t("chat.upload.public")}
+        </span>
+      )}
     </div>
   );
 }
