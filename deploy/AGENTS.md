@@ -108,7 +108,7 @@ systemctl --user start sloptown-nightly.service     # re-run now
 ### Recycle the warm pool / roll runtimes
 
 ```bash
-podman exec sloptown-cp python - <<'PY'
+podman exec -i sloptown-cp python - <<'PY'
 import json, os, urllib.request
 req = urllib.request.Request("http://127.0.0.1:8000/internal/images/rolled", method="POST",
     data=json.dumps({"devImage": os.environ["SLOPTOWN_DEV_IMAGE"], "runtimeImage": os.environ["SLOPTOWN_RUNTIME_IMAGE"], "tag": "manual"}).encode(),
