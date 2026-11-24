@@ -21,8 +21,13 @@
           "tool_call": true,
           "attachment": true,
           "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           },
           "limit": {
             "context": 200000,
@@ -34,8 +39,13 @@
           "tool_call": true,
           "attachment": true,
           "modalities": {
-            "input": ["text", "image"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
           },
           "limit": {
             "context": 200000,
@@ -45,9 +55,25 @@
       }
     }
   },
+  "mcp": {
+    "web": {
+      "type": "local",
+      "command": [
+        "/usr/local/bin/python3",
+        "/usr/local/bin/vibe-search-mcp"
+      ],
+      "environment": {
+        "VIBE_PLATFORM_URL": "{env:VIBE_PLATFORM_URL}",
+        "VIBE_PROJECT_TOKEN": "{env:VIBE_PROJECT_TOKEN}"
+      },
+      "enabled": true,
+      "timeout": 30000
+    }
+  },
   "permission": {
     "edit": "allow",
     "bash": "allow",
-    "webfetch": "deny"
+    "webfetch": "deny",
+    "websearch": "deny"
   }
 }

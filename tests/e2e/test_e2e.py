@@ -328,6 +328,37 @@ def test_05_chat_turn_commits_and_streams():
     assert S["marker"] in S["preview"].get(f"{S['preview_origin']}/src/App.tsx").text
 
 
+def test_05b_agent_searches_the_web():
+    """The agent's web_search tool (MCP in vibe-dev) -> egress /search/web -> (fake) Brave."""
+    st, pid = S["studio"], S["fid"]
+    finished: list[dict] = []
+
+    def listen() -> None:
+        with st.stream("GET", f"{STUDIO}/api/projects/{pid}/events", timeout=TURN_TIMEOUT + 30) as r:
+            name = None
+            for line in r.iter_lines():
+                if line.startswith("event:"):
+                    name = line[6:].strip()
+                elif line.startswith("data:") and name == "turn.finished":
+                    finished.append(json.loads(line[5:]))
+                    return
+
+    t = threading.Thread(target=listen, daemon=True)
+    t.start()
+    time.sleep(1)
+    marker = f"E2E-SEARCH-{uuid.uuid4().hex[:8]}"
+    r = ok(st.post(f"{STUDIO}/api/threads/{S['thread']}/messages", json={"text": f"Søg efter {marker}"}), 202)
+    assert r["queued"] is False
+    t.join(TURN_TIMEOUT)
+    assert finished and finished[0]["status"] == "done", finished
+    msgs = ok(st.get(f"{STUDIO}/api/threads/{S['thread']}/messages"))
+    parts = [p for m in msgs for p in m.get("parts", [])
+             if p.get("type") == "tool" and "search" in p.get("tool", "") and marker in json.dumps(p.get("input"))]
+    assert parts, [p.get("tool") for m in msgs for p in m.get("parts", []) if p.get("type") == "tool"]
+    assert parts[-1]["status"] == "done", parts[-1]
+    assert f"Fundet: {marker}" in parts[-1]["output"] and "https://example.org/e2e" in parts[-1]["output"], parts[-1]
+
+
 # --- 6-7: publish and the app as owner ----------------------------------------------------
 
 

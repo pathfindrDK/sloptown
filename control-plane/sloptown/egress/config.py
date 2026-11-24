@@ -18,6 +18,10 @@ KEYS = (
     "EGRESS_PROXY_PORT",
     "EGRESS_HOST_RPM_PER_PROJECT",
     "EGRESS_HOST_RPM_GLOBAL",
+    "SEARCH_RPM_PER_PROJECT",
+    "SEARCH_RPM_GLOBAL",
+    "SEARCH_RPM_PER_APP",
+    "SEARCH_TOKENS_PER_CALL",
 )
 
 
@@ -54,6 +58,14 @@ class EgressConfig:
     # Per external host, so a Vibe (or all of them together) can't flood one service.
     host_rpm_per_project: int = 60
     host_rpm_global: int = 300
+    # Web searches (/search/web, Brave) per minute: per Vibe, and across all Vibes
+    # (keep the global one within the Brave plan's rate).
+    search_rpm_per_project: int = 20
+    search_rpm_global: int = 60
+    # Searches per minute by one published app (all its users together), and what one
+    # app search costs on the app's weekly AI budget, in tokens.
+    search_rpm_per_app: int = 30
+    search_tokens_per_call: int = 2000
 
     @classmethod
     def load(cls) -> "EgressConfig":
@@ -73,6 +85,10 @@ class EgressConfig:
             "EGRESS_PROXY_PORT": ("proxy_port", int),
             "EGRESS_HOST_RPM_PER_PROJECT": ("host_rpm_per_project", int),
             "EGRESS_HOST_RPM_GLOBAL": ("host_rpm_global", int),
+            "SEARCH_RPM_PER_PROJECT": ("search_rpm_per_project", int),
+            "SEARCH_RPM_GLOBAL": ("search_rpm_global", int),
+            "SEARCH_RPM_PER_APP": ("search_rpm_per_app", int),
+            "SEARCH_TOKENS_PER_CALL": ("search_tokens_per_call", int),
         }
         for key, (attr, typ) in conv.items():
             if raw.get(key):
@@ -94,6 +110,10 @@ class EgressConfig:
             "proxyPort": d["proxy_port"],
             "hostRpmPerProject": d["host_rpm_per_project"],
             "hostRpmGlobal": d["host_rpm_global"],
+            "searchRpmPerProject": d["search_rpm_per_project"],
+            "searchRpmGlobal": d["search_rpm_global"],
+            "searchRpmPerApp": d["search_rpm_per_app"],
+            "searchTokensPerCall": d["search_tokens_per_call"],
             "source": "env",
             "editable": False,
         }

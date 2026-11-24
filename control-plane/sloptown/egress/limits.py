@@ -44,7 +44,7 @@ class SlidingWindow:
 class Throttled(Exception):
     def __init__(self, reason: str):
         super().__init__(reason)
-        self.reason = reason  # rate|concurrency|inference_rpm|inference_rpm_global|host_rpm|host_rpm_global
+        self.reason = reason  # rate|concurrency|inference_rpm|inference_rpm_global|host_rpm|host_rpm_global|search_rpm|search_rpm_global
 
 
 class Limiter:
@@ -55,6 +55,9 @@ class Limiter:
         self._rpm_global = SlidingWindow(cfg.inference_rpm_global)
         self._host_rpm: dict[tuple[str, str], SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.host_rpm_per_project))
         self._host_rpm_global: dict[str, SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.host_rpm_global))
+        self._search_rpm: dict[str, SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.search_rpm_per_project))
+        self._search_rpm_app: dict[str, SlidingWindow] = defaultdict(lambda: SlidingWindow(cfg.search_rpm_per_app))
+        self._search_rpm_global = SlidingWindow(cfg.search_rpm_global)
         self._open: dict[str, int] = defaultdict(int)
 
     def check_rate(self, project_id: str) -> None:
@@ -74,6 +77,13 @@ class Limiter:
             raise Throttled("inference_rpm")
         if not self._rpm_global.take():
             raise Throttled("inference_rpm_global")
+
+    def check_search(self, project_id: str, app: bool = False) -> None:
+        """Searches per minute: the agent's and the published app's own window, then all together."""
+        if not (self._search_rpm_app if app else self._search_rpm)[project_id].take():
+            raise Throttled("search_rpm")
+        if not self._search_rpm_global.take():
+            raise Throttled("search_rpm_global")
 
     @asynccontextmanager
     async def slot(self, project_id: str):

@@ -29,7 +29,8 @@ browser ──/api/_vibe/*──▶ app backend (miira_vibe.setup) ──Bearer 
 | `python/miira_vibe/members.py` | `list/get/fetch` (15 s cache), `sync(conn)` into SQLite `members`, `on_members_changed`, SSE watcher, `subscribe()` fan-out |
 | `python/miira_vibe/ai.py` | `chat`, `stream` (OpenAI chat completions via `OPENAI_BASE_URL`), `BudgetExceeded(retry_at)` |
 | `python/miira_vibe/db.py` | `connect()`, `session()` for `/data/app.sqlite` (`VIBE_DB_PATH`) |
-| `python/miira_vibe/router.py` | `setup(app)`: mounts `/_vibe/{me,members,members/events,ai/chat}` and runs the members watcher in the app lifespan |
+| `python/miira_vibe/search.py` | `web(query, …)` → `[SearchResult]` via egress `GET /search/web` (project token, `X-Vibe-User`); `SearchError`; budget 429 → `ai.BudgetExceeded`. Since 1.1 |
+| `python/miira_vibe/router.py` | `setup(app)`: mounts `/_vibe/{me,members,members/events,ai/chat,search}` and runs the members watcher in the app lifespan (`search` is mounted even with `ai_route=False`) |
 | `python/miira_vibe/runtime.py` | `miira_vibe.runtime:app` for vibe-runtime: `/healthz`, `/api` → `api/main.py`, SPA from `web/dist` (`VIBE_APP_DIR`) |
 | `python/miira_vibe/_env.py` | all env lookups (read at call time) |
 | `python/tests/` | pytest, respx-mocked platform |

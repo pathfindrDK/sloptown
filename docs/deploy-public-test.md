@@ -47,6 +47,9 @@ deploy/dev-up.sh --down                              # stop (data volumes are ke
   SLOPTOWN_OPENAI_BASE_URL=http://sloptown-fake-openai:8300/v1 SLOPTOWN_OPENAI_API_KEY=sk-fake \
     deploy/dev-up.sh --public miira-apps.dk --no-build
   ```
+- Web search for the agent (`web_search`): put `SLOPTOWN_BRAVE_API_KEY=<Brave Search
+  API key>` in `deploy/.public.env`; `dev-up.sh` passes it to the egress. Without it
+  the tool answers "Websøgning er ikke slået til".
 
 ## Using it
 

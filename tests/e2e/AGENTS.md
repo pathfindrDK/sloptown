@@ -6,15 +6,15 @@ with a scripted fake OpenAI so no real key or tokens are needed.
 | File | What |
 |---|---|
 | `run.sh` | starts `sloptown-fake-openai`, runs `deploy/dev-up.sh` (builds all images unless `--no-build`), then `test_e2e.py`; prints platform and vibe-dev logs on failure |
-| `test_e2e.py` | 11 ordered steps over HTTP through the edge: Miira file + launch token → studio session/terms/project from the warm pool → files/history → preview → a real OpenCode turn (commit, SSE, metering) → publish (vibe-build) → app as owner → student via OIDC before/after a class share (webhook, members) → restore → admin API usage and hard limit → a "fra bunden" (scratch) project is never served |
-| `fake_openai.py` | stdlib OpenAI chat-completions stand-in; writes `web/src/App.tsx` with the marker from the prompt using OpenCode's `write` tool or, for GPT models (which get `apply_patch`), `bash` |
+| `test_e2e.py` | 12 ordered steps over HTTP through the edge: Miira file + launch token → studio session/terms/project from the warm pool → files/history → preview → a real OpenCode turn (commit, SSE, metering) → the agent's `web_search` tool through the egress to the fake Brave (`test_05b`) → publish (vibe-build) → app as owner → student via OIDC before/after a class share (webhook, members) → restore → admin API usage and hard limit → a "fra bunden" (scratch) project is never served |
+| `fake_openai.py` | stdlib OpenAI chat-completions stand-in; writes `web/src/App.tsx` with the marker from the prompt using OpenCode's `write` tool or, for GPT models (which get `apply_patch`), `bash`; for an `E2E-SEARCH-<x>` marker it calls the agent's `web_search` tool instead. Also a fake Brave Search API at `/brave/res/v1/web/search` (`run.sh` points `SLOPTOWN_BRAVE_SEARCH_URL` there) |
 | `browser.sh` / `browser.cjs` | Playwright: the real studio inside fake Miira's iframe (drive:init handshake, terms, editor, preview, code tab); fails on page errors or 5xx; screenshots in `out/` |
 | `browser_miira3.cjs` | Playwright against the **real** Miira (miira3), run by `browser.sh` when `E2E_MIIRA_ORIGIN` is set: Opret ny offers Vibe to a lærer, `/drive/new` deep link, studio + preview inside Miira's iframe, Del opens Miira's share dialog, signed-out standalone studio → Miira login → authorize resumed, an elev opens a class-shared Vibe as viewer, System → Vibe (rollout + budgets). `E2E_BROWSER=chromium\|firefox\|webkit` |
 | `conftest.py` | exposes per-test reports so later steps skip after a failure |
 | `public.sh` | both tests against the public test deployment (`E2E_DOMAIN`, gate login, real DNS/TLS) |
 
 ```bash
-tests/e2e/run.sh                 # full: build images, start stack, run the 11 steps (~6 min)
+tests/e2e/run.sh                 # full: build images, start stack, run the 12 steps (~6 min)
 tests/e2e/run.sh --no-build      # reuse localhost/sloptown/*:dev images (~1 min)
 E2E_PYTEST_ARGS="-x -k publish" tests/e2e/run.sh --no-build
 tests/e2e/browser.sh             # needs the stack up

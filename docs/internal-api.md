@@ -10,7 +10,7 @@ interface changes.
 |---|---|---|---|
 | `edge` (Caddy) | container `sloptown-edge` | :80/:443 (dev :8080) | TLS, routing, `forward_auth` |
 | `control-plane` | container `sloptown-cp` | :8000 | FastAPI, `sloptown.app:app` |
-| `egress` | container `sloptown-egress` | :8200 (ASGI), :8201 (CONNECT/forward proxy) | inference + platform API on :8200 (`sloptown.egress.app:app`); raw forward proxy for allowlisted hosts on :8201, started by the same process |
+| `egress` | container `sloptown-egress` | :8200 (ASGI), :8201 (CONNECT/forward proxy) | inference + platform API + the build agent's web search on :8200 (`sloptown.egress.app:app`); raw forward proxy for allowlisted hosts on :8201, started by the same process |
 | `postgres` | container `sloptown-db` | :5432 | database `sloptown` |
 | `fake-miira` | container `sloptown-fake-miira` (dev) | :8100 | `fake_miira.app:app` |
 | `studio` | static files served by edge (dev: Vite :5173) | | React SPA |
@@ -409,6 +409,28 @@ carries `X-Vibe-Nerfed: <model actually used>`. Throttled requests get
 `429 { error: { type: "rate_limited", reason, message } }` with `Retry-After`
 (throttles from `edge/egress.env`, see `control-plane/AGENTS.md`).
 
+`GET /search/web` on egress is web search for the build agent (vibe-dev's
+`web_search` tool, dev token) and for published apps (runtime token, through the SDK's
+`search.web`; `403 forbidden` when `SLOPTOWN_APP_SEARCH_ENABLED=false`). Brave is
+used under a DPA, with Brave's EU setup. Query: `q` (required, whitespace collapsed, ≤ 400 characters and 50 words),
+`count` 1–20 (default 8), `offset` 0–9, optional `search_lang` (`da`, `en`, `pt-br`…),
+`country` (`DK`, `ALL`…), `freshness` (`pd|pw|pm|py|YYYY-MM-DDtoYYYY-MM-DD`); anything
+else invalid → `400 invalid_query`. Sent to the Brave Search API
+(`SLOPTOWN_BRAVE_SEARCH_URL`, key `SLOPTOWN_BRAVE_API_KEY` in `X-Subscription-Token`,
+always `safesearch=strict`). Response
+`{ query, results: [{ title, url, description, age? }] }`: web results only, tags
+stripped, entities decoded, only `http(s)` URLs. No key → `503 search_unavailable`;
+throttled (`SEARCH_RPM_PER_PROJECT` / `SEARCH_RPM_GLOBAL`, plus the per-project rate
+and concurrency) → `429 rate_limited` with `reason` `search_rpm|search_rpm_global`
+(`Retry-After: 60`) or `search_upstream` (Brave's own 429); other upstream failures
+→ `502 upstream_error`. The agent's searches are not metered. An **app** search is
+checked against the app budget first (`429 budget_exceeded`, as for `/v1/*`) and,
+when it succeeds, recorded as a `usage_events` row in the app bucket with
+`model = "brave-search"`, `input_tokens = SEARCH_TOKENS_PER_CALL` (default 2000),
+`member_id` from `X-Vibe-User`; apps have their own minute window
+(`SEARCH_RPM_PER_APP`). The egress logs one line per search (project, token kind,
+status), never the query; uvicorn's access log has the query string stripped.
+
 Project tokens are stored as SHA-256 hex digests (`sloptown.tokens.hash_token`)
 in `projects.dev_token_hash` / `projects.runtime_token_hash`; the egress caches
 lookups for 30 s, so a rotated token stays valid for up to 30 s.
@@ -429,6 +451,7 @@ calls `/api/_vibe/*` (same origin, identity from edge headers):
 | GET | `/api/_vibe/members` | `{ version, members: [{ id, name, role, classes, avatarHue }] }` |
 | GET | `/api/_vibe/members/events` | SSE `members.changed { version }`, `ping` |
 | POST | `/api/_vibe/ai/chat` | `{ messages, model?, stream? }` → `{ text }` or SSE `delta {text}` / `done` / `error {message}`; 429 `{ error: "budget_exceeded", message, retryAt }` |
+| POST | `/api/_vibe/search` | (SDK ≥ 1.1) `{ query, count?, offset?, language?, country?, freshness? }` → `{ query, results: [{ title, url, description, age }] }` via egress `/search/web` with `X-Vibe-User`; logged-in users only (401 otherwise, also with `ai_route=False`); 429 `{ error: "budget_exceeded", message, retryAt }`; other failures `{ error: "search_failed", message }` with 400/403/429/503, else 502 |
 
 Not to be confused with `/_vibe/session` at the root of app/preview hosts (edge).
 

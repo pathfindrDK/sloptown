@@ -8,6 +8,22 @@ export type Member = User & { avatarHue: number };
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
+/** One web search hit (Brave, safe search on). `age` is the page's date when known. */
+export type SearchResult = { title: string; url: string; description: string; age: string | null };
+
+export type SearchOptions = {
+  /** 1–20, default 8. */
+  count?: number;
+  /** Result page 0–9. */
+  offset?: number;
+  /** Language of the results, e.g. "da" or "en". */
+  language?: string;
+  /** Country, e.g. "DK". */
+  country?: string;
+  /** pd | pw | pm | py (day/week/month/year) or "YYYY-MM-DDtoYYYY-MM-DD". */
+  freshness?: string;
+};
+
 export const ROLE_RANK: Record<Role, number> = { viewer: 1, editor: 2, owner: 3 };
 
 export function hasRole(user: User | null | undefined, minimum: Role): boolean {
@@ -20,6 +36,16 @@ export class BudgetExceededError extends Error {
     super(message);
     this.name = "BudgetExceededError";
     this.retryAt = retryAt ? new Date(retryAt) : null;
+  }
+}
+
+/** A search that failed for another reason than the budget (rate limit, service down). Danish message. */
+export class SearchError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "SearchError";
+    this.status = status;
   }
 }
 
@@ -121,5 +147,21 @@ export class VibeClient {
       }
     }
     return full;
+  }
+
+  /** Search the web through the platform. Costs the app's AI budget; the user must be logged in. */
+  async search(query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {
+    const res = await fetch(this.url("/search"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query, ...opts }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 429 && body.error === "budget_exceeded") {
+      throw new BudgetExceededError(body.message ?? "AI-budgettet er brugt op for denne uge.", body.retryAt ?? null);
+    }
+    if (!res.ok) throw new SearchError(body.message ?? `Søgningen fejlede (HTTP ${res.status}).`, res.status);
+    return (body.results ?? []).map((r: SearchResult) => ({ ...r, age: r.age ?? null }));
   }
 }

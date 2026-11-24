@@ -10,7 +10,12 @@ which OpenCode uses through @ai-sdk/openai), streaming or not. Behaviour:
   (`E2E-<WORD>-<x>`, e.g. `E2E-MARKER-1a2b`). Uses OpenCode's `write` tool when offered, else `bash`
   with a heredoc (OpenCode gives GPT models `apply_patch` instead of `write`),
   filling in whatever parameter names the tool's JSON schema declares.
+  If the message holds an `E2E-SEARCH-<x>` marker instead, it calls the agent's
+  `web_search` tool (vibe-dev's MCP server) with the marker as the query.
 - otherwise: finish the turn with a short Danish summary.
+
+It also plays the Brave Search API: GET /brave/res/v1/web/search returns one web
+result whose title is "Fundet: <q>" (the e2e stack points SLOPTOWN_BRAVE_SEARCH_URL here).
 
 Every response reports usage (prompt 100 / completion 20 tokens) so the
 egress metering can be checked. GET /requests returns what was received.
@@ -20,6 +25,7 @@ import json
 import re
 import sys
 import time
+from urllib.parse import parse_qs, urlparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 USAGE = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
@@ -49,7 +55,15 @@ def _write_call(tools: list[dict], messages: list[dict]) -> dict | None:
     if any(m.get("role") == "tool" for m in messages[last_user + 1 :]):
         return None
     by_name = {t.get("function", {}).get("name"): t["function"] for t in tools}
-    match = re.search(r"E2E-[A-Z]+-\w+", _text(messages[last_user].get("content")) if last_user >= 0 else "")
+    user_text = _text(messages[last_user].get("content")) if last_user >= 0 else ""
+    search = re.search(r"E2E-SEARCH-\w+", user_text)
+    if search:
+        name = next((n for n in by_name if n and n.endswith("search") and n != "websearch"), None)
+        if name is None:
+            return None
+        return {"id": f"call_{int(time.time() * 1000)}", "type": "function",
+                "function": {"name": name, "arguments": json.dumps({"query": search.group(0), "count": 3})}}
+    match = re.search(r"E2E-[A-Z]+-\w+", user_text)
     source = APP_TSX.format(marker=match.group(0) if match else "E2E-MARKER")
     if "write" in by_name:
         props = by_name["write"].get("parameters", {}).get("properties", {})
@@ -113,6 +127,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, SEEN)
         if self.path == "/health":
             return self._json(200, {"ok": True})
+        if self.path.startswith("/brave/res/v1/web/search"):
+            q = parse_qs(urlparse(self.path).query)
+            query = (q.get("q") or [""])[0]
+            SEEN.append({"path": "brave", "query": query, "key": self.headers.get("x-subscription-token", "")})
+            return self._json(200, {"type": "search", "web": {"results": [
+                {"title": f"Fundet: <strong>{query}</strong>", "url": "https://example.org/e2e",
+                 "description": "Et søgeresultat fra den falske Brave."}]}})
         self._json(404, {"error": "not found"})
 
     def do_POST(self):

@@ -218,3 +218,49 @@ async def test_optional_user_is_none_for_a_public_visitor(monkeypatch):
     member = Request({"type": "http", "headers": [
         (b"x-vibe-edge-secret", b"s3cret"), (b"x-vibe-user", b"m1"), (b"x-vibe-role", b"viewer"), (b"x-vibe-name", b"Ali")]})
     assert (await identity.optional_user(member)).id == "m1"
+
+
+@respx.mock
+async def test_search_web_through_egress():
+    from miira_vibe import SearchError, User, search
+    from miira_vibe.ai import BudgetExceeded
+
+    route = respx.get(f"{PLATFORM}/search/web").mock(return_value=httpx.Response(200, json={
+        "query": "klima", "results": [{"title": "T", "url": "https://x.dk/", "description": "D", "age": "2 days ago"},
+                                      {"title": "no url"}]}))
+    user = User(id="m1", name="Ali", role="viewer", classes=[])
+    hits = await search.web("klima", language="da", count=3, freshness="pw", user=user)
+    assert [h.to_dict() for h in hits] == [{"title": "T", "url": "https://x.dk/", "description": "D", "age": "2 days ago"}]
+    sent = route.calls.last.request
+    assert sent.headers["authorization"] == "Bearer tok" and sent.headers["x-vibe-user"] == "m1"
+    assert dict(sent.url.params) == {"q": "klima", "search_lang": "da", "count": "3", "freshness": "pw"}
+
+    route.mock(return_value=httpx.Response(429, json={"error": {"type": "budget_exceeded", "retry_at": "2026-12-01T00:00:00Z"}}))
+    with pytest.raises(BudgetExceeded) as exc:
+        await search.web("x")
+    assert exc.value.retry_at.year == 2026
+    route.mock(return_value=httpx.Response(429, json={"error": {"type": "rate_limited", "message": "For mange søgninger. Vent et minut."}}))
+    with pytest.raises(SearchError) as err:
+        await search.web("x")
+    assert err.value.status == 429 and err.value.message.startswith("For mange")
+
+
+@respx.mock
+def test_search_browser_route():
+    route = respx.get(f"{PLATFORM}/search/web")
+    route.mock(return_value=httpx.Response(200, json={"query": "q", "results": [{"title": "T", "url": "https://x.dk/", "description": "D"}]}))
+    c = TestClient(setup(FastAPI()))
+    r = c.post("/_vibe/search", headers=EDGE, json={"query": "  hvad  sker der ", "language": "da", "count": None})
+    assert r.status_code == 200
+    assert r.json() == {"query": "hvad sker der", "results": [{"title": "T", "url": "https://x.dk/", "description": "D", "age": None}]}
+    assert dict(route.calls.last.request.url.params) == {"q": "  hvad  sker der ", "search_lang": "da"}
+    assert c.post("/_vibe/search", headers=EDGE, json={"query": " "}).status_code == 400
+    route.mock(return_value=httpx.Response(429, json={"error": {"type": "budget_exceeded", "retry_at": None}}))
+    r = c.post("/_vibe/search", headers=EDGE, json={"query": "x"})
+    assert r.status_code == 429 and r.json()["error"] == "budget_exceeded"
+    route.mock(return_value=httpx.Response(502, json={"error": {"type": "upstream_error", "message": "Søgetjenesten svarede ikke."}}))
+    r = c.post("/_vibe/search", headers=EDGE, json={"query": "x"})
+    assert r.status_code == 502 and r.json() == {"error": "search_failed", "message": "Søgetjenesten svarede ikke."}
+    assert c.post("/_vibe/search", json={"query": "x"}).status_code == 401  # visitors can't search
+    # without the AI route the search route is still there
+    assert TestClient(setup(FastAPI(), ai_route=False)).post("/_vibe/search", headers=EDGE, json={"query": " "}).status_code == 400

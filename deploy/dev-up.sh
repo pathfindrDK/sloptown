@@ -159,6 +159,10 @@ CP_ENV=(
   -e SLOPTOWN_CONTROL_PLANE_URL=http://sloptown-cp:8000
   -e SLOPTOWN_OPENAI_API_KEY="${SLOPTOWN_OPENAI_API_KEY:-}"
   -e SLOPTOWN_OPENAI_BASE_URL="${SLOPTOWN_OPENAI_BASE_URL:-https://api.openai.com/v1}"
+  # Web search for the build agent and apps (egress /search/web). Empty key = off.
+  -e SLOPTOWN_BRAVE_API_KEY="${SLOPTOWN_BRAVE_API_KEY:-}"
+  -e SLOPTOWN_BRAVE_SEARCH_URL="${SLOPTOWN_BRAVE_SEARCH_URL:-https://api.search.brave.com/res/v1/web/search}"
+  -e SLOPTOWN_APP_SEARCH_ENABLED="${SLOPTOWN_APP_SEARCH_ENABLED:-true}"
   -e SLOPTOWN_EGRESS_ENV_FILE=/etc/sloptown/egress.env
 )
 # After a domain move (2026-11: miira-apps.dk -> apps.miira.dk) the old public domain

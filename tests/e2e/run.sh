@@ -29,6 +29,7 @@ podman run -d --name sloptown-fake-openai --network sloptown --label sloptown=1 
 # Own database volume, so the interactive dev stack's data never affects the test.
 SLOPTOWN_DEV_DB_VOLUME=sloptown-e2e-db \
 SLOPTOWN_OPENAI_BASE_URL=http://sloptown-fake-openai:8300/v1 SLOPTOWN_OPENAI_API_KEY=sk-e2e-fake \
+SLOPTOWN_BRAVE_SEARCH_URL=http://sloptown-fake-openai:8300/brave/res/v1/web/search SLOPTOWN_BRAVE_API_KEY=brave-e2e-fake \
   deploy/dev-up.sh "${BUILD_ARGS[@]}"
 
 set +e

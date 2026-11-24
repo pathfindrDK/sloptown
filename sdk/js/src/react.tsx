@@ -7,6 +7,8 @@ import {
   type ChatMessage,
   type Member,
   type Role,
+  type SearchOptions,
+  type SearchResult,
   type User,
 } from "./client.js";
 import { announceReady, installErrorBridge } from "./errors.js";
@@ -129,6 +131,40 @@ export function useAi() {
   );
 
   return { chat, stream, loading, error, budget };
+}
+
+/**
+ * Web search through the platform (Brave, safe search on). Each search costs the app's
+ * AI budget. `results` holds the last search's hits; `search()` also returns them
+ * (null on failure, with `error` or `budget` set).
+ */
+export function useSearch() {
+  const { client } = useVibe();
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [budget, setBudget] = useState<{ retryAt: Date | null } | null>(null);
+
+  const search = useCallback(
+    async (query: string, opts?: SearchOptions): Promise<SearchResult[] | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const hits = await client.search(query, opts);
+        setResults(hits);
+        return hits;
+      } catch (e) {
+        if (e instanceof BudgetExceededError) setBudget({ retryAt: e.retryAt });
+        else setError(e as Error);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client],
+  );
+
+  return { search, results, loading, error, budget };
 }
 
 /** Theme helper. Import the CSS once with `import "@miira/vibe/theme.css"`. */

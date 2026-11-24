@@ -90,3 +90,8 @@ the read-only locked files and the egress allowlist:
 ```
 
 `ask` must not be used: there is no human to answer prompts in `opencode serve`.
+
+The agent's only way to the web is its `web_search` tool (MCP server
+`vibe-search-mcp`, through the egress's `/search/web`, Brave): titles, links and
+snippets, no page fetches. Rule 2 in `AGENTS.md` tells it so. Apps search through the
+SDK instead (`search.web` / `useSearch`, metered on the app budget).

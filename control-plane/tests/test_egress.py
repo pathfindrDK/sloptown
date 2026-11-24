@@ -291,3 +291,181 @@ async def test_connect_proxy(setup):
     finally:
         proxy.close()
         target.close()
+
+
+# --- web search (/search/web -> Brave) ------------------------------------------------
+
+BRAVE = "https://brave.test/res/v1/web/search"
+BRAVE_REPLY = {
+    "type": "search",
+    "web": {
+        "results": [
+            {"title": "<strong>Brøker</strong> &amp; procent", "url": "https://emu.dk/brok",
+             "description": "Om <strong>brøker</strong> i 5. klasse", "age": "3. mar. 2025", "profile": {"x": 1}},
+            {"title": "no url"},
+            {"title": "js", "url": "javascript:alert(1)", "description": "x"},
+            {"title": "Plain", "url": "http://example.com/", "description": None},
+        ]
+    },
+    "news": {"results": [{"url": "https://ignored.test"}]},
+}
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def search(setup):
+    from sloptown.config import get_settings
+
+    s = get_settings()
+    saved = (s.brave_api_key, s.brave_search_url)
+    s.brave_api_key, s.brave_search_url = "brave-key", BRAVE
+    egress.configure(EgressConfig())
+    yield setup
+    s.brave_api_key, s.brave_search_url = saved
+    egress.configure(EgressConfig())
+
+
+@respx.mock
+async def test_search_injects_key_and_trims_results(search):
+    route = respx.get(BRAVE).respond(json=BRAVE_REPLY)
+    r = await search.get("/search/web", params={"q": "  brøker   5. klasse ", "count": "5", "search_lang": "da", "country": "DK"},
+                         headers=auth())
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "query": "brøker 5. klasse",
+        "results": [
+            {"title": "Brøker & procent", "url": "https://emu.dk/brok", "description": "Om brøker i 5. klasse", "age": "3. mar. 2025"},
+            {"title": "Plain", "url": "http://example.com/", "description": ""},
+        ],
+    }
+    sent = route.calls.last.request
+    assert sent.headers["x-subscription-token"] == "brave-key"
+    assert "authorization" not in sent.headers  # the project token never leaves
+    assert dict(sent.url.params) == {"q": "brøker 5. klasse", "count": "5", "offset": "0", "safesearch": "strict",
+                                     "text_decorations": "false", "search_lang": "da", "country": "DK"}
+
+
+async def test_search_needs_a_project_token(search):
+    assert (await search.get("/search/web", params={"q": "x"})).status_code == 401
+    assert (await search.get("/search/web", params={"q": "x"}, headers=auth("nope"))).status_code == 401
+
+
+@respx.mock
+async def test_agent_search_is_not_metered(search, db):
+    respx.get(BRAVE).respond(json=BRAVE_REPLY)
+    assert (await search.get("/search/web", params={"q": "x"}, headers=auth())).status_code == 200
+    assert await usage_rows(db) == []
+
+
+@respx.mock
+async def test_app_search_is_metered_on_the_app_budget(search, db):
+    egress.configure(EgressConfig(search_tokens_per_call=1500))
+    respx.get(BRAVE).respond(json=BRAVE_REPLY)
+    r = await search.get("/search/web", params={"q": "nyheder om klima"}, headers={**auth("run-tok"), "X-Vibe-User": "member-7"})
+    assert r.status_code == 200, r.text
+    assert len(r.json()["results"]) == 2
+    [ev] = await usage_rows(db)
+    assert (ev.bucket, ev.project_id, ev.member_id, ev.user_sub) == ("app", "p1", "member-7", None)
+    assert (ev.model, ev.input_tokens, ev.output_tokens, ev.nerfed) == ("brave-search", 1500, 0, False)
+
+
+@respx.mock
+async def test_app_search_blocked_by_app_budget(search, db):
+    await enable_budgets(db, app_hard=1000)
+    await db.commit()
+    route = respx.get(BRAVE).respond(json=BRAVE_REPLY)
+    assert (await search.get("/search/web", params={"q": "x"}, headers=auth("run-tok"))).status_code == 200  # 2000 > 1000
+    r = await search.get("/search/web", params={"q": "x"}, headers=auth("run-tok"))
+    assert r.status_code == 429
+    err = r.json()["error"]
+    assert err["type"] == "budget_exceeded" and err["bucket"] == "app" and err["retry_at"]
+    assert route.call_count == 1
+    # the build agent's searches don't depend on the app budget
+    assert (await search.get("/search/web", params={"q": "x"}, headers=auth())).status_code == 200
+
+
+@respx.mock
+async def test_app_search_has_its_own_minute_limit(search):
+    egress.configure(EgressConfig(search_rpm_per_project=1, search_rpm_per_app=2, search_rpm_global=10))
+    respx.get(BRAVE).respond(json={"web": {"results": []}})
+    app = [(await search.get("/search/web", params={"q": "x"}, headers=auth("run-tok"))).status_code for _ in range(3)]
+    agent = [(await search.get("/search/web", params={"q": "x"}, headers=auth())).status_code for _ in range(2)]
+    assert app == [200, 200, 429] and agent == [200, 429]
+
+
+async def test_app_search_can_be_switched_off(search):
+    from sloptown.config import get_settings
+
+    get_settings().app_search_enabled = False
+    try:
+        r = await search.get("/search/web", params={"q": "x"}, headers=auth("run-tok"))
+        assert r.status_code == 403 and r.json()["error"]["type"] == "forbidden"
+    finally:
+        get_settings().app_search_enabled = True
+
+
+async def test_search_validates_parameters(search):
+    bad = [{}, {"q": "   "}, {"q": "x" * 401}, {"q": " ".join(["o"] * 51)}, {"q": "x", "count": "21"},
+           {"q": "x", "count": "0"}, {"q": "x", "offset": "10"}, {"q": "x", "count": "-1"},
+           {"q": "x", "search_lang": "da&x=1"}, {"q": "x", "country": "dk"}, {"q": "x", "freshness": "yesterday"}]
+    for params in bad:
+        r = await search.get("/search/web", params=params, headers=auth())
+        assert r.status_code == 400, params
+        assert r.json()["error"]["type"] == "invalid_query"
+
+
+async def test_search_off_without_key(setup):
+    r = await setup.get("/search/web", params={"q": "x"}, headers=auth())
+    assert r.status_code == 503
+    assert r.json()["error"]["type"] == "search_unavailable"
+
+
+@respx.mock
+async def test_search_throttles_per_project(search):
+    egress.configure(EgressConfig(search_rpm_per_project=2, search_rpm_global=10))
+    respx.get(BRAVE).respond(json={"web": {"results": []}})
+    codes = [(await search.get("/search/web", params={"q": "x"}, headers=auth())).status_code for _ in range(3)]
+    assert codes == [200, 200, 429]
+    r = await search.get("/search/web", params={"q": "x"}, headers=auth())
+    assert r.json()["error"]["reason"] == "search_rpm"
+    assert r.headers["retry-after"] == "60"
+
+
+@respx.mock
+async def test_search_upstream_errors(search):
+    respx.get(BRAVE).mock(side_effect=[
+        httpx.Response(429, json={}),
+        httpx.Response(401, json={"error": "bad token"}),
+        httpx.Response(200, text="not json"),
+        httpx.ConnectError("down"),
+    ])
+    got = []
+    for _ in range(4):
+        r = await search.get("/search/web", params={"q": "x"}, headers=auth())
+        got.append((r.status_code, r.json()["error"]["type"]))
+    assert got == [(429, "rate_limited"), (502, "upstream_error"), (502, "upstream_error"), (502, "upstream_error")]
+    assert egress.state.limiter._open["p1"] == 0  # every slot was released
+
+
+async def test_search_query_never_reaches_the_access_log():
+    import logging
+
+    rec = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
+                            ("10.0.0.2:1", "GET", "/search/web?q=elevens+navn&count=3", "1.1", 200), None)
+    assert egress.RedactSearchQuery().filter(rec)
+    assert rec.getMessage() == '10.0.0.2:1 - "GET /search/web HTTP/1.1" 200'
+    other = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
+                              ("10.0.0.2:1", "GET", "/platform/members?x=1", "1.1", 200), None)
+    egress.RedactSearchQuery().filter(other)
+    assert "x=1" in other.getMessage()
+    assert any(isinstance(f, egress.RedactSearchQuery) for f in logging.getLogger("uvicorn.access").filters)
+
+
+async def test_search_limiter_global():
+    lim = Limiter(EgressConfig(search_rpm_per_project=5, search_rpm_global=2))
+    lim.check_search("p1")
+    lim.check_search("p2")
+    try:
+        lim.check_search("p3")
+        raise AssertionError("expected Throttled")
+    except Exception as exc:
+        assert exc.reason == "search_rpm_global"

@@ -5,6 +5,7 @@ The app's FastAPI is served under /api, so the browser sees:
   GET  /api/_vibe/members          {version, members}
   GET  /api/_vibe/members/events   SSE: `members.changed {version}`, `ping`
   POST /api/_vibe/ai/chat          {messages, model?, stream?} -> {text} or SSE `delta`/`done`/`error`
+  POST /api/_vibe/search           {query, count?, offset?, language?, country?, freshness?} -> {query, results}
 """
 
 import asyncio
@@ -17,7 +18,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from . import ai, members
+from . import ai, members, search
 from .identity import User, current_user
 
 PING_SECONDS = 15
@@ -33,6 +34,11 @@ def _budget_response(e: ai.BudgetExceeded) -> JSONResponse:
         {"error": "budget_exceeded", "message": e.message, "retryAt": e.retry_at.isoformat() if e.retry_at else None},
         status_code=429,
     )
+
+
+def _search_error(e: search.SearchError) -> JSONResponse:
+    status = e.status if e.status in (400, 403, 429, 503) else 502
+    return JSONResponse({"error": "search_failed", "message": e.message}, status_code=status)
 
 
 def build_router(ai_route: bool = True) -> APIRouter:
@@ -100,6 +106,20 @@ def build_router(ai_route: bool = True) -> APIRouter:
                     yield _sse("error", {"message": str(e)})
 
             return StreamingResponse(gen(), media_type="text/event-stream", headers=SSE_HEADERS)
+
+    @router.post("/search", response_model=None)
+    async def web_search(body: dict[str, Any] = Body(...), user: User = Depends(current_user)):
+        query = body.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return JSONResponse({"error": "search_failed", "message": "Søgningen er tom."}, status_code=400)
+        opts = {k: body.get(k) for k in ("count", "offset", "language", "country", "freshness") if body.get(k) not in (None, "")}
+        try:
+            hits = await search.web(query, user=user, **opts)
+        except ai.BudgetExceeded as e:
+            return _budget_response(e)
+        except search.SearchError as e:
+            return _search_error(e)
+        return {"query": " ".join(query.split()), "results": [h.to_dict() for h in hits]}
 
     return router
 

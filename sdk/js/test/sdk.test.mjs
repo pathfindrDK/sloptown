@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { BudgetExceededError, VibeClient, announceReady, hasRole, installErrorBridge } from "../dist/index.js";
+import { BudgetExceededError, SearchError, VERSION, VibeClient, announceReady, hasRole, installErrorBridge, useSearch } from "../dist/index.js";
 
 function mockFetch(handler) {
   const calls = [];
@@ -101,4 +101,24 @@ test("theme.css defines every token it uses, including the names apps rely on", 
     assert.ok(defined.has(name), name);
   }
   assert.doesNotMatch(css, /PLACEHOLDER/);
+});
+
+test("search posts to /api/_vibe/search and returns hits", async () => {
+  const calls = mockFetch(() => json(200, { query: "klima", results: [{ title: "T", url: "https://x.dk/", description: "D" }] }));
+  const hits = await new VibeClient("/api").search("klima", { language: "da", freshness: "pw" });
+  assert.deepEqual(hits, [{ title: "T", url: "https://x.dk/", description: "D", age: null }]);
+  assert.equal(calls[0].url, "/api/_vibe/search");
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { query: "klima", language: "da", freshness: "pw" });
+  assert.equal(typeof useSearch, "function");
+  assert.equal(VERSION, "1.1.0");
+});
+
+test("search errors: budget vs other failures", async () => {
+  mockFetch(() => json(429, { error: "budget_exceeded", message: "Brugt op", retryAt: null }));
+  await assert.rejects(new VibeClient().search("x"), (e) => e instanceof BudgetExceededError);
+  mockFetch(() => json(429, { error: "search_failed", message: "For mange søgninger. Vent et minut." }));
+  await assert.rejects(new VibeClient().search("x"), (e) => e instanceof SearchError && e.status === 429 && e.message.startsWith("For mange"));
+  mockFetch(() => new Response("boom", { status: 502 }));
+  await assert.rejects(new VibeClient().search("x"), (e) => e instanceof SearchError && e.status === 502);
 });

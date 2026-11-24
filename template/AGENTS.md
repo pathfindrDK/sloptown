@@ -27,7 +27,11 @@ by itself when Python files change.
    or user tables of your own. Never read `X-Vibe-*` headers yourself.
 2. **No external network.** Do not call external URLs or APIs from the backend
    or the frontend, and do not load scripts, fonts or images from CDNs. Requests
-   to other hosts are blocked. AI goes through `ai.chat` / `useAi`.
+   to other hosts are blocked. AI goes through `ai.chat` / `useAi`; when the app
+   needs current information from the web, use `search.web` / `useSearch` (below),
+   never a search service of your own. You yourself can look things up with the
+   `web_search` tool (facts, curriculum, library docs). Both return titles, links
+   and short snippets; nobody can open the pages.
 3. **No new packages.** Do not run `npm install`, `pip install`, `uv add` or edit
    `web/package.json`, `web/package-lock.json`, `api/requirements.lock` or
    `web/vite.config.ts` (they are locked). Available: React 18, lucide-react
@@ -111,8 +115,8 @@ but only a small one (under 1 MB): a large image is sent with every later reques
 
 ```python
 from fastapi import Depends, FastAPI
-from miira_vibe import (BudgetExceeded, User, ai, current_user, db, members,
-                        on_members_changed, require_role, setup)
+from miira_vibe import (BudgetExceeded, SearchError, User, ai, current_user, db, members,
+                        on_members_changed, require_role, search, setup)
 
 app = setup(FastAPI())          # required: mounts /_vibe/* routes for the frontend SDK
 ```
@@ -129,7 +133,9 @@ app = setup(FastAPI())          # required: mounts /_vibe/* routes for the front
 | `@on_members_changed` | Decorator for `async def f(version)`; runs when sharing changes in Miira |
 | `await ai.chat(messages_or_text, user=user, model=None)` | Returns the reply text. `messages` like OpenAI: `[{"role": "system"\|"user"\|"assistant", "content": "..."}]` |
 | `async for piece in ai.stream(...)` | Streams text pieces |
-| `BudgetExceeded` | Raised by `ai.*` when the app's weekly AI budget is used up; `.retry_at` (datetime), `.message` (Danish) |
+| `await search.web(query, user=user, count=8, language="da", country="DK", freshness="pw")` | Web search (safe search on) → `[SearchResult(title, url, description, age)]`; `age` is the page's date or `None`. All but `query` optional; `freshness` `pd`/`pw`/`pm`/`py` (day/week/month/year). Each search costs the app's AI budget like a small AI call, so search on the server when the user asks, never on a timer, and cache results that many users share |
+| `BudgetExceeded` | Raised by `ai.*` and `search.web` when the app's weekly AI budget is used up; `.retry_at` (datetime), `.message` (Danish) |
+| `SearchError` | Raised by `search.web` for anything else (rate limit, service down); `.message` (Danish) |
 | `with db.session() as conn:` | `sqlite3` connection to `/data/app.sqlite`; rows behave like dicts (`dict(row)`); commits and closes |
 
 `User.id` and `Member.id` are the same stable id for a person in this app.
@@ -149,12 +155,29 @@ four structured suggestions took ~40–57 s at the default effort and ~11–14 s
   "prøv igen" to the user. A failed answer costs the user the whole wait again.
 - Free text the user reads as it arrives: use `ai.stream` / `useAi().stream`. Structured JSON you
   validate first can't be shown half done, so show what is happening instead of a bare spinner.
+
+### Current information from the web
+
+The model's knowledge stops at its training date. For anything newer (news, dates of
+events, prices, current rules), search first and give the hits to the model:
+
+```python
+hits = await search.web(question, language="da", freshness="pm", user=user)
+sources = "\n".join(f"[{i}] {h.title} ({h.url}): {h.description}" for i, h in enumerate(hits, 1))
+answer = await ai.chat([
+    {"role": "system", "content": "Svar kort på dansk ud fra kilderne. Henvis med [nummer]."},
+    {"role": "user", "content": f"{question}\n\nKilder:\n{sources}"},
+], user=user, reasoning_effort="low")
+```
+
+Always show the sources' titles and links next to the answer. Search text leaves the
+platform: never put students' names or other personal data in a query.
 <!-- /shared: sdk-backend -->
 
 ## SDK reference — frontend (`@miira/vibe`)
 
 ```tsx
-import { VibeProvider, useCurrentUser, useRole, RequireRole, useMembers, useAi, miiraTheme } from "@miira/vibe";
+import { VibeProvider, useCurrentUser, useRole, RequireRole, useMembers, useAi, useSearch, miiraTheme } from "@miira/vibe";
 ```
 
 | API | Description |
@@ -165,6 +188,7 @@ import { VibeProvider, useCurrentUser, useRole, RequireRole, useMembers, useAi, 
 | `<RequireRole role="editor" fallback={...}>` | Renders children only for that role or higher |
 | `useMembers()` | `{ members, loading, error, refresh }`; updates live when sharing changes |
 | `useAi()` | `{ chat(messages \| text), stream(messages \| text, onPiece), loading, error, budget }`; `budget` is `{ retryAt }` when this week's AI budget is used up – show a friendly Danish message |
+| `useSearch()` | `{ search(query, { count, language, country, freshness }), results, loading, error, budget }`; `results` are `{ title, url, description, age }`; needs a logged-in user; costs AI budget like `useAi` |
 | `miiraTheme.apply("dark" \| "light")` | Switch theme |
 
 Call your own backend with `fetch("/api/...")` (see `web/src/api.ts`).

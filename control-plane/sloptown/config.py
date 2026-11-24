@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     control_plane_url: str = "http://sloptown-cp:8000"  # used by egress
+    # Web search (egress GET /search/web -> Brave Search API, under a DPA with Brave's
+    # EU setup): the build agent's web_search tool and, when app_search_enabled, published
+    # apps through the SDK (metered on the app budget). Empty key = search is off.
+    brave_api_key: str = ""
+    app_search_enabled: bool = True
+    brave_search_url: str = "https://api.search.brave.com/res/v1/web/search"
 
     # Admin API
     admin_allowed_ips: list[str] = []  # also enforced at the edge; empty = edge only

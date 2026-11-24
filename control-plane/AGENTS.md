@@ -190,10 +190,10 @@ plane must run as container `sloptown-cp` on the same Podman so it can join proj
 |---|---|
 | `sloptown/budgets.py` | Weekly budget engine: window, settings (seeded off), `budget_status`, `decide`, `check_build_allowed`, `record_usage`, `reset`, `grant`, `limited_items` |
 | `sloptown/admin.py` | `router` for `/admin/v1/*` (Miira system-admin backend only). JWT auth dependency `admin_claims` |
-| `sloptown/egress/app.py` | Egress ASGI app on :8200: `/v1/*` inference proxy, `/platform/*` relay, `/health`. Starts the CONNECT proxy in its lifespan |
+| `sloptown/egress/app.py` | Egress ASGI app on :8200: `/v1/*` inference proxy, `/platform/*` relay, `/search/web` (web search via Brave for the build agent, free, and published apps, metered on the app budget as `brave-search`; `search_results` trims Brave's reply), `/health`. Starts the CONNECT proxy in its lifespan |
 | `sloptown/egress/connect.py` | Raw asyncio CONNECT + absolute-form HTTP forward proxy on `EGRESS_PROXY_PORT` (8201), allowlist only |
 | `sloptown/egress/auth.py` | Project token -> `Caller(project_id, kind)`; kind `dev` = build bucket, `runtime` = app bucket |
-| `sloptown/egress/limits.py` | In-memory token bucket (RPS), sliding window (inference RPM), concurrency counter |
+| `sloptown/egress/limits.py` | In-memory token bucket (RPS), sliding windows (inference, per-host and search RPM), concurrency counter |
 | `sloptown/egress/config.py` | `EgressConfig.load()` from `edge/egress.env` + env overrides; `host_allowed` |
 | `../edge/egress.env` | Throttling defaults (commented) |
 
@@ -250,7 +250,10 @@ streams exempt), `INFERENCE_RPM_PER_PROJECT` + `INFERENCE_RPM_GLOBAL` (sliding 6
 `EGRESS_HOST_RPM_PER_PROJECT` + `EGRESS_HOST_RPM_GLOBAL` (requests or tunnels to one external
 host per minute, per Vibe and across all; 429 with `Retry-After: 60`), `EGRESS_MAX_BODY_BYTES`
 (413 above), `EGRESS_TIMEOUT_SECONDS` (connect and idle-read timeout, not total),
-`EGRESS_PROXY_PORT` (0 disables the CONNECT server). The file is found at
+`EGRESS_PROXY_PORT` (0 disables the CONNECT server), `SEARCH_RPM_PER_PROJECT` +
+`SEARCH_RPM_GLOBAL` (web searches per minute by the agent, and by all together; keep the global
+one within the Brave plan), `SEARCH_RPM_PER_APP` (a published app's own window),
+`SEARCH_TOKENS_PER_CALL` (what one app search costs on the app budget). The file is found at
 `SLOPTOWN_EGRESS_ENV_FILE` or `<repo>/edge/egress.env`; real environment variables override it.
 `GET /admin/v1/egress-settings` returns the loaded values (read-only for now).
 
@@ -279,4 +282,12 @@ accept `user+build` or `project+app`.
   subject, bucket and window floor (week start or last reset, so a reset re-arms them),
   and mails `watcherEmails` after commit via `SLOPTOWN_SMTP_*` (unset host = log only).
   A failing check never loses the usage row (separate transaction).
+- Web search (`/search/web`) needs `SLOPTOWN_BRAVE_API_KEY` in the egress's environment
+  (empty = `503 search_unavailable`); `SLOPTOWN_BRAVE_SEARCH_URL` points it elsewhere (the
+  e2e stack uses `fake_openai.py`'s fake Brave). Apps may search too
+  (`SLOPTOWN_APP_SEARCH_ENABLED`, default true; Brave is under a DPA, EU setup): each app
+  search is checked against and charged to the app budget (`SEARCH_TOKENS_PER_CALL`), so
+  existing warnings, block, reset and grant cover it. The agent's searches are free.
+  The query is the teacher's work: `RedactSearchQuery` strips it from uvicorn's access
+  log, and the route logs only project id and status. Keep it that way.
 - In a container, set `SLOPTOWN_EGRESS_ENV_FILE` (the default path assumes the repo layout).
